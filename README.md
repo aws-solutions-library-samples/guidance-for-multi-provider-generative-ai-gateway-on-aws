@@ -83,6 +83,36 @@ If it's easier for you, you can deploy from an AWS Cloud9 environment using the 
 8. After the deployment is done, you can visit the UI by going to the url at the stack output `LitellmCdkStack.ServiceURL`, which is the `DOMAIN_NAME` you configured earlier.
 9. The master api key is stored in AWS Secrets Manager in the `LiteLLMSecret` secret. This api key can be used to call the LiteLLM API, and is also the default password for the LiteLLM UI
 
+#### Usage Instructions
+
+Using LiteLLM is practically Identical to using OpenAI, you just need to replace the baseurl and the api key with your LiteLLM ones
+
+```
+import openai # openai v1.0.0+
+client = openai.OpenAI(api_key="anything",base_url="https://<Your-Proxy-Endpoint>") # set proxy to base_url
+response = client.chat.completions.create(model="anthropic.claude-3-5-sonnet-20240620-v1:0", messages = [
+    {
+        "role": "user",
+        "content": "this is a test request, write a short poem"
+    }
+])
+
+print(response)
+```
+
+#### Compare Models
+
+If you would like to compare different models, you can use the `scripts/benchmark.py` script. To do so, do the following:
+
+1. `cd scripts`
+2. `python3 -m venv myenv`
+3. `source myenv/bin/activate`
+4. `pip3 install -r requirements.txt`
+5. `cp .env.template .env`
+6. Update the `.env` file with your litellm base url, and a valid litellm api key. Also change the list of model ids you would like to benchmark if needed.
+7. `benchmark.py` has a list of questions to use for the benchmark, at the top of the file. You can edit this list to try out different questions.
+8. run `python3 benchmark.py`
+9. The script will output the response from each model for each question, as well as the response time and the cost
 
 #### Config.yaml (all values pre-populated in Config.yaml, what they do, and what the default values are.)
 
@@ -409,22 +439,7 @@ So if you have traffic you want prioritized over all others, set those calls to 
 
 There is currently no way to set this priority on the server side. So you must handle this on the client side for now.
 
-#### Usage Instructions
 
-Using LiteLLM is practically Identical to using OpenAI, you just need to replace the baseurl and the api key with your LiteLLM ones
-
-```
-import openai # openai v1.0.0+
-client = openai.OpenAI(api_key="anything",base_url="https://<Your-Proxy-Endpoint>") # set proxy to base_url
-response = client.chat.completions.create(model="anthropic.claude-3-5-sonnet-20240620-v1:0", messages = [
-    {
-        "role": "user",
-        "content": "this is a test request, write a short poem"
-    }
-])
-
-print(response)
-```
 
 #### Bedrock interface
 

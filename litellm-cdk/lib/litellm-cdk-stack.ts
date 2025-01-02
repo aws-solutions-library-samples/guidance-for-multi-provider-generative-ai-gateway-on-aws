@@ -17,6 +17,7 @@ import * as path from 'path';
 import * as cr from 'aws-cdk-lib/custom-resources';
 import * as elasticache from 'aws-cdk-lib/aws-elasticache';
 import { Tag, Aspects } from 'aws-cdk-lib';
+import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 
 interface LiteLLMStackProps extends cdk.StackProps {
   domainName: string;
@@ -444,9 +445,45 @@ export class LitellmCdkStack extends cdk.Stack {
     new route53.ARecord(this, 'DNSRecord', {
       zone: hostedZone,
       target: route53.RecordTarget.fromAlias(
-        new targets.LoadBalancerTarget(fargateService.loadBalancer)
+        new targets.LoadBalancerTarget(fargateService.loadBalancers[0])
       ),
       recordName: props.domainName,  // This will be the full domain name
+    });
+
+    // Create a WAF Web ACL
+    const webAcl = new wafv2.CfnWebACL(this, 'LiteLLMWAF', {
+      defaultAction: { allow: {} },
+      scope: 'REGIONAL', // Must be REGIONAL for ALB
+      visibilityConfig: {
+        cloudWatchMetricsEnabled: true,
+        metricName: 'LiteLLMWebAcl',
+        sampledRequestsEnabled: true,
+      },
+      rules: [
+        {
+          name: 'AWS-AWSManagedRulesCommonRuleSet',
+          priority: 1,
+          overrideAction: { none: {} },
+          statement: {
+            managedRuleGroupStatement: {
+              name: 'AWSManagedRulesCommonRuleSet',
+              vendorName: 'AWS',
+            },
+          },
+          visibilityConfig: {
+            cloudWatchMetricsEnabled: true,
+            metricName: 'LiteLLMCommonRuleSet',
+            sampledRequestsEnabled: true,
+          },
+        },
+        // You can add more rules or managed rule groups here
+      ],
+    });
+
+    // Associate the WAF Web ACL with your existing ALB
+    new wafv2.CfnWebACLAssociation(this, 'LiteLLMWAFALBAssociation', {
+      resourceArn: fargateService.loadBalancers[0].loadBalancerArn,
+      webAclArn: webAcl.attrArn,
     });
 
     dbSecurityGroup.addIngressRule(

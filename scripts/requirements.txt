@@ -1,0 +1,4 @@
+litellm
+tabulate
+termcolor
+python-dotenv

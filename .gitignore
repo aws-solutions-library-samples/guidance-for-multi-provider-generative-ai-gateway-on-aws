@@ -19,3 +19,5 @@ litellm-source
 litellm-cdk/resources.txt
 
 **/outputs.json
+
+**/myenv/
