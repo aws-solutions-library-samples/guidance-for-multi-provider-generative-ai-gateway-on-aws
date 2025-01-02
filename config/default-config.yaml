@@ -31,6 +31,11 @@ model_list:
   - model_name: anthropic.claude-3-5-sonnet-20241022-v2:0
     litellm_params:
       model: bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0
+
+  - model_name: anthropic.claude-3-5-haiku-20241022-v1:0
+    litellm_params:
+      model: bedrock/anthropic.claude-3-5-haiku-20241022-v1:0
+
   - model_name: anthropic.claude-3-sonnet-20240229-v1:0
     litellm_params:
       model: bedrock/anthropic.claude-3-sonnet-20240229-v1:0
@@ -62,6 +67,34 @@ model_list:
   - model_name: meta.llama3-8b-instruct-v1:0
     litellm_params:
       model: bedrock/meta.llama3-8b-instruct-v1:0
+
+  - model_name: amazon.titan-text-premier-v1
+    litellm_params:
+      model: bedrock/amazon.titan-text-premier-v1:0
+
+  - model_name: amazon.titan-text-express-v1
+    litellm_params:
+      model: bedrock/amazon.titan-text-express-v1
+
+  - model_name: amazon.nova-pro-v1
+    litellm_params:
+      model: bedrock/amazon.nova-pro-v1:0
+
+  - model_name: amazon.nova-lite-v1
+    litellm_params:
+      model: bedrock/amazon.nova-lite-v1:0
+
+  - model_name: amazon.nova-micro-v1
+    litellm_params:
+      model: bedrock/amazon.nova-micro-v1:0
+
+  - model_name: mistral.mistral-small-2402-v1
+    litellm_params:
+      model: bedrock/mistral.mistral-small-2402-v1:0
+
+  - model_name: mistral.mistral-large-2402-v1
+    litellm_params:
+      model: bedrock/mistral.mistral-large-2402-v1:0
 
   - model_name: amazon.titan-embed-text-v2:0
     litellm_params:
@@ -217,10 +250,6 @@ model_list:
   - model_name: claude-3-opus-20240229
     litellm_params:
       model: anthropic/claude-3-opus-20240229
-
-  - model_name: claude-3-5-sonnet-20240620
-    litellm_params:
-      model: anthropic/claude-3-5-sonnet-20240620
 
   - model_name: claude-3-sonnet-20240229
     litellm_params:
