@@ -16,6 +16,7 @@ import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as path from 'path';
 import * as cr from 'aws-cdk-lib/custom-resources';
 import * as elasticache from 'aws-cdk-lib/aws-elasticache';
+import { Tag, Aspects } from 'aws-cdk-lib';
 
 interface LiteLLMStackProps extends cdk.StackProps {
   domainName: string;
@@ -51,6 +52,8 @@ interface LiteLLMStackProps extends cdk.StackProps {
 export class LitellmCdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: LiteLLMStackProps) {
     super(scope, id, props);
+
+    Aspects.of(this).add(new Tag('stack-id', this.stackName));
 
     const configBucket = new s3.Bucket(this, 'LiteLLMConfigBucket', {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
