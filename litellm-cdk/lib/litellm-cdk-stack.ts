@@ -120,8 +120,10 @@ export class LitellmCdkStack extends cdk.Stack {
       securityGroups: [dbSecurityGroup],
       credentials: rds.Credentials.fromSecret(databaseSecret),
       databaseName: 'litellm',
+      storageType: rds.StorageType.GP3,
+      storageEncrypted: true,
     });
-
+    
     const databaseMiddleware = new rds.DatabaseInstance(this, 'DatabaseMiddleware', {
       engine: rds.DatabaseInstanceEngine.postgres({
         version: rds.PostgresEngineVersion.VER_15,
@@ -133,7 +135,9 @@ export class LitellmCdkStack extends cdk.Stack {
       },
       securityGroups: [dbSecurityGroup],
       credentials: rds.Credentials.fromSecret(databaseMiddlewareSecret),
-      databaseName: 'middleware',
+      databaseName: 'middleware',    
+      storageType: rds.StorageType.GP3,
+      storageEncrypted: true,
     });
 
     const redisSecurityGroup = new ec2.SecurityGroup(this, 'RedisSecurityGroup', {
