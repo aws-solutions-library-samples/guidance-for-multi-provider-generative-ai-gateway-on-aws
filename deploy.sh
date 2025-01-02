@@ -124,6 +124,12 @@ if [ $? -eq 0 ]; then
         echo "Error: yq is not installed. Please install it first."
         exit 1
     fi
+
+    # Preliminary check to ensure config/config.yaml is valid YAML
+    if ! yq e '.' "$CONFIG_PATH" >/dev/null 2>&1; then
+        echo "Error: config/config.yaml is not valid YAML."
+        exit 1
+    fi
     
     # Check if s3_callback_params section exists and is not commented out
     if yq e '.litellm_settings.s3_callback_params' "$CONFIG_PATH" | grep -q "^[^#]"; then
