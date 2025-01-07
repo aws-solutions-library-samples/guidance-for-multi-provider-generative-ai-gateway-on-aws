@@ -33,6 +33,7 @@ const xaiApiKey = String(app.node.tryGetContext("xaiApiKey"));
 const perplexityaiApiKey = String(app.node.tryGetContext("perplexityaiApiKey"));
 const githubApiKey = String(app.node.tryGetContext("githubApiKey"));
 const deepseekApiKey = String(app.node.tryGetContext("deepseekApiKey"));
+const ai21ApiKey = String(app.node.tryGetContext("ai21ApiKey"));
 
 new LitellmCdkStack(app, 'LitellmCdkStack', {
   domainName: domainName,
@@ -63,6 +64,7 @@ new LitellmCdkStack(app, 'LitellmCdkStack', {
   perplexityaiApiKey: perplexityaiApiKey,
   githubApiKey: githubApiKey,
   deepseekApiKey: deepseekApiKey,
+  ai21ApiKey: ai21ApiKey,
 
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,

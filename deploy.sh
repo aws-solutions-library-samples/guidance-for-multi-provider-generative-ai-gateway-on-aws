@@ -75,6 +75,7 @@ echo "XAI_API_KEY: $XAI_API_KEY"
 echo "PERPLEXITYAI_API_KEY: $PERPLEXITYAI_API_KEY"
 echo "GITHUB_API_KEY: $GITHUB_API_KEY"
 echo "DEEPSEEK_API_KEY: $DEEPSEEK_API_KEY"
+echo "AI21_API_KEY: $AI21_API_KEY"
 
 if [ "$SKIP_BUILD" = false ]; then
     echo "Building and pushing docker image..."
@@ -184,6 +185,7 @@ cdk deploy "$STACK_NAME" \
 --context perplexityaiApiKey=$PERPLEXITYAI_API_KEY \
 --context githubApiKey=$GITHUB_API_KEY \
 --context deepseekApiKey=$DEEPSEEK_API_KEY \
+--context ai21ApiKey=$AI21_API_KEY \
 --outputs-file ./outputs.json
 
 if [ $? -eq 0 ]; then

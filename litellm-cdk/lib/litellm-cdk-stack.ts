@@ -48,6 +48,7 @@ interface LiteLLMStackProps extends cdk.StackProps {
   perplexityaiApiKey: string;
   githubApiKey: string;
   deepseekApiKey: string;
+  ai21ApiKey: string;
 }
 
 export class LitellmCdkStack extends cdk.Stack {
@@ -209,6 +210,7 @@ export class LitellmCdkStack extends cdk.Stack {
           PERPLEXITYAI_API_KEY: props.perplexityaiApiKey,
           GITHUB_API_KEY: props.githubApiKey,
           DEEPSEEK_API_KEY: props.deepseekApiKey,
+          AI21_API_KEY: props.ai21ApiKey
         }),
         generateStringKey: 'dummy',
       },
@@ -320,6 +322,7 @@ export class LitellmCdkStack extends cdk.Stack {
         PERPLEXITYAI_API_KEY: ecs.Secret.fromSecretsManager(litellmOtherSecrets, 'PERPLEXITYAI_API_KEY'),
         GITHUB_API_KEY: ecs.Secret.fromSecretsManager(litellmOtherSecrets, 'GITHUB_API_KEY'),
         DEEPSEEK_API_KEY: ecs.Secret.fromSecretsManager(litellmOtherSecrets, 'DEEPSEEK_API_KEY'),
+        AI21_API_KEY: ecs.Secret.fromSecretsManager(litellmOtherSecrets, 'AI21_API_KEY'),
       },
       environment: {
         LITELLM_CONFIG_BUCKET_NAME: configBucket.bucketName,

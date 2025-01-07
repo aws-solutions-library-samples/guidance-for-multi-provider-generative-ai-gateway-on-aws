@@ -477,6 +477,15 @@ model_list:
     litellm_params:
       model: deepseek/deepseek-coder
 
+  #AI21 Models
+  - model_name: jamba-1.5-mini
+    litellm_params:
+      model: ai21/jamba-1.5-mini
+  
+  - model_name: jamba-1.5-large
+    litellm_params:
+      model: ai21/jamba-1.5-large
+
   #Databricks Models (Commented out because the api_base value will vary by user and needs to be manually updated)
   # - model_name: databricks-meta-llama-3-1-70b-instruct
   #   litellm_params:
