@@ -34,6 +34,9 @@ const perplexityaiApiKey = String(app.node.tryGetContext("perplexityaiApiKey"));
 const githubApiKey = String(app.node.tryGetContext("githubApiKey"));
 const deepseekApiKey = String(app.node.tryGetContext("deepseekApiKey"));
 const ai21ApiKey = String(app.node.tryGetContext("ai21ApiKey"));
+const langsmithApiKey = String(app.node.tryGetContext("langsmithApiKey"));
+const langsmithProject = String(app.node.tryGetContext("langsmithProject"));
+const langsmithDefaultRunName = String(app.node.tryGetContext("langsmithDefaultRunName"));
 
 new LitellmCdkStack(app, 'LitellmCdkStack', {
   domainName: domainName,
@@ -65,6 +68,9 @@ new LitellmCdkStack(app, 'LitellmCdkStack', {
   githubApiKey: githubApiKey,
   deepseekApiKey: deepseekApiKey,
   ai21ApiKey: ai21ApiKey,
+  langsmithApiKey: langsmithApiKey,
+  langsmithProject: langsmithProject,
+  langsmithDefaultRunName: langsmithDefaultRunName,
 
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,

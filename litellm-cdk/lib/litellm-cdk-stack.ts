@@ -49,6 +49,9 @@ interface LiteLLMStackProps extends cdk.StackProps {
   githubApiKey: string;
   deepseekApiKey: string;
   ai21ApiKey: string;
+  langsmithApiKey: string,
+  langsmithProject: string,
+  langsmithDefaultRunName: string
 }
 
 export class LitellmCdkStack extends cdk.Stack {
@@ -210,7 +213,8 @@ export class LitellmCdkStack extends cdk.Stack {
           PERPLEXITYAI_API_KEY: props.perplexityaiApiKey,
           GITHUB_API_KEY: props.githubApiKey,
           DEEPSEEK_API_KEY: props.deepseekApiKey,
-          AI21_API_KEY: props.ai21ApiKey
+          AI21_API_KEY: props.ai21ApiKey,
+          LANGSMITH_API_KEY: props.langsmithApiKey
         }),
         generateStringKey: 'dummy',
       },
@@ -323,12 +327,15 @@ export class LitellmCdkStack extends cdk.Stack {
         GITHUB_API_KEY: ecs.Secret.fromSecretsManager(litellmOtherSecrets, 'GITHUB_API_KEY'),
         DEEPSEEK_API_KEY: ecs.Secret.fromSecretsManager(litellmOtherSecrets, 'DEEPSEEK_API_KEY'),
         AI21_API_KEY: ecs.Secret.fromSecretsManager(litellmOtherSecrets, 'AI21_API_KEY'),
+        LANGSMITH_API_KEY: ecs.Secret.fromSecretsManager(litellmOtherSecrets, 'LANGSMITH_API_KEY'),
       },
       environment: {
         LITELLM_CONFIG_BUCKET_NAME: configBucket.bucketName,
         LITELLM_CONFIG_BUCKET_OBJECT_KEY: 'config.yaml',
         UI_USERNAME: "admin",
-        REDIS_URL: `redis://${redis.attrPrimaryEndPointAddress}:${redis.attrPrimaryEndPointPort}`
+        REDIS_URL: `redis://${redis.attrPrimaryEndPointAddress}:${redis.attrPrimaryEndPointPort}`,
+        LANGSMITH_PROJECT: props.langsmithProject,
+        LANGSMITH_DEFAULT_RUN_NAME: props.langsmithDefaultRunName
       }
     });
 

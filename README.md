@@ -731,6 +731,10 @@ Reponse
 {"key_alias":null,"duration":null,"models":[],"spend":0.0,"max_budget":null,"user_id":"testuser@mycompany.com","team_id":null,"max_parallel_requests":null,"metadata":{},"tpm_limit":null,"rpm_limit":null,"budget_duration":null,"allowed_cache_controls":[],"soft_budget":null,"config":{},"permissions":{},"model_max_budget":{},"send_invite_email":null,"model_rpm_limit":null,"model_tpm_limit":null,"guardrails":null,"blocked":null,"aliases":{},"key":"<Second_Api_Key_Tied_To_Okta_User>","key_name":"sk-...fbcg","expires":null,"token_id":"8bb9cb70ce3ed3b7907dfbaae525e06a2fec6601dbe930b5571c0aca12552378"}     
 ```
 
+#### Langsmith support
+
+To use langsmith, provide your LANGSMITH_API_KEY, LANGSMITH_PROJECT, and LANGSMITH_DEFAULT_RUN_NAME in your .env file
+
 ## Open Source Library
 
 For detailed information about the open source libraries used in this application, please refer to the [ATTRIBUTION](ATTRIBUTION.md) file.

@@ -76,6 +76,9 @@ echo "PERPLEXITYAI_API_KEY: $PERPLEXITYAI_API_KEY"
 echo "GITHUB_API_KEY: $GITHUB_API_KEY"
 echo "DEEPSEEK_API_KEY: $DEEPSEEK_API_KEY"
 echo "AI21_API_KEY: $AI21_API_KEY"
+echo "LANGSMITH_API_KEY: $LANGSMITH_API_KEY"
+echo "LANGSMITH_PROJECT: $LANGSMITH_PROJECT"
+echo "LANGSMITH_DEFAULT_RUN_NAME: $LANGSMITH_DEFAULT_RUN_NAME"
 
 if [ "$SKIP_BUILD" = false ]; then
     echo "Building and pushing docker image..."
@@ -151,6 +154,16 @@ fi
 
 cd ..
 
+# Check if required environment variables exist and are not empty
+if [ -n "${LANGSMITH_API_KEY}" ] && [ -n "${LANGSMITH_PROJECT}" ] && [ -n "${LANGSMITH_DEFAULT_RUN_NAME}" ]; then
+
+    # Update the success callback array, creating them if they don't exist
+    yq eval '.litellm_settings.success_callback = ((.litellm_settings.success_callback // []) + ["langsmith"] | unique)' -i config/config.yaml
+
+    echo "Updated config.yaml with 'langsmith' added to success callback array"
+fi
+
+
 cd litellm-cdk
 echo "Installing dependencies..."
 npm install
@@ -186,6 +199,9 @@ cdk deploy "$STACK_NAME" \
 --context githubApiKey=$GITHUB_API_KEY \
 --context deepseekApiKey=$DEEPSEEK_API_KEY \
 --context ai21ApiKey=$AI21_API_KEY \
+--context langsmithApiKey=$LANGSMITH_API_KEY \
+--context langsmithProject=$LANGSMITH_PROJECT \
+--context langsmithDefaultRunName=$LANGSMITH_DEFAULT_RUN_NAME \
 --outputs-file ./outputs.json
 
 if [ $? -eq 0 ]; then
