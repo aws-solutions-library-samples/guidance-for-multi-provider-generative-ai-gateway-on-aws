@@ -475,6 +475,11 @@ export class LitellmCdkStack extends cdk.Stack {
             managedRuleGroupStatement: {
               name: 'AWSManagedRulesCommonRuleSet',
               vendorName: 'AWS',
+              excludedRules: [
+                {
+                  name: 'NoUserAgent_HEADER'
+                }
+              ]
             },
           },
           visibilityConfig: {

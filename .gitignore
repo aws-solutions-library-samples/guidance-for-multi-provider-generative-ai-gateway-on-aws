@@ -1,5 +1,6 @@
 .env
 config/config.yaml
+config/local-config.yaml
 
 **/.DS_Store
 .idea/

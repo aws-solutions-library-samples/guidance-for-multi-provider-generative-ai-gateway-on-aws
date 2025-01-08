@@ -707,10 +707,12 @@ router_settings:
 
 environment_variables:
   STORE_MODEL_IN_DB: 'True'
-  LITELLM_LOG: "TRACE"
+  LITELLM_LOG: "DEBUG"
 
 litellm_settings:
   cache: True
+  debug: True
+  detailed_debug: True
   cache_params:
     type: redis
 
