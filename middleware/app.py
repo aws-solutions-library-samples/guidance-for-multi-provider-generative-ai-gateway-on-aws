@@ -25,8 +25,18 @@ from sqlalchemy.sql import select, insert, update
 import hashlib
 from okta_jwt_verifier import AccessTokenVerifier
 from okta_jwt_verifier.jwt_utils import JWTUtils
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+    expose_headers=["X-Session-Id"],  # Expose the X-Session-Id header
+)
 
 LITELLM_ENDPOINT = "http://localhost:4000"
 LITELLM_CHAT = f"{LITELLM_ENDPOINT}/v1/chat/completions"

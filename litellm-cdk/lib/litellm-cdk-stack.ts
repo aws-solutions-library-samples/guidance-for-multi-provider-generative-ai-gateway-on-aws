@@ -393,40 +393,104 @@ export class LitellmCdkStack extends cdk.Stack {
       ],
       targetGroups: [
         {
-          containerPort: 4000,
+          containerPort: 3000,
           listener: 'Listener',
         },
         {
-          containerPort: 3000,
+          containerPort: 4000,
           listener: 'Listener',
-          priority: 5,
-          pathPattern: '/bedrock/model/*',
-        }
+        },
       ],
       desiredCount: 1,
       healthCheckGracePeriod: cdk.Duration.seconds(300),
     });
 
     const listener = fargateService.listeners[0]; // The previously created listener
-    const targetGroup = fargateService.targetGroups[1]; // The main target group created
+    const targetGroup = fargateService.targetGroups[0]; // The main target group created
+
+    listener.addAction('BedrockModels', {
+      priority: 16,
+      conditions: [
+        elasticloadbalancingv2.ListenerCondition.pathPatterns(['/bedrock/model/*']),
+        elasticloadbalancingv2.ListenerCondition.httpRequestMethods(['POST', 'GET', 'PUT'])
+      ],
+      action: elasticloadbalancingv2.ListenerAction.forward([targetGroup]),
+    });
 
     // Add additional rules with multiple conditions, all pointing to the same targetGroup
-    listener.addAction('OpenAIPaths', {
-      priority: 6,
+    // OpenAI Paths - Each with unique priority
+    listener.addAction('OpenAICompletions', {
+      priority: 15,
       conditions: [
-        elasticloadbalancingv2.ListenerCondition.pathPatterns(['/v1/chat/completions', '/chat/completions', '/chat-history', '/bedrock/chat-history', '/bedrock/health/liveliness']),
+        elasticloadbalancingv2.ListenerCondition.pathPatterns(['/v1/chat/completions']),
+        elasticloadbalancingv2.ListenerCondition.httpRequestMethods(['POST', 'GET', 'PUT'])
       ],
       action: elasticloadbalancingv2.ListenerAction.forward([targetGroup]),
     });
 
-    listener.addAction('MorePaths', {
-      priority: 7,
+    listener.addAction('ChatCompletions', {
+      priority: 14,
       conditions: [
-        elasticloadbalancingv2.ListenerCondition.pathPatterns(['/session-ids', '/key/generate', '/user/new']),
+        elasticloadbalancingv2.ListenerCondition.pathPatterns(['/chat/completions']),
+        elasticloadbalancingv2.ListenerCondition.httpRequestMethods(['POST', 'GET', 'PUT'])
       ],
       action: elasticloadbalancingv2.ListenerAction.forward([targetGroup]),
     });
 
+    listener.addAction('ChatHistory', {
+      priority: 8,
+      conditions: [
+        elasticloadbalancingv2.ListenerCondition.pathPatterns(['/chat-history']),
+        elasticloadbalancingv2.ListenerCondition.httpRequestMethods(['POST', 'GET', 'PUT'])
+      ],
+      action: elasticloadbalancingv2.ListenerAction.forward([targetGroup]),
+    });
+
+    listener.addAction('BedrockChatHistory', {
+      priority: 9,
+      conditions: [
+        elasticloadbalancingv2.ListenerCondition.pathPatterns(['/bedrock/chat-history']),
+        elasticloadbalancingv2.ListenerCondition.httpRequestMethods(['POST', 'GET', 'PUT'])
+      ],
+      action: elasticloadbalancingv2.ListenerAction.forward([targetGroup]),
+    });
+
+    listener.addAction('BedrockLiveliness', {
+      priority: 10,
+      conditions: [
+        elasticloadbalancingv2.ListenerCondition.pathPatterns(['/bedrock/health/liveliness']),
+        elasticloadbalancingv2.ListenerCondition.httpRequestMethods(['POST', 'GET', 'PUT'])
+      ],
+      action: elasticloadbalancingv2.ListenerAction.forward([targetGroup]),
+    });
+
+    // More Paths - Each with unique priority
+    listener.addAction('SessionIds', {
+      priority: 11,
+      conditions: [
+        elasticloadbalancingv2.ListenerCondition.pathPatterns(['/session-ids']),
+        elasticloadbalancingv2.ListenerCondition.httpRequestMethods(['POST', 'GET', 'PUT'])
+      ],
+      action: elasticloadbalancingv2.ListenerAction.forward([targetGroup]),
+    });
+
+    listener.addAction('KeyGenerate', {
+      priority: 12,
+      conditions: [
+        elasticloadbalancingv2.ListenerCondition.pathPatterns(['/key/generate']),
+        elasticloadbalancingv2.ListenerCondition.httpRequestMethods(['POST', 'GET', 'PUT'])
+      ],
+      action: elasticloadbalancingv2.ListenerAction.forward([targetGroup]),
+    });
+
+    listener.addAction('UserNew', {
+      priority: 13,
+      conditions: [
+        elasticloadbalancingv2.ListenerCondition.pathPatterns(['/user/new']),
+        elasticloadbalancingv2.ListenerCondition.httpRequestMethods(['POST', 'GET', 'PUT'])
+      ],
+      action: elasticloadbalancingv2.ListenerAction.forward([targetGroup]),
+    });
 
     redisSecurityGroup.addIngressRule(
       fargateService.service.connections.securityGroups[0],
