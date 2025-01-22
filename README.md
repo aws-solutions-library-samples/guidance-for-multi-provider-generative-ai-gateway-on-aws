@@ -8,6 +8,10 @@ This project provides a simple CDK deployment of LiteLLM into ECS on AWS. It aim
 
 It also provides additional features on top of LiteLLM such as an AWS Bedrock Interface (instead of the default OpenAI interface), support for AWS Bedrock Managed Prompts, Chat History, and support for Okta Oauth 2.0 JWT Token Auth.
 
+## Architecture
+
+![Architecture Diagram](./media/Genai-Gateway-Architecture.png)
+
 ## How to deploy
 
 ### Prerequisites
