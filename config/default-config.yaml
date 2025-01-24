@@ -50,23 +50,23 @@ model_list:
   
   - model_name: meta.llama3-1-405b-instruct-v1:0
     litellm_params:
-      model: bedrock/meta.llama3-1-405b-instruct-v1:0
+      model: bedrock/us.meta.llama3-1-405b-instruct-v1:0
   
   - model_name: meta.llama3-1-70b-instruct-v1:0
     litellm_params:
-      model: bedrock/meta.llama3-1-70b-instruct-v1:0
+      model: bedrock/us.meta.llama3-1-70b-instruct-v1:0
 
   - model_name: meta.llama3-1-8b-instruct-v1:0
     litellm_params:
-      model: bedrock/meta.llama3-1-8b-instruct-v1:0
+      model: bedrock/us.meta.llama3-1-8b-instruct-v1:0
   
   - model_name: meta.llama3-70b-instruct-v1:0
     litellm_params:
-      model: bedrock/meta.llama3-70b-instruct-v1:0
+      model: bedrock/us.meta.llama3-70b-instruct-v1:0
   
   - model_name: meta.llama3-8b-instruct-v1:0
     litellm_params:
-      model: bedrock/meta.llama3-8b-instruct-v1:0
+      model: bedrock/us.meta.llama3-8b-instruct-v1:0
 
   - model_name: amazon.titan-text-premier-v1
     litellm_params:
@@ -78,15 +78,15 @@ model_list:
 
   - model_name: amazon.nova-pro-v1
     litellm_params:
-      model: bedrock/amazon.nova-pro-v1:0
+      model: bedrock/us.amazon.nova-pro-v1:0
 
   - model_name: amazon.nova-lite-v1
     litellm_params:
-      model: bedrock/amazon.nova-lite-v1:0
+      model: bedrock/us.amazon.nova-lite-v1:0
 
   - model_name: amazon.nova-micro-v1
     litellm_params:
-      model: bedrock/amazon.nova-micro-v1:0
+      model: bedrock/us.amazon.nova-micro-v1:0
 
   - model_name: mistral.mistral-small-2402-v1
     litellm_params:
