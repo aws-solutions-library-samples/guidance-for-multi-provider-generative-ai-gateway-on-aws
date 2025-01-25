@@ -22,3 +22,5 @@ litellm-cdk/resources.txt
 **/outputs.json
 
 **/myenv/
+**/fresh_venv/
+*.pyc
