@@ -135,8 +135,6 @@ You can also use this to override the default region for a model. For example, i
 
 You can also use this to set a `weight` for an LLM to load balance between two different models with the same `model_name`
 
-For AWS Bedrock Models, you can also use this to specify a `guardrailConfig` to set a Guardrail for each model
-
 `litellm_settings`: These are additional settings for the litellm proxy
 
 `litellm_settings.cache`: Whether to enable or disable prompt caching. Caches prompt results to save time and money for repeated prompts. Set to `True` by default.
@@ -282,9 +280,12 @@ guardrails:
        mode: "during_call" # supported values: "pre_call", "post_call", "during_call"
        guardrailIdentifier: ff6ujrregl1q # your guardrail ID on bedrock
        guardrailVersion: "1"         # your guardrail version on bedrock
+       default_on: true # enforces the guardrail serverside for all models. Caller does not need to pass in the name of the guardrail for it to be enforced.
 ```
 
-To make use of the Guardrail, you must specifiy it's name in the client call. There is currently no way to globally enable a guardrail for all models. Example:
+If you set `default_on` to `true`, the guardrail will be enforced at all times. If you set it to false, enforcement is optional. 
+
+In the case that `default_on` is `false`, in order to make use of the Guardrail, you must specifiy it's name in the client call. Example:
 
 ```
 curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
@@ -301,22 +302,6 @@ curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
     "guardrails": ["bedrock-pre-guard"]
 }'
 ```
-
-If you would like to enable a Guardrail without having the client specify it, that is currently only possible with AWS Bedrock models. Instead of doing the above approach, you would do the following:
-
-```
-model_list:
-  #Bedrock Models
-  - model_name: anthropic.claude-3-5-sonnet-20240620-v1:0
-    litellm_params:
-      model: bedrock/anthropic.claude-3-5-sonnet-20240620-v1:0
-      guardrailConfig: {
-        "guardrailIdentifier": "ff6ujrregl1q", # The identifier (ID) for the guardrail.
-        "guardrailVersion": "1",           # The version of the guardrail.
-      }
-```
-
-With this configuration, the guardrails will always be applied, and your client does not need to make any adjustments to their code.
 
 More details on guardrails here:
 https://docs.litellm.ai/docs/proxy/guardrails/bedrock

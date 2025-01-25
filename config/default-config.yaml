@@ -22,10 +22,6 @@ model_list:
       #temperature: 0.7 # 👈 pass in default provider specific parameters like this
       #top_k: 1 # 👈 pass in default provider specific parameters like this
       #aws_region_name: us-west-2 #Override default of using the region litellm is deployed in
-      # guardrailConfig: { #Guardrail you would like to apply to this model
-      #   "guardrailIdentifier": "ff6ujrregl1q", # The identifier (ID) for the guardrail.
-      #   "guardrailVersion": "1",           # The version of the guardrail.
-      # }
       # weight: 1 #Used to load balance between two different models. Give two different models the same "model_name" and the traffic will be distributed based on the relative weights
 
   - model_name: anthropic.claude-3-5-sonnet-20241022-v2:0
@@ -697,6 +693,7 @@ model_list:
 #       mode: "during_call" # supported values: "pre_call", "post_call", "during_call"
 #       guardrailIdentifier: ff6ujrregl1q # your guardrail ID on bedrock
 #       guardrailVersion: "1"         # your guardrail version on bedrock
+#       default_on: true # enforces the guardrail serverside for all models. Caller does not need to pass in the name of the guardrail for it to be enforced.
 
 router_settings:
   routing_strategy: usage-based-routing-v2
