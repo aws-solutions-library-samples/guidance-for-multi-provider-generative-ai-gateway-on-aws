@@ -358,6 +358,8 @@ curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
 ```
 
 ##### Create user with a limit on TPM (Tokens Per Minute) and RPM (Requests Per Minute) and max parallel requests. In this case we give our user 10000 tokens per minute, and 10 requests per minute, and 2 parallel requests.
+Note: There is currently a bug where `max_parallel_requests` is are not returned in the create user response. However, it is still taking effect, and you can confirm that by doing a GET on the user
+
 ```
 curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
 -H "Content-Type: application/json" \
@@ -384,15 +386,13 @@ curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
 ```
 
 
-##### Create a user that has separate Spends Budgets, TPM (Tokens Per Minute) limits, and RPM (Requests Per Minute) limits for different models 
+##### Create a user that has separate Spends TPM (Tokens Per Minute) limits and RPM (Requests Per Minute) limits for different models 
 
 In this case:
-for Claude 3.5 sonnet: 100 dollars per month, 10000 tokens per minute, and 5 requests per minute
-for Claude 3 haiku: 10 dollars per month, 20000 tokens per minute, and 10 requests per minute
+for Claude 3.5 sonnet: 10000 tokens per minute, and 5 requests per minute
+for Claude 3 haiku: 20000 tokens per minute, and 10 requests per minute
 
-Note: There is currently a bug where `model_max_budget`, `model_rpm_limit` and `model_tpm_limit` are not returned in the create user response. However, they are still taking effect, and you can confirm that by doing a GET on the user
-
-Note: `model_max_budget` has a duration of 28 days. This is not currently configurable
+Note: There is currently a bug where `model_rpm_limit` and `model_tpm_limit` are not returned in the create user response. However, they are still taking effect, and you can confirm that by doing a GET on the user
 
 ```
 curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
@@ -401,7 +401,6 @@ curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
 -d '{
      "user_email": "new_user@example.com",
      "user_role": "internal_user"
-     "model_max_budget":  {"anthropic.claude-3-5-sonnet-20240620-v1:0": 100, "anthropic.claude-3-haiku-20240307-v1:0": 10},
      "model_rpm_limit": {"anthropic.claude-3-5-sonnet-20240620-v1:0": 1, "anthropic.claude-3-haiku-20240307-v1:0": 1},
      "model_tpm_limit": {"anthropic.claude-3-5-sonnet-20240620-v1:0": 10000, "anthropic.claude-3-haiku-20240307-v1:0": 20000},
  }'
