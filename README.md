@@ -23,6 +23,7 @@ It also provides additional features on top of LiteLLM such as an AWS Bedrock In
 5. Make sure you have already run `cdk bootstrap` against the account and region you are deploying to.
 
 If you have `DEPLOYMENT_PLATFORM` set to `EKS`:
+
 6. kubectl
 
 ### Installing kubectl
@@ -33,6 +34,7 @@ brew install kubectl
 ```
 
 On Linux
+
 ToDo
 
 
@@ -62,7 +64,7 @@ CDK: 2.170.0
 yq: version 4.40.5
 ```
 
-### Deploying from AWS Cloud9 (Optional)
+### Deploying from AWS Cloud9 (Optional) (Not tested with EKS)
 
 If it's easier for you, you can deploy from an AWS Cloud9 environment using the following steps:
 
