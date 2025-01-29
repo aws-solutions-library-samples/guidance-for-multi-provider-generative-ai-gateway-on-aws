@@ -344,7 +344,7 @@ curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
 ```
 
 ##### Create user with a limit on TPM (Tokens Per Minute) and RPM (Requests Per Minute) and max parallel requests. In this case we give our user 10000 tokens per minute, and 10 requests per minute, and 2 parallel requests.
-Note: There is currently a bug where `max_parallel_requests` is are not returned in the create user response. However, it is still taking effect, and you can confirm that by doing a GET on the user
+Note: There is currently a bug where `max_parallel_requests` is not returned in the create user response. However, it is still taking effect, and you can confirm that by doing a GET on the user
 
 ```
 curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \

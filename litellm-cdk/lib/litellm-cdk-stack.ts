@@ -1145,49 +1145,6 @@ export class LitellmCdkStack extends cdk.Stack {
           )
         ),
       });
-      
-
-
-
-
-
-
-      
-      //9) We must wait for the Ingress resource to exist before we read it
-      // const ingressHostnameValue = new eks.KubernetesObjectValue(this, 'IngressHostnameValue', {
-      //   cluster: eksCluster,
-      //   objectType: 'ingress',
-      //   objectName: ingressName,
-      //   objectNamespace: 'default',
-      //   jsonPath: '.status.loadBalancer.ingress[0].hostname',
-      // });
-      // ingressHostnameValue.node.addDependency(ingressResource);
-    
-      // //Ingress address is a lazy string
-      // const ingressAddress = ingressHostnameValue.value;
-      // // ingressAddress.node.addDependency(ingressResource);
-
-
-      // // Create a Route53 Alias record for the Ingress’s ALB
-      // // We'll get the ALB's DNS name from the Ingress:
-      // // This method returns the DNS, but you also need the HostedZoneId for your region's ALB
-      // // e.g. us-east-1 => 'Z35SXDOTRQ7X7K'
-      // const ingressAddress = eksCluster.getIngressLoadBalancerAddress(ingressName, {
-      //   namespace: 'default',
-      // });
-      // const albHostedZoneId = 'Z35SXDOTRQ7X7K'; // Replace with correct ID for your region
-
-      // new route53.ARecord(this, 'EKSIngressAlias', {
-      //   zone: hostedZone,
-      //   recordName: props.domainName, 
-      //   target: route53.RecordTarget.fromAlias(
-      //     new IngressAlias(ingressAddress, albHostedZoneId)
-      //   ),
-      // });
-
-      // new cdk.CfnOutput(this, 'EKSIngressURL', {
-      //   value: `https://${props.domainName}`,
-      // });
     }
     else {
       // Create ECS Cluster
@@ -1467,9 +1424,7 @@ export class LitellmCdkStack extends cdk.Stack {
         targetUtilizationPercent: 70,
       });
 
-      new cdk.CfnOutput(this, 'ServiceURL', {
-        value: `https://${props.domainName}`,
-      });
+      
 
       new cdk.CfnOutput(this, 'LitellmEcsCluster', {
         value: cluster.clusterName,
@@ -1481,5 +1436,9 @@ export class LitellmCdkStack extends cdk.Stack {
         description: 'Name of the task service'
       });
     }
+
+    new cdk.CfnOutput(this, 'ServiceURL', {
+      value: `https://${props.domainName}`,
+    });
   }
 }
