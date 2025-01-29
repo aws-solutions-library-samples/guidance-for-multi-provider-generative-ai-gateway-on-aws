@@ -1047,66 +1047,72 @@ export class LitellmCdkStack extends cdk.Stack {
                     path: '/bedrock/model',
                     pathType: 'Prefix',
                     backend: {
-                      service: { name: serviceName, port: { name: 'port4000' } },
+                      service: { name: serviceName, port: { name: 'port3000' } },
                     },
                   },
                   {
                     path: '/v1/chat/completions',
                     pathType: 'Prefix',
                     backend: {
-                      service: { name: serviceName, port: { name: 'port4000' } },
+                      service: { name: serviceName, port: { name: 'port3000' } },
                     },
                   },
                   {
                     path: '/chat/completions',
                     pathType: 'Prefix',
                     backend: {
-                      service: { name: serviceName, port: { name: 'port4000' } },
+                      service: { name: serviceName, port: { name: 'port3000' } },
                     },
                   },
                   {
                     path: '/chat-history',
                     pathType: 'Prefix',
                     backend: {
-                      service: { name: serviceName, port: { name: 'port4000' } },
+                      service: { name: serviceName, port: { name: 'port3000' } },
                     },
                   },
                   {
                     path: '/bedrock/chat-history',
                     pathType: 'Prefix',
                     backend: {
-                      service: { name: serviceName, port: { name: 'port4000' } },
+                      service: { name: serviceName, port: { name: 'port3000' } },
                     },
                   },
                   {
                     path: '/bedrock/health/liveliness',
                     pathType: 'Prefix',
                     backend: {
-                      service: { name: serviceName, port: { name: 'port4000' } },
+                      service: { name: serviceName, port: { name: 'port3000' } },
                     },
                   },
                   {
                     path: '/session-ids',
                     pathType: 'Prefix',
                     backend: {
-                      service: { name: serviceName, port: { name: 'port4000' } },
+                      service: { name: serviceName, port: { name: 'port3000' } },
                     },
                   },
                   {
                     path: '/key/generate',
                     pathType: 'Prefix',
                     backend: {
-                      service: { name: serviceName, port: { name: 'port4000' } },
+                      service: { name: serviceName, port: { name: 'port3000' } },
                     },
                   },
                   {
                     path: '/user/new',
                     pathType: 'Prefix',
                     backend: {
+                      service: { name: serviceName, port: { name: 'port3000' } },
+                    },
+                  },
+                  {
+                    path: '/',
+                    pathType: 'Prefix',
+                    backend: {
                       service: { name: serviceName, port: { name: 'port4000' } },
                     },
                   },
-                  // Add more paths for port3000 if you need the second container
                 ],
               },
             },

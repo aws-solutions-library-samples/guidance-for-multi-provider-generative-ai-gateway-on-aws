@@ -41,6 +41,8 @@ app.add_middleware(
 LITELLM_ENDPOINT = "http://localhost:4000"
 LITELLM_CHAT = f"{LITELLM_ENDPOINT}/v1/chat/completions"
 
+print(f"AWS_REGION: {os.getenv('AWS_REGION')}")
+print(f"AWS_DEFAULT_REGION: {os.getenv('AWS_DEFAULT_REGION')}")
 bedrock_client = boto3.client("bedrock-agent")
 
 db_engine = None
