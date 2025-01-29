@@ -22,6 +22,20 @@ It also provides additional features on top of LiteLLM such as an AWS Bedrock In
 4. yq (install with brew if on Mac, download binaries if on Linux (see `Installing yq` below))
 5. Make sure you have already run `cdk bootstrap` against the account and region you are deploying to.
 
+If you have `DEPLOYMENT_PLATFORM` set to `EKS`:
+6. kubectl
+
+### Installing kubectl
+
+On Mac
+```
+brew install kubectl
+```
+
+On Linux
+ToDo
+
+
 ### Installing yq
 
 On Mac
@@ -80,13 +94,13 @@ If it's easier for you, you can deploy from an AWS Cloud9 environment using the 
 1. Run `cp .env.template .env`
 2. In `.env`, set the `CERTIFICATE_ARN` to the ARN of the certificate you created in the `Creating your certificate` section of this README.
 3. In `.env`, set the `DOMAIN_NAME` to the sub domain you created in the `Creating your certificate` section of this README.
-4. If you'd like to use EKS instead of ECS, switch `DEPLOYMENT_PLATFORM="ECS"` to `DEPLOYMENT_PLATFORM="EKS"` (Still in beta, probably has bugs.) (Note: you currently cannot freely switch between these. You must delete your existing deployment to switch deployment platforms.)
+4. If you'd like to use EKS instead of ECS, switch `DEPLOYMENT_PLATFORM="ECS"` to `DEPLOYMENT_PLATFORM="EKS"` (Still in beta, probably has bugs.) (Note: you currently cannot freely switch between these. You must delete your existing deployment to switch deployment platforms.) (Also, deleting the stack when using EKS mode will fail because of EKS CDK issues. You will need to do some manual cleanup and some delete retries. We will try to find a fix for this soon.)
 5. In `.env`, Fill out any API Keys you need for any third party providers. If you only want to use Amazon Bedrock, you can just leave the `.env` file as-is
 6. By default, this solution is deployed with redis caching enabled, and with most popular model providers enabled. If you want to remove support for certain models, or add more models, you can create and edit your own `config/config.yaml` file. If not, the deployment will automatically use the `config/default-config.yaml`. Make sure you [enable model access](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access-modify.html) on Amazon Bedrock.
 7. Make sure you have valid AWS credentials configured in your environment before running the next step
 8. Run `./deploy.sh`
 9. After the deployment is done, you can visit the UI by going to the url at the stack output `LitellmCdkStack.ServiceURL`, which is the `DOMAIN_NAME` you configured earlier.
-10. The master api key is stored in AWS Secrets Manager in the `LiteLLMSecret` secret. This api key can be used to call the LiteLLM API, and is also the default password for the LiteLLM UI
+10. If you deployed to ECS, the master api key is stored in AWS Secrets Manager in the `LiteLLMSecret` secret. If you deployed to EKS, the master key will be in the stack output `LitellmCdkStack.MasterKey`. We will try to standardize this between the two modes soon. This api key can be used to call the LiteLLM API, and is also the default password for the LiteLLM UI.
 
 #### Usage Instructions
 

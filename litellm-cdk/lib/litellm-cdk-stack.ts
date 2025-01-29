@@ -345,22 +345,12 @@ export class LitellmCdkStack extends cdk.Stack {
       // ════════════════
       // EKS variant
       // ════════════════
-      // 1) Create an EKS cluster with defaultCapacity
-      // const eksCluster = new eks.Cluster(this, 'LiteLLMEksCluster', {
-      //   version: eks.KubernetesVersion.V1_31,
-      //   vpc,
-      //   defaultCapacity: 2,
-      //   kubectlLayer: new KubectlV26Layer(this, 'KubectlLayer')
-      // });
 
       const eksCluster = new eks.Cluster(this, 'HelloEKS', {
         version: eks.KubernetesVersion.V1_31,
         vpc,
         defaultCapacity: 0,
         kubectlLayer: new KubectlV26Layer(this, 'KubectlLayer'),
-        albController: {
-          version: eks.AlbControllerVersion.V2_8_2,
-        },
       });
 
       // Add a managed nodegroup with specific architecture
@@ -375,6 +365,12 @@ export class LitellmCdkStack extends cdk.Stack {
         amiType: props.architecture === "x86" 
           ? eks.NodegroupAmiType.AL2_X86_64 
           : eks.NodegroupAmiType.AL2_ARM_64,
+      });
+
+      // Wait for nodegroup to be ready
+      const albController = new eks.AlbController(this, 'AlbController', {
+        cluster: eksCluster,
+        version: eks.AlbControllerVersion.V2_8_2,
       });
       
 
@@ -650,6 +646,9 @@ export class LitellmCdkStack extends cdk.Stack {
         }
       });
 
+      litellmApiKeys.node.addDependency(albController);
+
+
       const middlewareSecrets = eksCluster.addManifest('MiddlewareSecrets', {
         apiVersion: 'v1',
         kind: 'Secret',
@@ -659,6 +658,9 @@ export class LitellmCdkStack extends cdk.Stack {
           MASTER_KEY: secretsCustomResource.getAtt('LITELLM_MASTER_KEY').toString(),
         },
       });
+
+      middlewareSecrets.node.addDependency(albController);
+
 
       // 5) Create the Deployment with 2 containers
       const deploymentName = 'litellm-deployment';
@@ -1016,6 +1018,8 @@ export class LitellmCdkStack extends cdk.Stack {
           ],
         },
       });
+
+      service.node.addDependency(albController);
       service.node.addDependency(deploymentResource);
     
       // 7) Ingress: ALB with path-based routing + WAF annotation
@@ -1120,6 +1124,7 @@ export class LitellmCdkStack extends cdk.Stack {
         },
       });
       ingressResource.node.addDependency(service);
+      ingressResource.node.addDependency(albController);
       ingressResource.node.addDependency(webAcl);
 
       // 8) Let DB & Redis allow traffic from EKS nodes
@@ -1131,20 +1136,159 @@ export class LitellmCdkStack extends cdk.Stack {
         description: 'ARN of the WAF Web ACL'
       });
 
-      new route53.ARecord(this, 'LiteLLMDNSRecord', {
-        zone: hostedZone,
-        recordName: props.domainName, // This creates litellm.mirodrr.people.aws.dev
-        target: route53.RecordTarget.fromAlias(
-          new route53targets.LoadBalancerTarget(
-            elbv2.ApplicationLoadBalancer.fromLookup(this, 'ALBLookup', {
-              loadBalancerTags: {
-                'ingress.k8s.aws/resource': 'LoadBalancer',
-                'ingress.k8s.aws/stack': `default/litellm-ingress`,
-              },
-            })
-          )
-        ),
+      // Create a Lambda function that will wait for the ALB and create the Route53 record
+      const albLookupFunction = new lambda.Function(this, 'AlbLookupFunction', {
+        runtime: lambda.Runtime.NODEJS_16_X,
+        handler: 'index.handler',
+        code: lambda.Code.fromInline(`
+          const AWS = require('aws-sdk');
+          const response = require('cfn-response');
+          exports.handler = async (event, context) => {
+            if (event.RequestType === 'Delete') {
+              return response.send(event, context, response.SUCCESS);
+            }
+            try {
+              const elbv2 = new AWS.ELBv2();
+              const route53 = new AWS.Route53();
+              
+              // Wait for the ALB with specific tags to exist (retry a few times)
+              let loadBalancer;
+              for (let i = 0; i < 10; i++) {
+                const lbs = await elbv2.describeLoadBalancers().promise();
+                for (const lb of lbs.LoadBalancers) {
+                  const tags = await elbv2.describeTags({
+                    ResourceArns: [lb.LoadBalancerArn]
+                  }).promise();
+                  
+                  const hasMatchingTags = tags.TagDescriptions[0].Tags.some(tag => 
+                    tag.Key === 'ingress.k8s.aws/stack' && 
+                    tag.Value === 'default/litellm-ingress'
+                  );
+                  
+                  if (hasMatchingTags) {
+                    loadBalancer = lb;
+                    break;
+                  }
+                }
+                if (loadBalancer) break;
+                await new Promise(resolve => setTimeout(resolve, 30000)); // Wait 30 seconds between retries
+              }
+              if (!loadBalancer) {
+                throw new Error('LoadBalancer not found after multiple retries');
+              }
+              
+              return response.send(event, context, response.SUCCESS, {
+                LoadBalancerDNS: loadBalancer.DNSName,
+                LoadBalancerArn: loadBalancer.LoadBalancerArn,
+                LoadBalancerHostedZoneId: loadBalancer.CanonicalHostedZoneId
+              });
+            } catch (error) {
+              console.error('Error:', error);
+              return response.send(event, context, response.FAILED, { error: error.message });
+            }
+          };
+        `),
+        timeout: cdk.Duration.minutes(3)
       });
+
+      // Grant permissions to the function
+      albLookupFunction.addToRolePolicy(new iam.PolicyStatement({
+        actions: [
+          'elasticloadbalancing:DescribeLoadBalancers',
+          'elasticloadbalancing:DescribeTags',
+          'route53:ChangeResourceRecordSets'
+        ],
+        resources: ['*']
+      }));
+
+      // Create the custom resource that will invoke the Lambda
+      const albLookup = new cdk.CustomResource(this, 'AlbLookupResource', {
+        serviceToken: albLookupFunction.functionArn,
+        properties: {
+          domainName: props.domainName,
+          hostedZoneId: hostedZone.hostedZoneId,
+          // Add a timestamp to force update on each deployment
+          timestamp: Date.now()
+        },
+        serviceTimeout: cdk.Duration.minutes(3)
+      });
+
+      // Make sure the custom resource waits for the ingress
+      albLookup.node.addDependency(ingressResource);
+
+
+      const route53Record = new route53.ARecord(this, 'LiteLLMDNSRecord', {
+          zone: hostedZone,
+          recordName: props.domainName, // This creates litellm.mirodrr.people.aws.dev
+          target: route53.RecordTarget.fromAlias({
+            bind: () => ({
+              dnsName: albLookup.getAttString('LoadBalancerDNS'),
+              hostedZoneId: albLookup.getAttString('LoadBalancerHostedZoneId')
+            })
+          })
+        });
+
+      new cdk.CfnOutput(this, 'LoadBalancerDnsName', {
+        value: albLookup.getAttString('LoadBalancerDNS'),
+        description: 'The LoadBalancerDnsName',
+        exportName: 'LiteLLMLoadBalancerDnsName',
+      });
+      
+      // Output for the Route53 Record
+      new cdk.CfnOutput(this, 'Route53RecordName', {
+        value: route53Record.domainName,
+        description: 'The domain name of the Route53 record',
+        exportName: 'LiteLLMRoute53RecordName',
+      });
+      
+      new cdk.CfnOutput(this, 'Route53ZoneId', {
+        value: hostedZone.hostedZoneId,
+        description: 'The hosted zone ID where the record was created',
+        exportName: 'LiteLLMRoute53ZoneId',
+      });
+      
+      new cdk.CfnOutput(this, 'FullDomainName', {
+        value: props.domainName,
+        description: 'The full domain name for the application',
+        exportName: 'LiteLLMFullDomainName',
+      });
+
+      // Output for the Route53 record alias target
+      const cfnRecord = route53Record.node.defaultChild as route53.CfnRecordSet;
+
+      new cdk.CfnOutput(this, 'Route53RecordAliasTarget', {
+        value: cfnRecord.ref,
+        description: 'The Route53 record reference',
+        exportName: 'LiteLLMRoute53RecordRef',
+      });
+
+      new cdk.CfnOutput(this, 'Route53RecordType', {
+        value: cfnRecord.type,
+        description: 'The Route53 record type',
+        exportName: 'LiteLLMRoute53RecordType',
+      });
+
+      new cdk.CfnOutput(this, 'MasterKey', {
+        value: secretsCustomResource.getAtt('LITELLM_MASTER_KEY').toString(),
+        description: 'The Litellm Master Key',
+        exportName: 'MasterKey',
+      });
+
+      new cdk.CfnOutput(this, 'EksDeploymentName', {
+        value: deploymentName,
+        description: 'The name of the EKS deployment',
+        exportName: 'EksDeploymentName'
+      });
+
+      new cdk.CfnOutput(this, 'EksClusterName', {
+        value: eksCluster.clusterName,
+        description: 'The name of the EKS cluster',
+        exportName: 'EksClusterName'
+      });
+      
+
+      route53Record.node.addDependency(ingressResource);
+      route53Record.node.addDependency(albLookup);
     }
     else {
       // Create ECS Cluster

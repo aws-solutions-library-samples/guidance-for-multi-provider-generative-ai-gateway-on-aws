@@ -221,6 +221,16 @@ if [ $? -eq 0 ]; then
             --desired-count 1 \
             --no-cli-pager
     fi
+
+    if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
+        EKS_DEPLOYMENT_NAME=$(jq -r ".\"${STACK_NAME}\".EksDeploymentName" ./outputs.json)
+        EKS_CLUSTER_NAME=$(jq -r ".\"${STACK_NAME}\".EksClusterName" ./outputs.json)
+
+        echo "EKS_DEPLOYMENT_NAME: $EKS_DEPLOYMENT_NAME"
+        echo "EKS_CLUSTER_NAME: $EKS_CLUSTER_NAME"
+        aws eks update-kubeconfig --region $aws_region --name $EKS_CLUSTER_NAME
+        kubectl rollout restart deployment $EKS_DEPLOYMENT_NAME
+    fi
 else
     echo "Deployment failed"
 fi

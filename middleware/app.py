@@ -389,6 +389,7 @@ def construct_prompt_text_from_variables(template_text: str, variables: dict) ->
     return template_text
 
 
+@app.get("/")
 @app.get("/bedrock/health/liveliness")
 async def health_check():
     try:
