@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
-import { LitellmCdkStack } from '../lib/litellm-cdk-stack';
+import { DeploymentPlatform, LitellmCdkStack } from '../lib/litellm-cdk-stack';
+
 
 const app = new cdk.App();
 const architecture = app.node.tryGetContext('architecture');
@@ -37,6 +38,21 @@ const ai21ApiKey = String(app.node.tryGetContext("ai21ApiKey"));
 const langsmithApiKey = String(app.node.tryGetContext("langsmithApiKey"));
 const langsmithProject = String(app.node.tryGetContext("langsmithProject"));
 const langsmithDefaultRunName = String(app.node.tryGetContext("langsmithDefaultRunName"));
+const deploymentPlatformString = String(app.node.tryGetContext("deploymentPlatform"));
+
+// Validate and convert deployment platform string to enum
+const deploymentPlatform = (() => {
+  if (!deploymentPlatformString) {
+    throw new Error('deploymentPlatform must be specified in context');
+  }
+  
+  const platform = deploymentPlatformString.toUpperCase() as DeploymentPlatform;
+  if (!Object.values(DeploymentPlatform).includes(platform)) {
+    throw new Error(`Invalid deployment platform: ${deploymentPlatformString}. Must be one of: ${Object.values(DeploymentPlatform).join(', ')}`);
+  }
+  
+  return platform;
+})();
 
 new LitellmCdkStack(app, 'LitellmCdkStack', {
   domainName: domainName,
@@ -71,6 +87,7 @@ new LitellmCdkStack(app, 'LitellmCdkStack', {
   langsmithApiKey: langsmithApiKey,
   langsmithProject: langsmithProject,
   langsmithDefaultRunName: langsmithDefaultRunName,
+  deploymentPlatform: deploymentPlatform,
 
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,

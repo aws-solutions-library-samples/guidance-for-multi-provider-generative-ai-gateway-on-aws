@@ -79,6 +79,7 @@ echo "AI21_API_KEY: $AI21_API_KEY"
 echo "LANGSMITH_API_KEY: $LANGSMITH_API_KEY"
 echo "LANGSMITH_PROJECT: $LANGSMITH_PROJECT"
 echo "LANGSMITH_DEFAULT_RUN_NAME: $LANGSMITH_DEFAULT_RUN_NAME"
+echo "DEPLOYMENT_PLATFORM: $DEPLOYMENT_PLATFORM"
 
 if [ "$SKIP_BUILD" = false ]; then
     echo "Building and pushing docker image..."
@@ -202,6 +203,7 @@ cdk deploy "$STACK_NAME" \
 --context langsmithApiKey=$LANGSMITH_API_KEY \
 --context langsmithProject=$LANGSMITH_PROJECT \
 --context langsmithDefaultRunName=$LANGSMITH_DEFAULT_RUN_NAME \
+--context deploymentPlatform=$DEPLOYMENT_PLATFORM \
 --outputs-file ./outputs.json
 
 if [ $? -eq 0 ]; then
@@ -211,13 +213,14 @@ if [ $? -eq 0 ]; then
     SERVICE_URL=$(jq -r ".\"${STACK_NAME}\".ServiceURL" ./outputs.json)
     
     echo "ServiceURL=$SERVICE_URL" > resources.txt
-
-    aws ecs update-service \
-        --cluster $LITELLM_ECS_CLUSTER \
-        --service $LITELLM_ECS_TASK \
-        --force-new-deployment \
-        --desired-count 1 \
-        --no-cli-pager
+    if [ "$DEPLOYMENT_PLATFORM" = "ECS" ]; then
+        aws ecs update-service \
+            --cluster $LITELLM_ECS_CLUSTER \
+            --service $LITELLM_ECS_TASK \
+            --force-new-deployment \
+            --desired-count 1 \
+            --no-cli-pager
+    fi
 else
     echo "Deployment failed"
 fi
