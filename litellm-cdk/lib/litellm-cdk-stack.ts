@@ -61,11 +61,22 @@ interface LiteLLMStackProps extends cdk.StackProps {
   githubApiKey: string;
   deepseekApiKey: string;
   ai21ApiKey: string;
-  langsmithApiKey: string,
-  langsmithProject: string,
-  langsmithDefaultRunName: string,
-  deploymentPlatform: DeploymentPlatform
-
+  langsmithApiKey: string;
+  langsmithProject: string;
+  langsmithDefaultRunName: string;
+  deploymentPlatform: DeploymentPlatform;
+  vpcId: string;
+  eksClusterName: string;
+  oidcUrl: string;
+  rdsLitellmHostname: string;
+  rdsLitellmSecretArn: string;
+  rdsMiddlewareHostname: string;
+  rdsMiddlewareSecretArn: string;
+  redisHostName: string;
+  redisPort: string;
+  rdsSecurityGroupId: string;
+  redisSecurityGroupId: string;
+  eksNodeGroupRoleArn: string;
 }
 
 class IngressAlias implements route53.IAliasRecordTarget {
@@ -115,106 +126,133 @@ export class LitellmCdkStack extends cdk.Stack {
       exclude: ['*'],
     });
 
-    // Create VPC
-    const vpc = new ec2.Vpc(this, 'LiteLLMVpc', {
-      maxAzs: 2,
-      natGateways: 1,
-    });
+    // Create VPC or import specified one
+    const vpc = ec2.Vpc.fromLookup(this, 'ImportedVpc', { vpcId: props.vpcId })
 
     // Create RDS Instance
-    const databaseSecret = new secretsmanager.Secret(this, 'DBSecret', {
-      generateSecretString: {
-        secretStringTemplate: JSON.stringify({
-          username: 'llmproxy',
-        }),
-        generateStringKey: 'password',
-        excludePunctuation: true,
-      },
-    });
+    // const databaseSecret = new secretsmanager.Secret(this, 'DBSecret', {
+    //   generateSecretString: {
+    //     secretStringTemplate: JSON.stringify({
+    //       username: 'llmproxy',
+    //     }),
+    //     generateStringKey: 'password',
+    //     excludePunctuation: true,
+    //   },
+    // });
 
-    const databaseMiddlewareSecret = new secretsmanager.Secret(this, 'DBMiddlewareSecret', {
-      generateSecretString: {
-        secretStringTemplate: JSON.stringify({
-          username: 'middleware',
-        }),
-        generateStringKey: 'password',
-        excludePunctuation: true,
-      },
-    });
+    const databaseSecret = secretsmanager.Secret.fromSecretCompleteArn(
+      this,
+      'ImportedDatabaseSecret',
+      props.rdsLitellmSecretArn
+    );
 
-    const dbSecurityGroup = new ec2.SecurityGroup(this, 'DBSecurityGroup', {
-      vpc,
-      description: 'Security group for RDS instance',
-      allowAllOutbound: true,
-    });
+    const databaseMiddlewareSecret = secretsmanager.Secret.fromSecretCompleteArn(
+      this,
+      'ImportedDatabaseMiddlewareSecret',
+      props.rdsMiddlewareSecretArn
+    );
 
-    const database = new rds.DatabaseInstance(this, 'Database', {
-      engine: rds.DatabaseInstanceEngine.postgres({
-        version: rds.PostgresEngineVersion.VER_15,
-      }),
-      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO),
-      vpc,
-      vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-      },
-      securityGroups: [dbSecurityGroup],
-      credentials: rds.Credentials.fromSecret(databaseSecret),
-      databaseName: 'litellm',
-      storageType: rds.StorageType.GP3,
-      storageEncrypted: true,
-    });
+    const redisSecurityGroup = ec2.SecurityGroup.fromSecurityGroupId(
+      this,
+      'RedisSecurityGroup',
+      props.redisSecurityGroupId, // Replace with your Redis SG ID
+      {
+        mutable: true  // Important: This allows modifications to the security group
+      }
+    );
 
-    const databaseMiddleware = new rds.DatabaseInstance(this, 'DatabaseMiddleware', {
-      engine: rds.DatabaseInstanceEngine.postgres({
-        version: rds.PostgresEngineVersion.VER_15,
-      }),
-      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO),
-      vpc,
-      vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-      },
-      securityGroups: [dbSecurityGroup],
-      credentials: rds.Credentials.fromSecret(databaseMiddlewareSecret),
-      databaseName: 'middleware',
-      storageType: rds.StorageType.GP3,
-      storageEncrypted: true,
-    });
+    const dbSecurityGroup = ec2.SecurityGroup.fromSecurityGroupId(
+      this,
+      'DatabaseSecurityGroup',
+      props.rdsSecurityGroupId, // Replace with your RDS SG ID
+      {
+        mutable: true
+      }
+    );
 
-    const redisSecurityGroup = new ec2.SecurityGroup(this, 'RedisSecurityGroup', {
-      vpc,
-      description: 'Security group for Redis cluster',
-      allowAllOutbound: true,
-    });
+    // const databaseMiddlewareSecret = new secretsmanager.Secret(this, 'DBMiddlewareSecret', {
+    //   generateSecretString: {
+    //     secretStringTemplate: JSON.stringify({
+    //       username: 'middleware',
+    //     }),
+    //     generateStringKey: 'password',
+    //     excludePunctuation: true,
+    //   },
+    // });
 
-    // Create Redis Subnet Group
-    const redisSubnetGroup = new elasticache.CfnSubnetGroup(this, 'RedisSubnetGroup', {
-      description: 'Subnet group for Redis cluster',
-      subnetIds: vpc.privateSubnets.map(subnet => subnet.subnetId),
-      cacheSubnetGroupName: 'litellm-redis-subnet-group',
-    });
+    // const dbSecurityGroup = new ec2.SecurityGroup(this, 'DBSecurityGroup', {
+    //   vpc,
+    //   description: 'Security group for RDS instance',
+    //   allowAllOutbound: true,
+    // });
 
-    const redisParameterGroup = new elasticache.CfnParameterGroup(this, 'RedisParameterGroup', {
-      cacheParameterGroupFamily: 'redis7',
-      description: 'Redis parameter group',
-    });
+    // const database = new rds.DatabaseInstance(this, 'Database', {
+    //   engine: rds.DatabaseInstanceEngine.postgres({
+    //     version: rds.PostgresEngineVersion.VER_15,
+    //   }),
+    //   instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO),
+    //   vpc,
+    //   vpcSubnets: {
+    //     subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+    //   },
+    //   securityGroups: [dbSecurityGroup],
+    //   credentials: rds.Credentials.fromSecret(databaseSecret),
+    //   databaseName: 'litellm',
+    //   storageType: rds.StorageType.GP3,
+    //   storageEncrypted: true,
+    // });
 
-    // Create Redis Cluster
-    const redis = new elasticache.CfnReplicationGroup(this, 'RedisCluster', {
-      replicationGroupDescription: 'Redis cluster',
-      engine: 'redis',
-      cacheNodeType: 'cache.t3.micro',
-      numCacheClusters: 2,
-      automaticFailoverEnabled: true,
-      cacheParameterGroupName: redisParameterGroup.ref,
-      cacheSubnetGroupName: redisSubnetGroup.ref,
-      securityGroupIds: [redisSecurityGroup.securityGroupId],
-      engineVersion: '7.0',
-      port: 6379,
-    });
+    // const databaseMiddleware = new rds.DatabaseInstance(this, 'DatabaseMiddleware', {
+    //   engine: rds.DatabaseInstanceEngine.postgres({
+    //     version: rds.PostgresEngineVersion.VER_15,
+    //   }),
+    //   instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO),
+    //   vpc,
+    //   vpcSubnets: {
+    //     subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+    //   },
+    //   securityGroups: [dbSecurityGroup],
+    //   credentials: rds.Credentials.fromSecret(databaseMiddlewareSecret),
+    //   databaseName: 'middleware',
+    //   storageType: rds.StorageType.GP3,
+    //   storageEncrypted: true,
+    // });
 
-    // Make sure the subnet group is created before the cluster
-    redis.addDependency(redisSubnetGroup);
-    redis.addDependency(redisParameterGroup);
+    // const redisSecurityGroup = new ec2.SecurityGroup(this, 'RedisSecurityGroup', {
+    //   vpc,
+    //   description: 'Security group for Redis cluster',
+    //   allowAllOutbound: true,
+    // });
+
+    // // Create Redis Subnet Group
+    // const redisSubnetGroup = new elasticache.CfnSubnetGroup(this, 'RedisSubnetGroup', {
+    //   description: 'Subnet group for Redis cluster',
+    //   subnetIds: vpc.privateSubnets.map(subnet => subnet.subnetId),
+    //   cacheSubnetGroupName: 'litellm-redis-subnet-group',
+    // });
+
+    // const redisParameterGroup = new elasticache.CfnParameterGroup(this, 'RedisParameterGroup', {
+    //   cacheParameterGroupFamily: 'redis7',
+    //   description: 'Redis parameter group',
+    // });
+
+    // // Create Redis Cluster
+    // const redis = new elasticache.CfnReplicationGroup(this, 'RedisCluster', {
+    //   replicationGroupDescription: 'Redis cluster',
+    //   engine: 'redis',
+    //   cacheNodeType: 'cache.t3.micro',
+    //   numCacheClusters: 2,
+    //   automaticFailoverEnabled: true,
+    //   cacheParameterGroupName: redisParameterGroup.ref,
+    //   cacheSubnetGroupName: redisSubnetGroup.ref,
+    //   securityGroupIds: [redisSecurityGroup.securityGroupId],
+    //   engineVersion: '7.0',
+    //   port: 6379,
+    // });
+
+    // // Make sure the subnet group is created before the cluster
+    // redis.addDependency(redisSubnetGroup);
+    // redis.addDependency(redisParameterGroup);
 
     // Create LiteLLM Secret
     const litellmMasterAndSaltKeySecret = new secretsmanager.Secret(this, 'LiteLLMSecret', {
@@ -278,13 +316,13 @@ export class LitellmCdkStack extends cdk.Stack {
     // Create a custom secret for the database URL
     const dbUrlSecret = new secretsmanager.Secret(this, 'DBUrlSecret', {
       secretStringValue: cdk.SecretValue.unsafePlainText(
-        `postgresql://llmproxy:${databaseSecret.secretValueFromJson('password').unsafeUnwrap()}@${database.instanceEndpoint.hostname}:5432/litellm`
+        `postgresql://llmproxy:${databaseSecret.secretValueFromJson('password').unsafeUnwrap()}@${props.rdsLitellmHostname}:5432/litellm`
       ),
     });
 
     const dbMiddlewareUrlSecret = new secretsmanager.Secret(this, 'DBMiddlewareUrlSecret', {
       secretStringValue: cdk.SecretValue.unsafePlainText(
-        `postgresql://middleware:${databaseMiddlewareSecret.secretValueFromJson('password').unsafeUnwrap()}@${databaseMiddleware.instanceEndpoint.hostname}:5432/middleware`
+        `postgresql://middleware:${databaseMiddlewareSecret.secretValueFromJson('password').unsafeUnwrap()}@${props.rdsMiddlewareHostname}:5432/middleware`
       ),
     });
 
@@ -345,119 +383,400 @@ export class LitellmCdkStack extends cdk.Stack {
       // ════════════════
       // EKS variant
       // ════════════════
-
-      const eksCluster = new eks.Cluster(this, 'HelloEKS', {
-        version: eks.KubernetesVersion.V1_31,
-        vpc,
-        defaultCapacity: 0,
-        kubectlLayer: new KubectlV26Layer(this, 'KubectlLayer'),
-      });
-
-      // Add a managed nodegroup with specific architecture
-      const nodegroup = eksCluster.addNodegroupCapacity('custom-ng', {
-        instanceTypes: [ec2.InstanceType.of(
-          props.architecture === "x86" ? ec2.InstanceClass.T3 : ec2.InstanceClass.T4G,
-          ec2.InstanceSize.MEDIUM
-        )],      
-        minSize: 1,
-        maxSize: 3,
-        desiredSize: 1,
-        amiType: props.architecture === "x86" 
-          ? eks.NodegroupAmiType.AL2_X86_64 
-          : eks.NodegroupAmiType.AL2_ARM_64,
-      });
-
-      // Wait for nodegroup to be ready
-      const albController = new eks.AlbController(this, 'AlbController', {
-        cluster: eksCluster,
-        version: eks.AlbControllerVersion.V2_8_2,
-      });
-      
-
       // 1) Call 'aws sts get-caller-identity' directly in Node.js at synth time
       //    This requires that the "aws" CLI is installed and configured on your machine/environment.
-      let rawArn: string;
-      let accountId: string;
-      try {
-        const rawJson = execSync('aws sts get-caller-identity --output json', { encoding: 'utf-8' });
-        const identity = JSON.parse(rawJson);
-        rawArn = identity.Arn;       // e.g. arn:aws:sts::123456789012:assumed-role/Admin/SessionName
-        accountId = identity.Account; // e.g. 123456789012
-      } catch (error) {
-        throw new Error(`Failed to run "aws sts get-caller-identity". Make sure AWS CLI is installed and configured.\n${error}`);
-      }
 
-      // 2) Parse out the base IAM role from the assumed-role ARN
-      //    e.g. "arn:aws:sts::123456789012:assumed-role/Admin/SessionName"
-      //         => "arn:aws:iam::123456789012:role/Admin"
-      const arnParts = rawArn.split(':'); // [ 'arn','aws','sts','','123456789012','assumed-role/Admin/SessionName' ]
-      if (arnParts[2] !== 'sts') {
-        // It might be a user ARN: e.g. arn:aws:iam::123456789012:user/MyUser
-        // or something else
-        // We'll handle that differently below.
-      }
-      let baseRoleArn: string | undefined;
-      const lastPart = arnParts[5]; // e.g. 'assumed-role/Admin/SessionName'
-      if (lastPart.startsWith('assumed-role/')) {
-        // "assumed-role/Admin/SessionName"
-        const subParts = lastPart.split('/');
-        // subParts = [ 'assumed-role','Admin','SessionName' ]
-        const roleName = subParts[1]; // "Admin"
-        baseRoleArn = `arn:aws:iam::${accountId}:role/${roleName}`;
-      } else {
-        // e.g. user ARN or root
-        // fallback to the entire rawArn if you want
-        // but that won't help if you're ephemeral.
-        baseRoleArn = rawArn.replace(':sts:', ':iam:').replace('assumed-role', 'role');
-        // This naive approach might break if it's not actually an assumed role.
-        // Or just skip if we don't know how to parse it.
-      }
+      let eksCluster : eks.ICluster;
+      let albChart : eks.HelmChart | undefined;
+      let nodegroup : eks.Nodegroup;
+      let nodeRole : cdk.aws_iam.IRole;
+      if(props.eksClusterName) {
+        // Create or import kubectl role
+        // const kubectlRole = new iam.Role(this, 'KubectlRole', {
+        //   assumedBy: new iam.CompositePrincipal(
+        //     new iam.ServicePrincipal('eks.amazonaws.com'),
+        //     new iam.ServicePrincipal('lambda.amazonaws.com')
+        //   ),
+        //   roleName: `eks-kubectl-role`,  // Make role name unique per cluster
+        // });
 
-      if (!baseRoleArn) {
-        throw new Error(`Could not parse a base role from: ${rawArn}`);
+        // kubectlRole.assumeRolePolicy!.addStatements(new iam.PolicyStatement({
+        //   effect: iam.Effect.ALLOW,
+        //   principals: [
+        //     new iam.AccountPrincipal(this.account)
+        //   ],
+        //   actions: ['sts:AssumeRole'],
+        //   conditions: {
+        //     ArnLike: {
+        //       'aws:PrincipalArn': `arn:aws:iam::${this.account}:role/LitellmCdkStack*`,
+        //     },
+        //   },        
+        // }));
+
+        // // Add necessary permissions to kubectl role
+        // kubectlRole.addToPrincipalPolicy(new iam.PolicyStatement({
+        //   effect: iam.Effect.ALLOW,
+        //   actions: [
+        //     'eks:DescribeCluster',
+        //     'eks:ListClusters',
+        //     'eks:AccessKubernetesApi',
+        //     'sts:AssumeRole',
+        //     'sts:GetCallerIdentity',
+        //   ],
+        //   resources: ['*'],
+        // }));
+
+        // // Add Lambda VPC execution role permissions
+        // kubectlRole.addToPrincipalPolicy(new iam.PolicyStatement({
+        //   effect: iam.Effect.ALLOW,
+        //   actions: [
+        //     'ec2:CreateNetworkInterface',
+        //     'ec2:DescribeNetworkInterfaces',
+        //     'ec2:DeleteNetworkInterface',
+        //     'ec2:AssignPrivateIpAddresses',
+        //     'ec2:UnassignPrivateIpAddresses',
+        //   ],
+        //   resources: ['*'],
+        // }));
+
+        // Import the EKS cluster
+        // eksCluster = eks.Cluster.fromClusterAttributes(this, 'ImportedCluster', {
+        //   clusterName: props.eksClusterName,
+        //   vpc,
+        //   kubectlRoleArn: kubectlRole.roleArn,
+        //   openIdConnectProvider: iam.OpenIdConnectProvider.fromOpenIdConnectProviderArn(
+        //     this,
+        //     'ClusterOIDCProvider',
+        //     `arn:aws:iam::${this.account}:oidc-provider/${props.oidcUrl}`
+        //   ),
+        // });
+
+        // 1) Create a new role that we will map as an admin in the EKS cluster
+        // const clusterAdminRole = new iam.Role(this, 'ClusterAdminRole', {
+        //   // who or what can assume this role is up to you; often AccountRootPrincipal for simplicity
+        //   // but you could use a principal that a Pipeline or other system runs as
+        //   assumedBy: new iam.AccountRootPrincipal(),
+        //   // For simplicity, we attach full AdministratorAccess
+        //   // You could scope it to EKS operations only
+        // });
+        // clusterAdminRole.addManagedPolicy(
+        //   iam.ManagedPolicy.fromAwsManagedPolicyName('AdministratorAccess')
+        // );
+
+        eksCluster = eks.Cluster.fromClusterAttributes(this, 'ImportedCluster', {
+          clusterName: props.eksClusterName,
+          vpc: vpc,
+          // If your chart or service account relies on IRSA, you must provide the OIDC provider:
+          openIdConnectProvider: iam.OpenIdConnectProvider.fromOpenIdConnectProviderArn(
+            this,
+            'OIDCProvider',
+            `arn:aws:iam::${this.account}:oidc-provider/${props.oidcUrl}`
+          ),
+          kubectlRoleArn: "arn:aws:iam::235614385815:role/LitellmEksClusterCdkStack-HelloEKSCreationRole089CC-i3gKQrICW6XJ",
+          kubectlLambdaRole: iam.Role.fromRoleArn(this, 'ImportedRole', 'arn:aws:iam::235614385815:role/LitellmEksClusterCdkStack-HelloEKSKubectlHandlerRol-mNZVEzk7piwk')
+        });
+
+        // eksCluster.addManifest('AwsAuthRoleMapping', {
+        //   apiVersion: 'v1',
+        //   kind: 'ConfigMap',
+        //   metadata: {
+        //     name: 'aws-auth',
+        //     namespace: 'kube-system',
+        //   },
+        //   data: {
+        //     // This is a literal YAML structure inside the `mapRoles` key.
+        //     // We can keep the existing mapRoles as well, if needed, but for minimal example:
+        //     mapRoles: [
+        //       {
+        //         rolearn: clusterAdminRole.roleArn,
+        //         username: 'admin',
+        //         groups: ['system:masters']
+        //       }
+        //     ]
+        //   }
+        // });
+
+        // const lbControllerSA = new eks.ServiceAccount(this, 'AwsLoadBalancerControllerSA', {
+        //   cluster: eksCluster,
+        //   name: 'aws-load-balancer-controller',
+        //   namespace: 'kube-system',
+        // });
+        // lbControllerSA.role.addManagedPolicy(
+        //   iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEKSLoadBalancerControllerPolicy')
+        // );
+
+        // 5) Finally, install the AWS Load Balancer Controller via Helm
+        // albChart = new eks.HelmChart(this, 'AwsLoadBalancerControllerChart', {
+        //   cluster: eksCluster,
+        //   chart: 'aws-load-balancer-controller',
+        //   repository: 'https://aws.github.io/eks-charts',
+        //   release: 'aws-load-balancer-controller',
+        //   namespace: 'kube-system',
+        //   wait: true,
+        //   values: {
+        //     clusterName: props.eksClusterName,
+        //     region: this.region,
+        //     // serviceAccount: {
+        //     //   create: false,
+        //     //   name: lbControllerSA.serviceAccountName,
+        //     // },
+        //   },
+        // });
+    
+    
+
+        // new eks.KubernetesManifest(this, 'AwsAuthConfigMap', {
+        //   cluster: eksCluster,
+        //   manifest: [
+        //     {
+        //       apiVersion: 'v1',
+        //       kind: 'ConfigMap',
+        //       metadata: {
+        //         name: 'aws-auth',
+        //         namespace: 'kube-system'
+        //       },
+        //       data: {
+        //         mapRoles: [
+        //           {
+        //             rolearn: 'arn:aws:iam::123456789012:role/LitellmCdkStack-LitellmCdkStackImp-Handler886CB40B-0nO4KNFAqpD0',
+        //             username: 'cdk-user',
+        //             groups: ['system:masters']
+        //           },
+        //           {
+        //             rolearn: kubectlRole.roleArn,
+        //             username: 'system:node:{{EC2PrivateDNSName}}',
+        //             groups: ['system:bootstrappers','system:nodes','system:masters']
+        //           }
+        //         ]
+        //       }
+        //     }
+        //   ]
+        // });
+
+        // First create the aws-auth ConfigMap to allow the role access
+        // const awsAuth = new eks.KubernetesManifest(this, 'AwsAuthConfigMap', {
+        //   cluster: eksCluster,
+        //   manifest: [{
+        //     apiVersion: 'v1',
+        //     kind: 'ConfigMap',
+        //     metadata: {
+        //       name: 'aws-auth',
+        //       namespace: 'kube-system'
+        //     },
+        //     data: {
+        //       mapRoles: [
+        //         {
+        //           rolearn: kubectlRole.roleArn,
+        //           username: 'system:node:{{EC2PrivateDNSName}}',
+        //           groups: ['system:bootstrappers', 'system:nodes', 'system:masters']
+        //         }
+        //       ]
+        //     }
+        //   }]
+        // });
+
+        // Create node group
+        // nodegroup = new eks.Nodegroup(this, 'additional-nodegroup', {
+        //   cluster: eksCluster,
+        //   instanceTypes: [ec2.InstanceType.of(
+        //     props.architecture === "x86" ? ec2.InstanceClass.T3 : ec2.InstanceClass.T4G,
+        //     ec2.InstanceSize.MEDIUM
+        //   )],      
+        //   minSize: 1,
+        //   maxSize: 3,
+        //   desiredSize: 1,
+        //   amiType: props.architecture === "x86" 
+        //     ? eks.NodegroupAmiType.AL2_X86_64 
+        //     : eks.NodegroupAmiType.AL2_ARM_64,
+        // });
+        nodeRole = iam.Role.fromRoleArn(this, 'ImportedNodeRole', props.eksNodeGroupRoleArn, {
+          mutable: true
+        });
+        
+        // Create the ALB controller service account
+        // const albServiceAccount = eksCluster.addServiceAccount('aws-load-balancer-controller', {
+        //   name: 'aws-load-balancer-controller',
+        //   namespace: 'kube-system',
+        // });
+
+        // Add ALB controller policy
+        // albServiceAccount.role.addToPrincipalPolicy(
+        //   new iam.PolicyStatement({
+        //     effect: iam.Effect.ALLOW,
+        //     actions: [
+        //       'elasticloadbalancing:*',
+        //       'ec2:CreateSecurityGroup',
+        //       'ec2:Describe*',
+        //       'iam:CreateServiceLinkedRole',
+        //       'ec2:CreateTags',
+        //       'ec2:AuthorizeSecurityGroupIngress',
+        //       'ec2:RevokeSecurityGroupIngress',
+        //     ],
+        //     resources: ['*'],
+        //   })
+        // );
+
+        // Deploy ALB controller using Helm
+        // albChart = new eks.HelmChart(this, 'AlbController', {
+        //   cluster: eksCluster,
+        //   chart: 'aws-load-balancer-controller',
+        //   repository: 'https://aws.github.io/eks-charts',
+        //   namespace: 'kube-system',
+        //   release: 'aws-load-balancer-controller',
+        //   version: '1.11.0',
+        //   wait: true,
+        //   values: {
+        //     clusterName: eksCluster.clusterName,
+        //     region: cdk.Stack.of(this).region,
+        //     vpcId: eksCluster.vpc.vpcId,
+        //     serviceAccount: {
+        //       create: false,
+        //       name: albServiceAccount.serviceAccountName,
+        //     },
+        //   },
+        // });
+
+        // // Add dependencies
+        // albChart.node.addDependency(awsAuth);
+        // albChart.node.addDependency(albServiceAccount);
+        // albChart.node.addDependency(nodegroup);
       }
-
-      // 4) Import the stable base role, then map it to system:masters
-      const deployerRole = iam.Role.fromRoleArn(this, 'CdkDeployerRole', baseRoleArn, {
-        mutable: false,
-      });
-      eksCluster.awsAuth.addMastersRole(deployerRole);
-      
-      // Add this right after:
-      // Also map the assumed-role pattern for the same role
-      const assumedRoleArn = baseRoleArn.replace(
-        'arn:aws:iam::',
-        'arn:aws:sts::'
-      ).replace(
-        'role/',
-        'assumed-role/'
-      );
-
-      // Add both patterns to aws-auth
-      eksCluster.awsAuth.addRoleMapping(
-        iam.Role.fromRoleArn(this, 'AssumedDeployerRole', assumedRoleArn, {
-          mutable: false,
-        }),
-        {
-          username: assumedRoleArn,
-          groups: ['system:masters']
+      else {
+        let rawArn: string;
+        let accountId: string;
+        try {
+          const rawJson = execSync('aws sts get-caller-identity --output json', { encoding: 'utf-8' });
+          const identity = JSON.parse(rawJson);
+          rawArn = identity.Arn;       // e.g. arn:aws:sts::123456789012:assumed-role/Admin/SessionName
+          accountId = identity.Account; // e.g. 123456789012
+        } catch (error) {
+          throw new Error(`Failed to run "aws sts get-caller-identity". Make sure AWS CLI is installed and configured.\n${error}`);
         }
-      );
 
-      // Optional: Add output to see both mapped roles
-      new cdk.CfnOutput(this, 'MappedBaseRole', {
-        value: baseRoleArn,
-        description: 'The IAM role mapped to system:masters',
-      });
+        // 2) Parse out the base IAM role from the assumed-role ARN
+        //    e.g. "arn:aws:sts::123456789012:assumed-role/Admin/SessionName"
+        //         => "arn:aws:iam::123456789012:role/Admin"
+        const arnParts = rawArn.split(':'); // [ 'arn','aws','sts','','123456789012','assumed-role/Admin/SessionName' ]
+        if (arnParts[2] !== 'sts') {
+          // It might be a user ARN: e.g. arn:aws:iam::123456789012:user/MyUser
+          // or something else
+          // We'll handle that differently below.
+        }
+        let baseRoleArn: string | undefined;
+        const lastPart = arnParts[5]; // e.g. 'assumed-role/Admin/SessionName'
+        if (lastPart.startsWith('assumed-role/')) {
+          // "assumed-role/Admin/SessionName"
+          const subParts = lastPart.split('/');
+          // subParts = [ 'assumed-role','Admin','SessionName' ]
+          const roleName = subParts[1]; // "Admin"
+          baseRoleArn = `arn:aws:iam::${accountId}:role/${roleName}`;
+        } else {
+          // e.g. user ARN or root
+          // fallback to the entire rawArn if you want
+          // but that won't help if you're ephemeral.
+          baseRoleArn = rawArn.replace(':sts:', ':iam:').replace('assumed-role', 'role');
+          // This naive approach might break if it's not actually an assumed role.
+          // Or just skip if we don't know how to parse it.
+        }
 
-      new cdk.CfnOutput(this, 'MappedAssumedRole', {
-        value: assumedRoleArn,
-        description: 'The assumed role pattern mapped to system:masters',
-      });
+        if (!baseRoleArn) {
+          throw new Error(`Could not parse a base role from: ${rawArn}`);
+        }
+
+        // 4) Import the stable base role, then map it to system:masters
+        const deployerRole = iam.Role.fromRoleArn(this, 'CdkDeployerRole', baseRoleArn, {
+          mutable: false,
+        });
+
+        const eksClusterTemp = new eks.Cluster(this, 'HelloEKS', {
+          version: eks.KubernetesVersion.V1_31,
+          vpc,
+          defaultCapacity: 0,
+          kubectlLayer: new KubectlV26Layer(this, 'KubectlLayer'),
+        });
+  
+        // Add a managed nodegroup with specific architecture
+        nodegroup = eksClusterTemp.addNodegroupCapacity('custom-ng', {
+          instanceTypes: [ec2.InstanceType.of(
+            props.architecture === "x86" ? ec2.InstanceClass.T3 : ec2.InstanceClass.T4G,
+            ec2.InstanceSize.MEDIUM
+          )],      
+          minSize: 1,
+          maxSize: 3,
+          desiredSize: 1,
+          amiType: props.architecture === "x86" 
+            ? eks.NodegroupAmiType.AL2_X86_64 
+            : eks.NodegroupAmiType.AL2_ARM_64,
+        });
+        nodeRole = nodegroup.role;
+  
+        albChart = eksClusterTemp.addHelmChart('AlbController', {
+          chart: 'aws-load-balancer-controller',
+          repository: 'https://aws.github.io/eks-charts',
+          namespace: 'kube-system',
+          release: 'aws-load-balancer-controller',
+          version: '1.11.0',
+          wait: true,                           // Ensures the chart waits for readiness
+          values: {
+            clusterName: eksClusterTemp.clusterName,
+            region: cdk.Stack.of(this).region,
+            vpcId: eksClusterTemp.vpc.vpcId,
+          },
+        });
+
+        eksClusterTemp.awsAuth.addMastersRole(deployerRole);
+        // Add this right after:
+        // Also map the assumed-role pattern for the same role
+        const assumedRoleArn = baseRoleArn.replace(
+          'arn:aws:iam::',
+          'arn:aws:sts::'
+        ).replace(
+          'role/',
+          'assumed-role/'
+        );
+
+        // Add both patterns to aws-auth
+        eksClusterTemp.awsAuth.addRoleMapping(
+          iam.Role.fromRoleArn(this, 'AssumedDeployerRole', assumedRoleArn, {
+            mutable: false,
+          }),
+          {
+            username: assumedRoleArn,
+            groups: ['system:masters']
+          }
+        );
+        new cdk.CfnOutput(this, 'MappedAssumedRole', {
+          value: assumedRoleArn,
+          description: 'The assumed role pattern mapped to system:masters',
+        });
+
+        // Optional: Add output to see both mapped roles
+        new cdk.CfnOutput(this, 'MappedBaseRole', {
+          value: baseRoleArn,
+          description: 'The IAM role mapped to system:masters',
+        });
+
+        eksCluster = eksClusterTemp;
+      }
+
+      
+      
+
+      //Wait for nodegroup to be ready
+      // const albController = new eks.AlbController(this, 'AlbController', {
+      //   cluster: eksCluster,
+      //   version: eks.AlbControllerVersion.V2_8_2,
+      // });
+      
+
+      
+      
+
+      
+      
 
       // 2) Attach ECS-like policies to the node role
       //    so pods can do the same S3/Bedrock/SageMaker calls ECS tasks had.
-      const nodeRole = nodegroup.role;
       
       const ecrPolicyStatement = new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
@@ -589,8 +908,8 @@ export class LitellmCdkStack extends cdk.Stack {
         properties: {
           dbSecretArn: databaseSecret.secretArn,
           dbMiddlewareSecretArn: databaseMiddlewareSecret.secretArn,
-          dbEndpoint: database.instanceEndpoint.hostname,
-          dbMiddlewareEndpoint: databaseMiddleware.instanceEndpoint.hostname,
+          dbEndpoint: props.rdsLitellmHostname,
+          dbMiddlewareEndpoint: props.rdsMiddlewareHostname,
           openaiApiKey: props.openaiApiKey,
           azureOpenAiApiKey: props.azureOpenAiApiKey,
           azureApiKey: props.azureApiKey,
@@ -643,11 +962,14 @@ export class LitellmCdkStack extends cdk.Stack {
           GITHUB_API_KEY: secretsCustomResource.getAtt('GITHUB_API_KEY').toString(),
           DEEPSEEK_API_KEY: secretsCustomResource.getAtt('DEEPSEEK_API_KEY').toString(),
           AI21_API_KEY: secretsCustomResource.getAtt('AI21_API_KEY').toString(),
-        }
+        },
       });
 
-      litellmApiKeys.node.addDependency(albController);
-
+      //litellmApiKeys.node.addDependency(albController);
+      if (albChart) {
+        litellmApiKeys.node.addDependency(albChart);
+      }
+      
 
       const middlewareSecrets = eksCluster.addManifest('MiddlewareSecrets', {
         apiVersion: 'v1',
@@ -659,7 +981,10 @@ export class LitellmCdkStack extends cdk.Stack {
         },
       });
 
-      middlewareSecrets.node.addDependency(albController);
+      //middlewareSecrets.node.addDependency(albController);
+      if (albChart) {
+        middlewareSecrets.node.addDependency(albChart);
+      }
 
 
       // 5) Create the Deployment with 2 containers
@@ -697,7 +1022,7 @@ export class LitellmCdkStack extends cdk.Stack {
                     },
                     {
                       name: 'REDIS_URL',
-                      value: `redis://${redis.attrPrimaryEndPointAddress}:${redis.attrPrimaryEndPointPort}`
+                      value: `redis://${props.redisHostName}:${props.redisPort}`
                     },
                     {
                       name: 'LANGSMITH_PROJECT',
@@ -1019,7 +1344,10 @@ export class LitellmCdkStack extends cdk.Stack {
         },
       });
 
-      service.node.addDependency(albController);
+      //service.node.addDependency(albController);
+      if (albChart) {
+        service.node.addDependency(albChart);
+      }
       service.node.addDependency(deploymentResource);
     
       // 7) Ingress: ALB with path-based routing + WAF annotation
@@ -1124,12 +1452,16 @@ export class LitellmCdkStack extends cdk.Stack {
         },
       });
       ingressResource.node.addDependency(service);
-      ingressResource.node.addDependency(albController);
+      //ingressResource.node.addDependency(albController);
+
+      if(albChart){
+        ingressResource.node.addDependency(albChart);
+      }
       ingressResource.node.addDependency(webAcl);
 
       // 8) Let DB & Redis allow traffic from EKS nodes
-      dbSecurityGroup.addIngressRule(ec2.Peer.ipv4(vpc.vpcCidrBlock), ec2.Port.tcp(5432));
-      redisSecurityGroup.addIngressRule(ec2.Peer.ipv4(vpc.vpcCidrBlock), ec2.Port.tcp(6379));
+      // dbSecurityGroup.addIngressRule(ec2.Peer.ipv4(vpc.vpcCidrBlock), ec2.Port.tcp(5432));
+      // redisSecurityGroup.addIngressRule(ec2.Peer.ipv4(vpc.vpcCidrBlock), ec2.Port.tcp(6379));
 
       new cdk.CfnOutput(this, 'WebAclArn', {
         value: webAcl.attrArn,
@@ -1176,7 +1508,10 @@ export class LitellmCdkStack extends cdk.Stack {
               if (!loadBalancer) {
                 throw new Error('LoadBalancer not found after multiple retries');
               }
-              
+              console.log(loadBalancer.DNSName)
+              console.log(loadBalancer.LoadBalancerArn)
+              console.log(loadBalancer.CanonicalHostedZoneId)
+
               return response.send(event, context, response.SUCCESS, {
                 LoadBalancerDNS: loadBalancer.DNSName,
                 LoadBalancerArn: loadBalancer.LoadBalancerArn,
@@ -1188,7 +1523,7 @@ export class LitellmCdkStack extends cdk.Stack {
             }
           };
         `),
-        timeout: cdk.Duration.minutes(3)
+        timeout: cdk.Duration.minutes(10)
       });
 
       // Grant permissions to the function
@@ -1210,7 +1545,7 @@ export class LitellmCdkStack extends cdk.Stack {
           // Add a timestamp to force update on each deployment
           timestamp: Date.now()
         },
-        serviceTimeout: cdk.Duration.minutes(3)
+        serviceTimeout: cdk.Duration.minutes(10)
       });
 
       // Make sure the custom resource waits for the ingress
@@ -1280,10 +1615,10 @@ export class LitellmCdkStack extends cdk.Stack {
         exportName: 'EksDeploymentName'
       });
 
-      new cdk.CfnOutput(this, 'EksClusterName', {
+      new cdk.CfnOutput(this, 'EksClusterNameMainStack', {
         value: eksCluster.clusterName,
         description: 'The name of the EKS cluster',
-        exportName: 'EksClusterName'
+        exportName: 'EksClusterNameMainStack'
       });
       
 
@@ -1372,7 +1707,7 @@ export class LitellmCdkStack extends cdk.Stack {
           LITELLM_CONFIG_BUCKET_NAME: configBucket.bucketName,
           LITELLM_CONFIG_BUCKET_OBJECT_KEY: 'config.yaml',
           UI_USERNAME: "admin",
-          REDIS_URL: `redis://${redis.attrPrimaryEndPointAddress}:${redis.attrPrimaryEndPointPort}`,
+          REDIS_URL: `redis://${props.redisHostName}:${props.redisPort}`,
           LANGSMITH_PROJECT: props.langsmithProject,
           LANGSMITH_DEFAULT_RUN_NAME: props.langsmithDefaultRunName
         }

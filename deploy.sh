@@ -34,6 +34,9 @@ APP_NAME=litellm
 MIDDLEWARE_APP_NAME=middleware
 STACK_NAME="LitellmCdkStack"
 LOG_BUCKET_STACK_NAME="LogBucketCdkStack"
+DATABASE_STACK_NAME="LitellmDatabaseCdkStack"
+EKS_CLUSTER_PRE_SETUP_STACK_NAME="LitellmEksClusterPreSetupCdkStack"
+EKS_CLUSTER_NODE_GROUP_STACK_NAME="LitellmEksClusterNodeGroupCdkStack"
 
 # Load environment variables from .env file
 source .env
@@ -80,6 +83,9 @@ echo "LANGSMITH_API_KEY: $LANGSMITH_API_KEY"
 echo "LANGSMITH_PROJECT: $LANGSMITH_PROJECT"
 echo "LANGSMITH_DEFAULT_RUN_NAME: $LANGSMITH_DEFAULT_RUN_NAME"
 echo "DEPLOYMENT_PLATFORM: $DEPLOYMENT_PLATFORM"
+echo "VPC_ID: $VPC_ID"
+echo "EKS_CLUSTER_NAME: $EKS_CLUSTER_NAME"
+echo "EKS_OIDC_URL: $EKS_OIDC_URL"
 
 if [ "$SKIP_BUILD" = false ]; then
     echo "Building and pushing docker image..."
@@ -164,6 +170,69 @@ if [ -n "${LANGSMITH_API_KEY}" ] && [ -n "${LANGSMITH_PROJECT}" ] && [ -n "${LAN
     echo "Updated config.yaml with 'langsmith' added to success callback array"
 fi
 
+cd litellm-database-cdk
+echo "Installing dependencies for database cdk..."
+npm install
+echo "Deploying the database CDK stack..."
+cdk deploy "$DATABASE_STACK_NAME" \
+--context vpcId=$VPC_ID \
+--outputs-file ./outputs.json
+
+if [ $? -eq 0 ]; then
+    echo "Deployment successful. Extracting outputs..."
+    VPC_ID=$(jq -r ".\"${DATABASE_STACK_NAME}\".VpcId" ./outputs.json)
+    RDS_LITELLM_HOSTNAME=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsLitellmHostname" ./outputs.json)
+    RDS_LITELLM_SECRET_ARN=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsLitellmSecretArn" ./outputs.json)
+    RDS_MIDDLEWARE_HOSTNAME=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsMiddlewareHostname" ./outputs.json)
+    RDS_MIDDLEWARE_SECRET_ARN=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsMiddlewareSecretArn" ./outputs.json)
+    REDIS_HOST_NAME=$(jq -r ".\"${DATABASE_STACK_NAME}\".RedisHostName" ./outputs.json)
+    REDIS_PORT=$(jq -r ".\"${DATABASE_STACK_NAME}\".RedisPort" ./outputs.json)
+    RDS_SECURITY_GROUP_ID=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsSecurityGroupId" ./outputs.json)
+    REDIS_SECURITY_GROUP_ID=$(jq -r ".\"${DATABASE_STACK_NAME}\".RedisSecurityGroupId" ./outputs.json)
+else
+    echo "Deployment failed"
+fi
+
+cd ..
+
+cd litellm-eks-cluster-node-group-cdk
+echo "Installing dependencies for eks cluster node group cdk..."
+npm install
+echo "Deploying the eks cluster node group CDK stack..."
+cdk deploy "$EKS_CLUSTER_NODE_GROUP_STACK_NAME" \
+--context architecture=$ARCH \
+--context vpcId=$VPC_ID \
+--context eksClusterName=$EKS_CLUSTER_NAME \
+--context eksOidcUrl=$EKS_OIDC_URL \
+--outputs-file ./outputs.json
+
+if [ $? -eq 0 ]; then
+    echo "Deployment successful. Extracting outputs..."
+    EKS_NODE_GROUP_ROLE_ARN=$(jq -r ".\"${EKS_CLUSTER_NODE_GROUP_STACK_NAME}\".EksNodeGroupRoleArn" ./outputs.json)
+else
+    echo "Deployment failed"
+fi
+
+cd ..
+
+cd litellm-eks-cluster-pre-setup-cdk
+echo "Installing dependencies for eks cluster pre setup cdk..."
+npm install
+echo "Deploying the eks cluster pre setup CDK stack..."
+cdk deploy "$EKS_CLUSTER_PRE_SETUP_STACK_NAME" \
+--context architecture=$ARCH \
+--context vpcId=$VPC_ID \
+--context eksClusterName=$EKS_CLUSTER_NAME \
+--context eksOidcUrl=$EKS_OIDC_URL \
+--outputs-file ./outputs.json
+
+if [ $? -eq 0 ]; then
+    echo "Deployment successful. Extracting outputs..."
+else
+    echo "Deployment failed"
+fi
+
+cd ..
 
 cd litellm-cdk
 echo "Installing dependencies..."
@@ -204,6 +273,18 @@ cdk deploy "$STACK_NAME" \
 --context langsmithProject=$LANGSMITH_PROJECT \
 --context langsmithDefaultRunName=$LANGSMITH_DEFAULT_RUN_NAME \
 --context deploymentPlatform=$DEPLOYMENT_PLATFORM \
+--context vpcId=$VPC_ID \
+--context eksClusterName=$EKS_CLUSTER_NAME \
+--context rdsLitellmHostname=$RDS_LITELLM_HOSTNAME \
+--context rdsLitellmSecretArn=$RDS_LITELLM_SECRET_ARN \
+--context rdsMiddlewareHostname=$RDS_MIDDLEWARE_HOSTNAME \
+--context rdsMiddlewareSecretArn=$RDS_MIDDLEWARE_SECRET_ARN \
+--context redisHostName=$REDIS_HOST_NAME \
+--context redisPort=$REDIS_PORT \
+--context rdsSecurityGroupId=$RDS_SECURITY_GROUP_ID \
+--context redisSecurityGroupId=$REDIS_SECURITY_GROUP_ID \
+--context eksNodeGroupRoleArn=$EKS_NODE_GROUP_ROLE_ARN \
+--context eksOidcUrl=$EKS_OIDC_URL \
 --outputs-file ./outputs.json
 
 if [ $? -eq 0 ]; then
@@ -224,7 +305,7 @@ if [ $? -eq 0 ]; then
 
     if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
         EKS_DEPLOYMENT_NAME=$(jq -r ".\"${STACK_NAME}\".EksDeploymentName" ./outputs.json)
-        EKS_CLUSTER_NAME=$(jq -r ".\"${STACK_NAME}\".EksClusterName" ./outputs.json)
+        EKS_CLUSTER_NAME=$(jq -r ".\"${STACK_NAME}\".EksClusterNameMainStack" ./outputs.json)
 
         echo "EKS_DEPLOYMENT_NAME: $EKS_DEPLOYMENT_NAME"
         echo "EKS_CLUSTER_NAME: $EKS_CLUSTER_NAME"
