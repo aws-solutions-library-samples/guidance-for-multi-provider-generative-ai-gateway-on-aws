@@ -39,6 +39,7 @@ const langsmithApiKey = String(app.node.tryGetContext("langsmithApiKey"));
 const langsmithProject = String(app.node.tryGetContext("langsmithProject"));
 const langsmithDefaultRunName = String(app.node.tryGetContext("langsmithDefaultRunName"));
 const deploymentPlatformString = String(app.node.tryGetContext("deploymentPlatform"));
+const vpcId = String(app.node.tryGetContext("vpcId"));
 
 // Validate and convert deployment platform string to enum
 const deploymentPlatform = (() => {
@@ -88,6 +89,7 @@ new LitellmCdkStack(app, 'LitellmCdkStack', {
   langsmithProject: langsmithProject,
   langsmithDefaultRunName: langsmithDefaultRunName,
   deploymentPlatform: deploymentPlatform,
+  vpcId: vpcId,
 
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,

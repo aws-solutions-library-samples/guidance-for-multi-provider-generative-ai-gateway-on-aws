@@ -37,6 +37,7 @@ LOG_BUCKET_STACK_NAME="LogBucketCdkStack"
 
 # Load environment variables from .env file
 source .env
+export JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION=1
 
 if [[ (-z "$LITELLM_VERSION") || ("$LITELLM_VERSION" == "placeholder") ]]; then
     echo "LITELLM_VERSION must be set in .env file"
@@ -80,6 +81,8 @@ echo "LANGSMITH_API_KEY: $LANGSMITH_API_KEY"
 echo "LANGSMITH_PROJECT: $LANGSMITH_PROJECT"
 echo "LANGSMITH_DEFAULT_RUN_NAME: $LANGSMITH_DEFAULT_RUN_NAME"
 echo "DEPLOYMENT_PLATFORM: $DEPLOYMENT_PLATFORM"
+echo "EXISTING_EKS_CLUSTER_NAME: $EXISTING_EKS_CLUSTER_NAME"
+echo "EXISTING_VPC_ID: $EXISTING_VPC_ID"
 
 if [ "$SKIP_BUILD" = false ]; then
     echo "Building and pushing docker image..."
@@ -204,16 +207,134 @@ cdk deploy "$STACK_NAME" \
 --context langsmithProject=$LANGSMITH_PROJECT \
 --context langsmithDefaultRunName=$LANGSMITH_DEFAULT_RUN_NAME \
 --context deploymentPlatform=$DEPLOYMENT_PLATFORM \
+--context vpcId=$EXISTING_VPC_ID \
 --outputs-file ./outputs.json
+
+if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
+    # Standard variables from CloudFormation outputs
+    export TF_VAR_region=$aws_region
+    export TF_VAR_name="genai-gateway"
+    # Set create_cluster to false if EXISTING_EKS_CLUSTER_NAME is not empty, true otherwise
+    if [ -n "$EXISTING_EKS_CLUSTER_NAME" ]; then
+        export TF_VAR_create_cluster="false"
+    else
+        export TF_VAR_create_cluster="true"
+    fi
+
+    # Cluster information
+    export TF_VAR_existing_cluster_name=$EXISTING_EKS_CLUSTER_NAME
+
+    # VPC and Network
+    export TF_VAR_vpc_id=$(jq -r ".\"${STACK_NAME}\".VpcId" ./outputs.json)
+
+    # Architecture
+    export TF_VAR_architecture=$ARCH
+
+    # Bucket information
+    export TF_VAR_config_bucket_arn=$(jq -r ".\"${STACK_NAME}\".ConfigBucketArn" ./outputs.json)
+    export TF_VAR_config_bucket_name=$(jq -r ".\"${STACK_NAME}\".ConfigBucketName" ./outputs.json)
+    export TF_VAR_log_bucket_arn=$LOG_BUCKET_ARN
+
+    # ECR Repositories
+    export TF_VAR_ecr_litellm_repository_url=$(jq -r ".\"${STACK_NAME}\".LiteLLMRepositoryUrl" ./outputs.json)
+    export TF_VAR_ecr_middleware_repository_url=$(jq -r ".\"${STACK_NAME}\".MiddlewareRepositoryUrl" ./outputs.json)
+    export TF_VAR_litellm_version=$LITELLM_VERSION
+
+
+    MAIN_DB_SECRET_ARN=$(jq -r ".\"${STACK_NAME}\".DatabaseUrlSecretArn" ./outputs.json)
+    MIDDLEWARE_DB_SECRET_ARN=$(jq -r ".\"${STACK_NAME}\".DatabaseMiddlewareUrlSecretArn" ./outputs.json)
+
+    # Get the connection strings
+    MAIN_DB_URL=$(aws secretsmanager get-secret-value \
+    --secret-id "$MAIN_DB_SECRET_ARN" \
+    --query 'SecretString' \
+    --output text)
+
+    MIDDLEWARE_DB_URL=$(aws secretsmanager get-secret-value \
+    --secret-id "$MIDDLEWARE_DB_SECRET_ARN" \
+    --query 'SecretString' \
+    --output text)
+
+    # Database and Redis URLs
+    export TF_VAR_database_url=$(aws secretsmanager get-secret-value \
+        --secret-id "$MAIN_DB_SECRET_ARN" \
+        --query 'SecretString' \
+        --output text)
+    export TF_VAR_database_middleware_url=$(aws secretsmanager get-secret-value \
+        --secret-id "$MIDDLEWARE_DB_SECRET_ARN" \
+        --query 'SecretString' \
+        --output text)
+
+    export TF_VAR_redis_url=$(jq -r ".\"${STACK_NAME}\".RedisUrl" ./outputs.json)
+
+    # Certificate and WAF
+    export TF_VAR_certificate_arn=$CERTIFICATE_ARN
+    export TF_VAR_wafv2_acl_arn=$(jq -r ".\"${STACK_NAME}\".WafAclArn" ./outputs.json)
+    export TF_VAR_domain_name=$DOMAIN_NAME
+
+    # Get the secret ARN from CloudFormation output
+    LITELLM_MASTER_AND_SALT_KEY_SECRET_ARN=$(jq -r ".\"${STACK_NAME}\".LitellmMasterAndSaltKeySecretArn" ./outputs.json)
+
+    # Get the secret JSON and parse out individual values
+    LITELLM_MASTER_AND_SALT_KEY_SECRET_JSON=$(aws secretsmanager get-secret-value \
+    --secret-id "$LITELLM_MASTER_AND_SALT_KEY_SECRET_ARN" \
+    --query 'SecretString' \
+    --output text)
+
+    # Extract individual values using jq
+    export TF_VAR_litellm_master_key=$(echo $LITELLM_MASTER_AND_SALT_KEY_SECRET_JSON | jq -r '.LITELLM_MASTER_KEY')
+    export TF_VAR_litellm_salt_key=$(echo $LITELLM_MASTER_AND_SALT_KEY_SECRET_JSON | jq -r '.LITELLM_SALT_KEY')
+
+    export TF_VAR_openai_api_key=$OPENAI_API_KEY
+    export TF_VAR_azure_openai_api_key=$AZURE_OPENAI_API_KEY
+    export TF_VAR_azure_api_key=$AZURE_API_KEY
+    export TF_VAR_anthropic_api_key=$ANTHROPIC_API_KEY
+    export TF_VAR_groq_api_key=$GROQ_API_KEY
+    export TF_VAR_cohere_api_key=$COHERE_API_KEY
+    export TF_VAR_co_api_key=$CO_API_KEY
+    export TF_VAR_hf_token=$HF_TOKEN
+    export TF_VAR_huggingface_api_key=$HUGGINGFACE_API_KEY
+    export TF_VAR_databricks_api_key=$DATABRICKS_API_KEY
+    export TF_VAR_gemini_api_key=$GEMINI_API_KEY
+    export TF_VAR_codestral_api_key=$CODESTRAL_API_KEY
+    export TF_VAR_mistral_api_key=$MISTRAL_API_KEY
+    export TF_VAR_azure_ai_api_key=$AZURE_API_KEY
+    export TF_VAR_nvidia_nim_api_key=$NVIDIA_NIM_API_KEY
+    export TF_VAR_xai_api_key=$XAI_API_KEY
+    export TF_VAR_perplexityai_api_key=$PERPLEXITYAI_API_KEY
+    export TF_VAR_github_api_key=$GITHUB_API_KEY
+    export TF_VAR_deepseek_api_key=$DEEPSEEK_API_KEY
+    export TF_VAR_ai21_api_key=$AI21_API_KEY
+
+    export TF_VAR_langsmith_api_key=$LANGSMITH_API_KEY
+    export TF_VAR_langsmith_project=$LANGSMITH_PROJECT
+    export TF_VAR_langsmith_default_run_name=$LANGSMITH_DEFAULT_RUN_NAME
+
+
+    # Okta configuration
+    export TF_VAR_okta_issuer=$OKTA_ISSUER
+    export TF_VAR_okta_audience=$OKTA_AUDIENCE
+
+    export TF_VAR_db_security_group_id=$(jq -r ".\"${STACK_NAME}\".DbSecurityGroupId" ./outputs.json)
+    export TF_VAR_redis_security_group_id=$(jq -r ".\"${STACK_NAME}\".RedisSecurityGroupId" ./outputs.json)
+
+    cd ..
+    cd litellm-eks-terraform
+    terraform init
+    #terraform destroy
+    terraform apply
+
+fi
 
 if [ $? -eq 0 ]; then
     echo "Deployment successful. Extracting outputs..."
-    LITELLM_ECS_CLUSTER=$(jq -r ".\"${STACK_NAME}\".LitellmEcsCluster" ./outputs.json)
-    LITELLM_ECS_TASK=$(jq -r ".\"${STACK_NAME}\".LitellmEcsTask" ./outputs.json)
-    SERVICE_URL=$(jq -r ".\"${STACK_NAME}\".ServiceURL" ./outputs.json)
     
-    echo "ServiceURL=$SERVICE_URL" > resources.txt
     if [ "$DEPLOYMENT_PLATFORM" = "ECS" ]; then
+        LITELLM_ECS_CLUSTER=$(jq -r ".\"${STACK_NAME}\".LitellmEcsCluster" ./outputs.json)
+        LITELLM_ECS_TASK=$(jq -r ".\"${STACK_NAME}\".LitellmEcsTask" ./outputs.json)
+        SERVICE_URL=$(jq -r ".\"${STACK_NAME}\".ServiceURL" ./outputs.json)
+        
+        echo "ServiceURL=$SERVICE_URL" > resources.txt
         aws ecs update-service \
             --cluster $LITELLM_ECS_CLUSTER \
             --service $LITELLM_ECS_TASK \
@@ -223,8 +344,8 @@ if [ $? -eq 0 ]; then
     fi
 
     if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
-        EKS_DEPLOYMENT_NAME=$(jq -r ".\"${STACK_NAME}\".EksDeploymentName" ./outputs.json)
-        EKS_CLUSTER_NAME=$(jq -r ".\"${STACK_NAME}\".EksClusterName" ./outputs.json)
+        EKS_CLUSTER_NAME=$(terraform output -raw eks_cluster_name)
+        EKS_DEPLOYMENT_NAME=$(terraform output -raw eks_deployment_name)
 
         echo "EKS_DEPLOYMENT_NAME: $EKS_DEPLOYMENT_NAME"
         echo "EKS_CLUSTER_NAME: $EKS_CLUSTER_NAME"
