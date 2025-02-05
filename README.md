@@ -25,7 +25,7 @@ It also provides additional features on top of LiteLLM such as an AWS Bedrock In
 If you have `DEPLOYMENT_PLATFORM` set to `EKS`:
 
 6. kubectl
-7. Terraform (needed because of limitations in the EKS CDK constructs. We hope to eventually unify the deployment in one IAC solution.)
+7. Terraform (needed because of limitations in the EKS CDK constructs. We hope to eventually unify the deployment in one IaC solution.)
 
 ### Installing kubectl
 
