@@ -117,7 +117,7 @@ npm install
 npm run build
 echo "Deploying the log bucket CDK stack..."
 
-cdk deploy "$LOG_BUCKET_STACK_NAME" \
+cdk deploy "$LOG_BUCKET_STACK_NAME" --require-approval never \
 --outputs-file ./outputs.json
 
 if [ $? -eq 0 ]; then
@@ -173,7 +173,7 @@ echo "Installing dependencies..."
 npm install
 echo "Deploying the CDK stack..."
 
-cdk deploy "$STACK_NAME" \
+cdk deploy "$STACK_NAME" --require-approval never \
 --context architecture=$ARCH \
 --context liteLLMVersion=$LITELLM_VERSION \
 --context ecrLitellmRepository=$APP_NAME \
@@ -322,7 +322,7 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     cd litellm-eks-terraform
     terraform init
     #terraform destroy
-    terraform apply
+    terraform apply -auto-approve
 
 fi
 

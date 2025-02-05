@@ -37,13 +37,11 @@ data "aws_iam_policy_document" "assume_role" {
 
 resource "aws_iam_role" "eks_developers" {
   name               = "${var.name}-developers"
-  path               = "/"
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
 }
 
 resource "aws_iam_role" "eks_operators" {
   name               = "${var.name}-operators"
-  path               = "/"
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
 }
 #--------------------------------------------------------------
@@ -65,12 +63,12 @@ resource "aws_cloudformation_stack" "guidance_deployment_metrics" {
 }
 
 provider "kubernetes" {
-  host                   = module.eks.cluster_endpoint
-  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+  host                   = aws_eks_cluster.this.endpoint
+  cluster_ca_certificate = base64decode(aws_eks_cluster.this.certificate_authority[0].data)
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "aws"
-    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+    args        = ["eks", "get-token", "--cluster-name", aws_eks_cluster.this.name]
   }
 }
 
@@ -419,6 +417,7 @@ resource "kubernetes_ingress_v1" "litellm" {
       }
     }
   }
+  depends_on = [helm_release.aws_load_balancer_controller, module.aws_load_balancer_controller_irsa_role, aws_eks_addon.coredns]
 }
 
 # Service
@@ -457,7 +456,7 @@ module "aws_load_balancer_controller_irsa_role" {
 
   oidc_providers = {
     ex = {
-      provider_arn               = module.eks.oidc_provider_arn
+      provider_arn               = aws_iam_openid_connect_provider.this.arn
       namespace_service_accounts = ["kube-system:aws-load-balancer-controller"]
     }
   }
@@ -472,7 +471,7 @@ resource "helm_release" "aws_load_balancer_controller" {
 
   set {
     name  = "clusterName"
-    value = module.eks.cluster_name
+    value = aws_eks_cluster.this.name
   }
 
   set {
@@ -485,13 +484,16 @@ resource "helm_release" "aws_load_balancer_controller" {
     value = module.aws_load_balancer_controller_irsa_role.iam_role_arn
   }
 
-  depends_on = [module.eks.eks_managed_node_groups]
+  depends_on = [
+    aws_eks_node_group.core_nodegroup,
+    module.aws_load_balancer_controller_irsa_role
+  ]
 }
 
 # Add additional IAM policies to node groups
 resource "aws_iam_role_policy" "node_additional_policies" {
   name = "${var.name}-eks-node-additional"
-  role = module.eks.eks_managed_node_groups["core_nodegroup"].iam_role_name
+  role = aws_iam_role.eks_nodegroup.name
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -543,7 +545,7 @@ data "aws_lb" "ingress_alb" {
   
   tags = {
     # The ALB created by the AWS Load Balancer Controller will have this tag
-    "elbv2.k8s.aws/cluster" = module.eks.cluster_name
+    "elbv2.k8s.aws/cluster" = aws_eks_cluster.this.name
     # This tag helps identify the specific ingress
     "ingress.k8s.aws/stack" = "default/litellm-ingress"
   }
@@ -552,12 +554,12 @@ data "aws_lb" "ingress_alb" {
 # Add provider configurations
 provider "helm" {
   kubernetes {
-    host                   = module.eks.cluster_endpoint
-    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+    host                   = aws_eks_cluster.this.endpoint
+    cluster_ca_certificate = base64decode(aws_eks_cluster.this.certificate_authority[0].data)
     exec {
       api_version = "client.authentication.k8s.io/v1beta1"
       command     = "aws"
-      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+      args        = ["eks", "get-token", "--cluster-name", aws_eks_cluster.this.name]
     }
   }
 }

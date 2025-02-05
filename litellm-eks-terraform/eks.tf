@@ -2,15 +2,6 @@
 # Cluster
 ################################################################################
 # Data source for existing EKS cluster (when importing)
-data "aws_eks_cluster" "existing" {
-  count = var.create_cluster ? 0 : 1
-  name  = var.existing_cluster_name
-}
-
-data "aws_eks_cluster_auth" "existing" {
-  count = var.create_cluster ? 0 : 1
-  name  = var.existing_cluster_name
-}
 
 data "aws_vpc" "existing" {
   id = var.vpc_id
@@ -85,113 +76,239 @@ resource "aws_security_group_rule" "redis_ingress" {
   security_group_id = data.aws_security_group.redis.id
 }
 
-# Create new cluster or use existing
-module "eks" {
-  source  = "terraform-aws-modules/eks/aws"
-  version = "~> 20.24"
+resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
+  role       = aws_iam_role.eks_cluster.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+}
 
-  create = var.create_cluster
 
-  cluster_name    = "${var.name}-cluster"
-  cluster_version = var.create_cluster ? var.cluster_version : data.aws_eks_cluster.existing[0].version
-  cluster_endpoint_private_access = var.create_cluster ? true : null
-  # Only set these if creating a new cluster
-  cluster_endpoint_public_access = var.create_cluster ? true : null
-  cluster_enabled_log_types     = var.create_cluster ? ["api", "audit", "authenticator", "controllerManager", "scheduler"] : []
+resource "aws_iam_role" "eks_cluster" {
+  name = "${var.name}-eks-cluster-role"
 
-  enable_cluster_creator_admin_permissions = var.create_cluster ? true : null
-
-  access_entries = var.create_cluster ? {
-    eks-operators = {
-      kubernetes_groups = ["eks-operators"]
-      principal_arn     = aws_iam_role.eks_operators.arn
-      policy_associations = {
-        cluster_admin = {
-          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-          access_scope = {
-            type = "cluster"
-          }
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "eks.amazonaws.com"
         }
+        Action = [
+          "sts:AssumeRole",
+          "sts:TagSession"
+        ]
       }
-    }
-    eks-developers = {
-      kubernetes_groups = ["eks-developers"]
-      principal_arn     = aws_iam_role.eks_developers.arn
-      policy_associations = {
-        cluster_view = {
-          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSViewPolicy"
-          access_scope = {
-            type = "cluster"
-          }
-        }
-        namespace_admin = {
-          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminPolicy"
-          access_scope = {
-            type       = "namespace"
-            namespaces = ["default"]
-          }
-        }
-      }
-    }
-  } : {
-    eks-operators = null
-    eks-developers = null
+    ]
+  })
+}
+
+resource "aws_eks_cluster" "this" {
+  name     = "${var.name}-cluster"
+  version  = var.cluster_version
+  role_arn = aws_iam_role.eks_cluster.arn
+
+  vpc_config {
+    subnet_ids              = concat(data.aws_subnets.private.ids, data.aws_subnets.public.ids)
+    endpoint_private_access = true
+    endpoint_public_access  = true
   }
 
-  # EKS Addons - only for new clusters
-  cluster_addons = var.create_cluster ? {
-    coredns = {
-      most_recent = true
-    }
-    kube-proxy = {
-      most_recent = true
-    }
-    vpc-cni = {
-      before_compute = true
-      most_recent    = true
-    }
-  } : {}
+  enabled_cluster_log_types = [
+    "api",
+    "audit",
+    "authenticator",
+    "controllerManager",
+    "scheduler"
+  ]
 
-  vpc_id = var.create_cluster ? var.vpc_id : data.aws_eks_cluster.existing[0].vpc_config[0].vpc_id
-  subnet_ids = var.create_cluster ? concat(data.aws_subnets.private.ids, data.aws_subnets.public.ids) : data.aws_eks_cluster.existing[0].vpc_config[0].subnet_ids
+  # If your cluster IAM role or its policies are managed elsewhere,
+  # you can add explicit depends_on to ensure they exist first:
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_cluster_policy
+  ]
 
-  # Node groups are always created/managed
-  eks_managed_node_groups = {
-    core_nodegroup = {
-      description = "EKS Core Managed Node Group for hosting system add-ons"
-      
-      # Match CDK instance type configuration
-      instance_types = [var.architecture == "x86" ? "t3.medium" : "t4g.medium"]
-      ami_type       = var.architecture == "x86" ? "AL2_X86_64" : "AL2_ARM_64"
+  # Example: pass tags to the cluster
+  tags = local.tags
+}
 
-      min_size     = 1
-      max_size     = 3
-      desired_size = 1
+# OIDC provider for the cluster (to replace module.eks.oidc_provider_arn)
+data "tls_certificate" "eks_oidc" {
+  url = aws_eks_cluster.this.identity[0].oidc[0].issuer
+}
 
-      iam_role_attach_cni_policy = true
-      iam_role_additional_policies = {
-        AmazonSSMManagedInstanceCore       = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-        AmazonEC2ContainerRegistryReadOnly = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-      }
-      iam_role_policy_statements = [
-        {
-          sid    = "ECRPullThroughCache"
-          effect = "Allow"
-          actions = [
-            "ecr:CreateRepository",
-            "ecr:BatchImportUpstreamImage",
-          ]
-          resources = ["*"]
-        }
-      ]
+resource "aws_iam_openid_connect_provider" "this" {
+  url             = aws_eks_cluster.this.identity[0].oidc[0].issuer
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.eks_oidc.certificates[0].sha1_fingerprint]
+}
 
-      ebs_optimized     = true
-      enable_monitoring = true
+resource "kubernetes_config_map" "aws_auth" {
+  metadata {
+    name      = "aws-auth"
+    namespace = "kube-system"
+  }
 
+  # Wait until the cluster and its endpoint are actually ready
+  depends_on = [
+    aws_eks_cluster.this,
+  ]
 
-      tags = local.tags
-    }
+  # The 'data' block is YAML that instructs EKS how to map IAM roles to Kubernetes RBAC
+  data = {
+    # Map IAM roles for the Node Group
+    mapRoles = <<-YAML
+      - rolearn: ${aws_iam_role.eks_nodegroup.arn}
+        username: system:node:{{EC2PrivateDNSName}}
+        groups:
+          - system:bootstrappers
+          - system:nodes
+      - rolearn: ${aws_iam_role.eks_developers.arn}
+        username: eks-developers
+        groups:
+          - eks-developers
+      - rolearn: ${aws_iam_role.eks_operators.arn}
+        username: eks-operators
+        groups:
+          - eks-operators
+    YAML
   }
 }
+
+###############################################################################
+# EKS Addons (replacing cluster_addons in the module)                         #
+###############################################################################
+resource "aws_eks_addon" "coredns" {
+  cluster_name = aws_eks_cluster.this.name
+  addon_name   = "coredns"
+  # "most_recent = true" in the module means picking the latest stable version,
+  # so you can omit addon_version for auto-selection or look up specific versions
+  depends_on = [
+    aws_eks_cluster.this,
+    aws_eks_node_group.core_nodegroup,
+    kubernetes_config_map.aws_auth
+  ]
+}
+
+resource "aws_eks_addon" "kube_proxy" {
+  cluster_name = aws_eks_cluster.this.name
+  addon_name   = "kube-proxy"
+  depends_on = [
+    aws_eks_cluster.this
+  ]
+}
+
+resource "aws_eks_addon" "vpc_cni" {
+  cluster_name = aws_eks_cluster.this.name
+  addon_name   = "vpc-cni"
+  # "before_compute = true" means it should come before node group creation
+  depends_on = [
+    aws_eks_cluster.this
+  ]
+}
+
+###############################################################################
+# Node group IAM role example                                                #
+###############################################################################
+resource "aws_iam_role" "eks_nodegroup" {
+  name = "${var.name}-eks-nodegroup-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+# Attach required policies to the node group role
+resource "aws_iam_role_policy_attachment" "eks_nodegroup_worker_policy" {
+  role       = aws_iam_role.eks_nodegroup.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "eks_nodegroup_cni_policy" {
+  role       = aws_iam_role.eks_nodegroup.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+}
+
+resource "aws_iam_role_policy_attachment" "eks_nodegroup_ec2_registry" {
+  role       = aws_iam_role.eks_nodegroup.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
+resource "aws_iam_role_policy_attachment" "eks_nodegroup_ssm" {
+  role       = aws_iam_role.eks_nodegroup.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# Example of attaching a custom inline policy statement
+data "aws_iam_policy_document" "nodegroup_ecr_ptc" {
+  statement {
+    sid     = "ECRPullThroughCache"
+    effect  = "Allow"
+    actions = [
+      "ecr:CreateRepository",
+      "ecr:BatchImportUpstreamImage",
+    ]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_policy" "nodegroup_ecr_ptc" {
+  name        = "${var.name}-nodegroup-ecr-ptc"
+  policy      = data.aws_iam_policy_document.nodegroup_ecr_ptc.json
+  description = "Allow ECR Pull Through Cache"
+}
+
+resource "aws_iam_policy_attachment" "nodegroup_ecr_ptc_attach" {
+  name       = "${var.name}-nodegroup-ecr-ptc-attach"
+  policy_arn = aws_iam_policy.nodegroup_ecr_ptc.arn
+  roles      = [aws_iam_role.eks_nodegroup.name]
+}
+
+###############################################################################
+# EKS Managed Node Group (replacing eks_managed_node_groups in the module)    #
+###############################################################################
+resource "aws_eks_node_group" "core_nodegroup" {
+  cluster_name    = aws_eks_cluster.this.name
+  node_group_name = "core_nodegroup"
+  node_role_arn   = aws_iam_role.eks_nodegroup.arn
+  subnet_ids      = concat(data.aws_subnets.private.ids, data.aws_subnets.public.ids)
+
+  scaling_config {
+    desired_size = 2
+    min_size     = 1
+    max_size     = 4
+  }
+
+  # Architecture-sensitive instance types + AMI type
+  instance_types = [
+    var.architecture == "x86" ? "t3.medium" : "t4g.medium"
+  ]
+  ami_type = var.architecture == "x86" ? "AL2_X86_64" : "AL2_ARM_64"
+
+  # Use depends_on to ensure the VPC CNI add-on is installed before node creation
+  depends_on = [
+    aws_eks_cluster.this,
+    aws_eks_addon.vpc_cni,
+    aws_eks_addon.kube_proxy,
+    aws_iam_role_policy_attachment.eks_nodegroup_worker_policy,
+    aws_iam_role_policy_attachment.eks_nodegroup_cni_policy,
+    aws_iam_role_policy_attachment.eks_nodegroup_ec2_registry,
+    aws_iam_role_policy_attachment.eks_nodegroup_ssm,
+    aws_iam_policy_attachment.nodegroup_ecr_ptc_attach,
+    kubernetes_config_map.aws_auth
+  ]
+
+  # Example tags
+  tags = local.tags
+}
+
 
 
