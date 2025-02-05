@@ -244,11 +244,11 @@ variable "domain_name" {
 }
 
 # Variables
-# variable "create_cluster" {
-#   description = "Controls if EKS cluster should be created (it affects all resources)"
-#   type        = bool
-#   default     = true
-# }
+variable "create_cluster" {
+  description = "Controls if EKS cluster should be created"
+  type        = bool
+  default     = true
+}
 
 variable "vpc_id" {
   description = "VPC ID where the cluster and nodes will be deployed"

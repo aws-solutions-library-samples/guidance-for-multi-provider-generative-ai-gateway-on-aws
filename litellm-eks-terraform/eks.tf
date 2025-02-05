@@ -77,12 +77,16 @@ resource "aws_security_group_rule" "redis_ingress" {
 }
 
 resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
+  count = var.create_cluster ? 1 : 0
+
   role       = aws_iam_role.eks_cluster.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 }
 
 
 resource "aws_iam_role" "eks_cluster" {
+  count = var.create_cluster ? 1 : 0
+
   name = "${var.name}-eks-cluster-role"
 
   assume_role_policy = jsonencode({
@@ -103,6 +107,8 @@ resource "aws_iam_role" "eks_cluster" {
 }
 
 resource "aws_eks_cluster" "this" {
+  count = var.create_cluster ? 1 : 0
+
   name     = "${var.name}-cluster"
   version  = var.cluster_version
   role_arn = aws_iam_role.eks_cluster.arn
@@ -131,12 +137,34 @@ resource "aws_eks_cluster" "this" {
   tags = local.tags
 }
 
+# Look up existing EKS cluster only if create_cluster = false
+data "aws_eks_cluster" "existing" {
+  count = var.create_cluster ? 0 : 1
+  name  = var.existing_cluster_name
+}
+
+data "aws_eks_cluster_auth" "existing" {
+  count = var.create_cluster ? 0 : 1
+  name  = var.existing_cluster_name
+}
+
+locals {
+  # If create_cluster is true, reference the newly-created EKS cluster;
+  # otherwise reference the existing EKS cluster data source.
+  cluster_name = var.create_cluster ? aws_eks_cluster.this[0].name : data.aws_eks_cluster.existing[0].name
+  cluster_endpoint = var.create_cluster ? aws_eks_cluster.this[0].endpoint : data.aws_eks_cluster.existing[0].endpoint
+  cluster_ca = var.create_cluster ? aws_eks_cluster.this[0].certificate_authority[0].data : data.aws_eks_cluster.existing[0].certificate_authority[0].data
+}
+
+
 # OIDC provider for the cluster (to replace module.eks.oidc_provider_arn)
 data "tls_certificate" "eks_oidc" {
+  count = var.create_cluster ? 1 : 0
   url = aws_eks_cluster.this.identity[0].oidc[0].issuer
 }
 
 resource "aws_iam_openid_connect_provider" "this" {
+  count = var.create_cluster ? 1 : 0
   url             = aws_eks_cluster.this.identity[0].oidc[0].issuer
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = [data.tls_certificate.eks_oidc.certificates[0].sha1_fingerprint]
@@ -178,32 +206,25 @@ resource "kubernetes_config_map" "aws_auth" {
 # EKS Addons (replacing cluster_addons in the module)                         #
 ###############################################################################
 resource "aws_eks_addon" "coredns" {
-  cluster_name = aws_eks_cluster.this.name
+  cluster_name = local.cluster_name
   addon_name   = "coredns"
-  # "most_recent = true" in the module means picking the latest stable version,
-  # so you can omit addon_version for auto-selection or look up specific versions
-  depends_on = [
-    aws_eks_cluster.this,
-    aws_eks_node_group.core_nodegroup,
-    kubernetes_config_map.aws_auth
-  ]
+
+  # If we create the cluster, wait for it & the node group. Otherwise no wait.
+  depends_on = var.create_cluster ? [aws_eks_cluster.this, aws_eks_node_group.core_nodegroup] : [aws_eks_node_group.core_nodegroup]
 }
 
 resource "aws_eks_addon" "kube_proxy" {
-  cluster_name = aws_eks_cluster.this.name
+  cluster_name = local.cluster_name
   addon_name   = "kube-proxy"
-  depends_on = [
-    aws_eks_cluster.this
-  ]
+
+  depends_on = var.create_cluster ? [aws_eks_cluster.this] : []
 }
 
 resource "aws_eks_addon" "vpc_cni" {
-  cluster_name = aws_eks_cluster.this.name
+  cluster_name = local.cluster_name
   addon_name   = "vpc-cni"
-  # "before_compute = true" means it should come before node group creation
-  depends_on = [
-    aws_eks_cluster.this
-  ]
+
+  depends_on = var.create_cluster ? [aws_eks_cluster.this] : []
 }
 
 ###############################################################################
@@ -276,7 +297,7 @@ resource "aws_iam_policy_attachment" "nodegroup_ecr_ptc_attach" {
 # EKS Managed Node Group (replacing eks_managed_node_groups in the module)    #
 ###############################################################################
 resource "aws_eks_node_group" "core_nodegroup" {
-  cluster_name    = aws_eks_cluster.this.name
+  cluster_name    = local.cluster_name
   node_group_name = "core_nodegroup"
   node_role_arn   = aws_iam_role.eks_nodegroup.arn
   subnet_ids      = concat(data.aws_subnets.private.ids, data.aws_subnets.public.ids)
@@ -294,17 +315,9 @@ resource "aws_eks_node_group" "core_nodegroup" {
   ami_type = var.architecture == "x86" ? "AL2_X86_64" : "AL2_ARM_64"
 
   # Use depends_on to ensure the VPC CNI add-on is installed before node creation
-  depends_on = [
-    aws_eks_cluster.this,
-    aws_eks_addon.vpc_cni,
-    aws_eks_addon.kube_proxy,
-    aws_iam_role_policy_attachment.eks_nodegroup_worker_policy,
-    aws_iam_role_policy_attachment.eks_nodegroup_cni_policy,
-    aws_iam_role_policy_attachment.eks_nodegroup_ec2_registry,
-    aws_iam_role_policy_attachment.eks_nodegroup_ssm,
-    aws_iam_policy_attachment.nodegroup_ecr_ptc_attach,
-    kubernetes_config_map.aws_auth
-  ]
+  # If we're creating the cluster, ensure the cluster resource is built first.
+  # If we're using an existing cluster, the depends_on is effectively empty.
+  depends_on = var.create_cluster? [aws_eks_cluster.this, aws_iam_role_policy_attachment.eks_nodegroup_worker_policy, aws_iam_role_policy_attachment.eks_nodegroup_cni_policy, aws_iam_role_policy_attachment.eks_nodegroup_ec2_registry, aws_iam_role_policy_attachment.eks_nodegroup_ssm, aws_iam_policy_attachment.nodegroup_ecr_ptc_attach] : [aws_iam_role_policy_attachment.eks_nodegroup_worker_policy, aws_iam_role_policy_attachment.eks_nodegroup_cni_policy, aws_iam_role_policy_attachment.eks_nodegroup_ec2_registry, aws_iam_role_policy_attachment.eks_nodegroup_ssm, aws_iam_policy_attachment.nodegroup_ecr_ptc_attach]
 
   # Example tags
   tags = local.tags
