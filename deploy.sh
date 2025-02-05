@@ -81,7 +81,7 @@ echo "LANGSMITH_API_KEY: $LANGSMITH_API_KEY"
 echo "LANGSMITH_PROJECT: $LANGSMITH_PROJECT"
 echo "LANGSMITH_DEFAULT_RUN_NAME: $LANGSMITH_DEFAULT_RUN_NAME"
 echo "DEPLOYMENT_PLATFORM: $DEPLOYMENT_PLATFORM"
-echo "EXISTING_EKS_CLUSTER_NAME: $EXISTING_EKS_CLUSTER_NAME"
+#echo "EXISTING_EKS_CLUSTER_NAME: $EXISTING_EKS_CLUSTER_NAME"
 echo "EXISTING_VPC_ID: $EXISTING_VPC_ID"
 
 if [ "$SKIP_BUILD" = false ]; then
@@ -215,11 +215,11 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     export TF_VAR_region=$aws_region
     export TF_VAR_name="genai-gateway"
     # Set create_cluster to false if EXISTING_EKS_CLUSTER_NAME is not empty, true otherwise
-    if [ -n "$EXISTING_EKS_CLUSTER_NAME" ]; then
-        export TF_VAR_create_cluster="false"
-    else
-        export TF_VAR_create_cluster="true"
-    fi
+    # if [ -n "$EXISTING_EKS_CLUSTER_NAME" ]; then
+    #     export TF_VAR_create_cluster="false"
+    # else
+    #     export TF_VAR_create_cluster="true"
+    # fi
 
     # Cluster information
     export TF_VAR_existing_cluster_name=$EXISTING_EKS_CLUSTER_NAME
