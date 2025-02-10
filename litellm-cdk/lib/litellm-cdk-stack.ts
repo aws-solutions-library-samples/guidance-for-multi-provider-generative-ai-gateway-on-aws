@@ -207,6 +207,7 @@ export class LitellmCdkStack extends cdk.Stack {
       securityGroupIds: [redisSecurityGroup.securityGroupId],
       engineVersion: '7.0',
       port: 6379,
+      atRestEncryptionEnabled: true
     });
 
     // Make sure the subnet group is created before the cluster
