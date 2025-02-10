@@ -25,6 +25,7 @@ import { execSync } from 'child_process';
 import * as route53targets from 'aws-cdk-lib/aws-route53-targets';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as logs from 'aws-cdk-lib/aws-logs';
 
 export enum DeploymentPlatform {
   ECS = 'ECS',
@@ -116,7 +117,18 @@ export class LitellmCdkStack extends cdk.Stack {
     });
 
     // Create VPC or import one if provided
-    const vpc = props.vpcId ? ec2.Vpc.fromLookup(this, 'ImportedVpc', { vpcId: props.vpcId }) : new ec2.Vpc(this, 'LiteLLMVpc', { maxAzs: 2, natGateways: 1 });
+    const vpc = props.vpcId ? ec2.Vpc.fromLookup(this, 'ImportedVpc', { vpcId: props.vpcId }) : new ec2.Vpc(this, 'LiteLLMVpc', { maxAzs: 2, natGateways: 1, flowLogs: {
+      'flowlog1': {
+        destination: ec2.FlowLogDestination.toCloudWatchLogs(
+          new logs.LogGroup(this, 'VPCFlowLogs', {
+            retention: logs.RetentionDays.ONE_MONTH,
+          })
+        ),
+        trafficType: ec2.FlowLogTrafficType.ALL,
+        maxAggregationInterval: ec2.FlowLogMaxAggregationInterval.ONE_MINUTE,
+      }
+    }
+   });
 
     // Create RDS Instance
     const databaseSecret = new secretsmanager.Secret(this, 'DBSecret', {
@@ -205,7 +217,7 @@ export class LitellmCdkStack extends cdk.Stack {
       cacheParameterGroupName: redisParameterGroup.ref,
       cacheSubnetGroupName: redisSubnetGroup.ref,
       securityGroupIds: [redisSecurityGroup.securityGroupId],
-      engineVersion: '7.0',
+      engineVersion: '7.1',
       port: 6379,
       atRestEncryptionEnabled: true
     });
