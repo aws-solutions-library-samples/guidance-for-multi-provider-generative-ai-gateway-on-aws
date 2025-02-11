@@ -38,7 +38,7 @@ brew install kubectl
 
 On Linux
 
-ToDo
+https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
 
 
 ### Installing yq
