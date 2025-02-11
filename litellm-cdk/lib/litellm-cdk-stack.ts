@@ -130,6 +130,101 @@ export class LitellmCdkStack extends cdk.Stack {
     }
    });
 
+   // ------------------------------------------------------------------------
+    // --- VPC Endpoints ------------------------------------------------------
+    // ------------------------------------------------------------------------
+    // Create a security group for Interface Endpoints if you want to control ingress
+    // For many use cases, allowing inbound on port 443 from inside the VPC is sufficient.
+    const vpcEndpointSG = new ec2.SecurityGroup(this, 'VPCEndpointsSG', {
+      vpc,
+      description: 'Security group for Interface VPC Endpoints',
+      allowAllOutbound: true,
+    });
+    vpcEndpointSG.addIngressRule(ec2.Peer.ipv4(vpc.vpcCidrBlock), ec2.Port.tcp(443));
+
+    vpc.addGatewayEndpoint('S3Endpoint', {
+      service: ec2.GatewayVpcEndpointAwsService.S3,
+      subnets: [{ subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }],
+    });
+
+    vpc.addInterfaceEndpoint('SecretsManagerEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+      subnets: {
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+      },
+      securityGroups: [vpcEndpointSG],
+      lookupSupportedAzs: true
+    });
+
+    vpc.addInterfaceEndpoint('ECREndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.ECR,
+      subnets: {
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+      },
+      securityGroups: [vpcEndpointSG],
+      lookupSupportedAzs: true
+    });
+
+    vpc.addInterfaceEndpoint('ECRDockerEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
+      subnets: {
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+      },
+      securityGroups: [vpcEndpointSG],
+      lookupSupportedAzs: true
+    });
+
+    // CloudWatch Logs - used by ECS tasks, Flow Logs, etc.
+    vpc.addInterfaceEndpoint('CloudWatchLogsEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
+      subnets: {
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+      },
+      securityGroups: [vpcEndpointSG],
+      lookupSupportedAzs: true
+    });
+
+    // STS (Interface) - used by ECS tasks to assume roles
+    vpc.addInterfaceEndpoint('STSEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.STS,
+      subnets: {
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+      },
+      securityGroups: [vpcEndpointSG],
+      lookupSupportedAzs: true
+    });
+
+    vpc.addInterfaceEndpoint('SageMakerRuntimeEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.SAGEMAKER_RUNTIME,
+      subnets: {
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+      },
+      securityGroups: [vpcEndpointSG],
+      lookupSupportedAzs: true
+    });
+
+    vpc.addInterfaceEndpoint('BedrockEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.BEDROCK,
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [vpcEndpointSG],
+      lookupSupportedAzs: true
+    });
+
+    vpc.addInterfaceEndpoint('BedrockRuntimeEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.BEDROCK_RUNTIME,
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [vpcEndpointSG],
+      lookupSupportedAzs: true
+    });
+
+    //Bedrock Agent - Used by middleware to get bedrock managed prompts
+    vpc.addInterfaceEndpoint('BedrockAgentEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.BEDROCK_AGENT,
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [vpcEndpointSG],
+      lookupSupportedAzs: true
+    });
+
     // Create RDS Instance
     const databaseSecret = new secretsmanager.Secret(this, 'DBSecret', {
       generateSecretString: {
