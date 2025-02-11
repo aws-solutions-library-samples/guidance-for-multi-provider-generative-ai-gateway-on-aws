@@ -34,6 +34,7 @@ APP_NAME=litellm
 MIDDLEWARE_APP_NAME=middleware
 STACK_NAME="LitellmCdkStack"
 LOG_BUCKET_STACK_NAME="LogBucketCdkStack"
+DATABASE_STACK_NAME="LitellmDatabaseCdkStack"
 
 # Load environment variables from .env file
 source .env
@@ -167,6 +168,30 @@ if [ -n "${LANGSMITH_API_KEY}" ] && [ -n "${LANGSMITH_PROJECT}" ] && [ -n "${LAN
     echo "Updated config.yaml with 'langsmith' added to success callback array"
 fi
 
+cd litellm-database-cdk
+echo "Installing dependencies for database cdk..."
+npm install
+echo "Deploying the database CDK stack..."
+cdk deploy "$DATABASE_STACK_NAME" --require-approval never \
+--context vpcId=$EXISTING_VPC_ID \
+--outputs-file ./outputs.json
+
+if [ $? -eq 0 ]; then
+    echo "Deployment successful. Extracting outputs..."
+    EXISTING_VPC_ID=$(jq -r ".\"${DATABASE_STACK_NAME}\".VpcId" ./outputs.json)
+    RDS_LITELLM_HOSTNAME=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsLitellmHostname" ./outputs.json)
+    RDS_LITELLM_SECRET_ARN=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsLitellmSecretArn" ./outputs.json)
+    RDS_MIDDLEWARE_HOSTNAME=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsMiddlewareHostname" ./outputs.json)
+    RDS_MIDDLEWARE_SECRET_ARN=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsMiddlewareSecretArn" ./outputs.json)
+    REDIS_HOST_NAME=$(jq -r ".\"${DATABASE_STACK_NAME}\".RedisHostName" ./outputs.json)
+    REDIS_PORT=$(jq -r ".\"${DATABASE_STACK_NAME}\".RedisPort" ./outputs.json)
+    RDS_SECURITY_GROUP_ID=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsSecurityGroupId" ./outputs.json)
+    REDIS_SECURITY_GROUP_ID=$(jq -r ".\"${DATABASE_STACK_NAME}\".RedisSecurityGroupId" ./outputs.json)
+else
+    echo "Deployment failed"
+fi
+
+cd ..
 
 cd litellm-cdk
 echo "Installing dependencies..."
@@ -208,6 +233,14 @@ cdk deploy "$STACK_NAME" --require-approval never \
 --context langsmithDefaultRunName=$LANGSMITH_DEFAULT_RUN_NAME \
 --context deploymentPlatform=$DEPLOYMENT_PLATFORM \
 --context vpcId=$EXISTING_VPC_ID \
+--context rdsLitellmHostname=$RDS_LITELLM_HOSTNAME \
+--context rdsLitellmSecretArn=$RDS_LITELLM_SECRET_ARN \
+--context rdsMiddlewareHostname=$RDS_MIDDLEWARE_HOSTNAME \
+--context rdsMiddlewareSecretArn=$RDS_MIDDLEWARE_SECRET_ARN \
+--context redisHostName=$REDIS_HOST_NAME \
+--context redisPort=$REDIS_PORT \
+--context rdsSecurityGroupId=$RDS_SECURITY_GROUP_ID \
+--context redisSecurityGroupId=$REDIS_SECURITY_GROUP_ID \
 --outputs-file ./outputs.json
 
 if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then

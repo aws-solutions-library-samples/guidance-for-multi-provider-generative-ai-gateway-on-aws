@@ -41,6 +41,16 @@ const langsmithDefaultRunName = String(app.node.tryGetContext("langsmithDefaultR
 const deploymentPlatformString = String(app.node.tryGetContext("deploymentPlatform"));
 const vpcId = String(app.node.tryGetContext("vpcId"));
 
+const rdsLitellmHostname = String(app.node.tryGetContext("rdsLitellmHostname"));
+const rdsLitellmSecretArn = String(app.node.tryGetContext("rdsLitellmSecretArn"));
+const rdsMiddlewareHostname = String(app.node.tryGetContext("rdsMiddlewareHostname"));
+const rdsMiddlewareSecretArn = String(app.node.tryGetContext("rdsMiddlewareSecretArn"));
+const redisHostName = String(app.node.tryGetContext("redisHostName"));
+const redisPort = String(app.node.tryGetContext("redisPort"));
+const rdsSecurityGroupId = String(app.node.tryGetContext("rdsSecurityGroupId"));
+const redisSecurityGroupId = String(app.node.tryGetContext("redisSecurityGroupId"));
+
+
 // Validate and convert deployment platform string to enum
 const deploymentPlatform = (() => {
   if (!deploymentPlatformString) {
@@ -90,6 +100,14 @@ new LitellmCdkStack(app, 'LitellmCdkStack', {
   langsmithDefaultRunName: langsmithDefaultRunName,
   deploymentPlatform: deploymentPlatform,
   vpcId: vpcId,
+  rdsLitellmHostname: rdsLitellmHostname,
+  rdsLitellmSecretArn: rdsLitellmSecretArn,
+  rdsMiddlewareHostname: rdsMiddlewareHostname,
+  rdsMiddlewareSecretArn: rdsMiddlewareSecretArn,
+  redisHostName: redisHostName,
+  redisPort: redisPort,
+  rdsSecurityGroupId: rdsSecurityGroupId,
+  redisSecurityGroupId: redisSecurityGroupId,
 
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
