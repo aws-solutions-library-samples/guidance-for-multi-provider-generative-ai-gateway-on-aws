@@ -140,6 +140,9 @@ resource "kubernetes_deployment" "litellm" {
       }
 
       spec {
+        node_selector = {
+          "eks.amazonaws.com/nodegroup" = aws_eks_node_group.core_nodegroup.node_group_name
+        }
         container {
           name  = "litellm-container"
           image = "${var.ecr_litellm_repository_url}:${var.litellm_version}"
@@ -263,6 +266,7 @@ resource "kubernetes_deployment" "litellm" {
       }
     }
   }
+  depends_on = [aws_eks_node_group.core_nodegroup]
 }
 
 # Ingress
@@ -417,7 +421,7 @@ resource "kubernetes_ingress_v1" "litellm" {
       }
     }
   }
-  depends_on = [helm_release.aws_load_balancer_controller, module.aws_load_balancer_controller_irsa_role, aws_eks_addon.coredns]
+  depends_on = [helm_release.aws_load_balancer_controller, module.aws_load_balancer_controller_irsa_role, aws_eks_addon.coredns, aws_eks_node_group.core_nodegroup]
 }
 
 # Service
@@ -471,7 +475,7 @@ resource "helm_release" "aws_load_balancer_controller" {
 
   set {
     name  = "clusterName"
-    value = aws_eks_cluster.this.name
+    value = local.cluster_name
   }
 
   set {
@@ -545,7 +549,7 @@ data "aws_lb" "ingress_alb" {
   
   tags = {
     # The ALB created by the AWS Load Balancer Controller will have this tag
-    "elbv2.k8s.aws/cluster" = aws_eks_cluster.this.name
+    "elbv2.k8s.aws/cluster" = local.cluster_name
     # This tag helps identify the specific ingress
     "ingress.k8s.aws/stack" = "default/litellm-ingress"
   }
@@ -554,12 +558,12 @@ data "aws_lb" "ingress_alb" {
 # Add provider configurations
 provider "helm" {
   kubernetes {
-    host                   = aws_eks_cluster.this.endpoint
-    cluster_ca_certificate = base64decode(aws_eks_cluster.this.certificate_authority[0].data)
+    host                   = local.cluster_endpoint
+    cluster_ca_certificate = base64decode(local.cluster_ca)
     exec {
       api_version = "client.authentication.k8s.io/v1beta1"
       command     = "aws"
-      args        = ["eks", "get-token", "--cluster-name", aws_eks_cluster.this.name]
+      args        = ["eks", "get-token", "--cluster-name", local.cluster_name]
     }
   }
 }

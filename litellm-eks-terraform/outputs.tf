@@ -5,33 +5,33 @@
 
 output "eks" {
   description = "Amazon EKS Cluster full configuration"
-  value       = aws_eks_cluster.this
+  value       = var.create_cluster ? aws_eks_cluster.this[0] : null
 }
 
 output "configure_kubectl" {
   description = "Configure kubectl: make sure you're logged in with the correct AWS profile and run the following command to update your kubeconfig"
-  value       = "aws eks --region ${local.region} update-kubeconfig --name ${aws_eks_cluster.this.name}"
+  value       = "aws eks --region ${local.region} update-kubeconfig --name ${local.cluster_name}"
 }
 
 # Outputs matching the CDK configuration
 output "cluster_name" {
   description = "The name of the EKS cluster"
-  value       = aws_eks_cluster.this.name
+  value       = local.cluster_name
 }
 
 output "cluster_endpoint" {
   description = "The endpoint for the EKS cluster"
-  value       = aws_eks_cluster.this.endpoint
+  value       = local.cluster_endpoint
 }
 
 output "cluster_security_group_id" {
   description = "Security group ID attached to the EKS cluster"
-  value       = aws_eks_cluster.this.vpc_config[0].cluster_security_group_id
+  value       = local.cluster_security_group_id
 }
 
 output "eks_cluster_name" {
   description = "Name of the EKS cluster"
-  value       = aws_eks_cluster.this.name
+  value       = local.cluster_name
 }
 
 output "eks_deployment_name" {

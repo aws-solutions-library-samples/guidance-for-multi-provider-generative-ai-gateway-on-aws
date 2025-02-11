@@ -47,6 +47,23 @@ resource "aws_ec2_tag" "private_subnet_internal_elb" {
   value       = "1"
 }
 
+resource "aws_ec2_tag" "private_subnets_cluster" {
+  for_each    = toset(data.aws_subnets.private.ids)
+  resource_id = each.value
+
+  key   = "kubernetes.io/cluster/${local.cluster_name}"
+  value = "shared"  # or "owned"
+}
+
+resource "aws_ec2_tag" "public_subnets_cluster" {
+  for_each    = toset(data.aws_subnets.public.ids)
+  resource_id = each.value
+
+  key   = "kubernetes.io/cluster/${local.cluster_name}"
+  value = "shared"  # or "owned"
+}
+
+
 # First, import the existing security groups
 data "aws_security_group" "db" {
   id = var.db_security_group_id
@@ -78,8 +95,7 @@ resource "aws_security_group_rule" "redis_ingress" {
 
 resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
   count = var.create_cluster ? 1 : 0
-
-  role       = aws_iam_role.eks_cluster.name
+  role       = aws_iam_role.eks_cluster[0].name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 }
 
@@ -111,7 +127,7 @@ resource "aws_eks_cluster" "this" {
 
   name     = "${var.name}-cluster"
   version  = var.cluster_version
-  role_arn = aws_iam_role.eks_cluster.arn
+  role_arn = aws_iam_role.eks_cluster[0].arn
 
   vpc_config {
     subnet_ids              = concat(data.aws_subnets.private.ids, data.aws_subnets.public.ids)
@@ -154,18 +170,18 @@ locals {
   cluster_name = var.create_cluster ? aws_eks_cluster.this[0].name : data.aws_eks_cluster.existing[0].name
   cluster_endpoint = var.create_cluster ? aws_eks_cluster.this[0].endpoint : data.aws_eks_cluster.existing[0].endpoint
   cluster_ca = var.create_cluster ? aws_eks_cluster.this[0].certificate_authority[0].data : data.aws_eks_cluster.existing[0].certificate_authority[0].data
+  cluster_security_group_id = var.create_cluster ? aws_eks_cluster.this[0].vpc_config[0].cluster_security_group_id : data.aws_eks_cluster.existing[0].vpc_config[0].cluster_security_group_id
+  cluster_tls_url = var.create_cluster ? aws_eks_cluster.this[0].identity[0].oidc[0].issuer : data.aws_eks_cluster.existing[0].identity[0].oidc[0].issuer
 }
 
 
 # OIDC provider for the cluster (to replace module.eks.oidc_provider_arn)
 data "tls_certificate" "eks_oidc" {
-  count = var.create_cluster ? 1 : 0
-  url = aws_eks_cluster.this.identity[0].oidc[0].issuer
+  url = local.cluster_tls_url
 }
 
 resource "aws_iam_openid_connect_provider" "this" {
-  count = var.create_cluster ? 1 : 0
-  url             = aws_eks_cluster.this.identity[0].oidc[0].issuer
+  url             = local.cluster_tls_url
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = [data.tls_certificate.eks_oidc.certificates[0].sha1_fingerprint]
 }
@@ -178,7 +194,7 @@ resource "kubernetes_config_map" "aws_auth" {
 
   # Wait until the cluster and its endpoint are actually ready
   depends_on = [
-    aws_eks_cluster.this,
+    aws_eks_cluster.this, aws_iam_role.eks_nodegroup
   ]
 
   # The 'data' block is YAML that instructs EKS how to map IAM roles to Kubernetes RBAC
@@ -210,22 +226,23 @@ resource "aws_eks_addon" "coredns" {
   addon_name   = "coredns"
 
   # If we create the cluster, wait for it & the node group. Otherwise no wait.
-  depends_on = var.create_cluster ? [aws_eks_cluster.this, aws_eks_node_group.core_nodegroup] : [aws_eks_node_group.core_nodegroup]
+  depends_on = [aws_eks_cluster.this, aws_eks_node_group.core_nodegroup]
 }
 
 resource "aws_eks_addon" "kube_proxy" {
   cluster_name = local.cluster_name
   addon_name   = "kube-proxy"
 
-  depends_on = var.create_cluster ? [aws_eks_cluster.this] : []
+  depends_on = [aws_eks_cluster.this]
 }
 
 resource "aws_eks_addon" "vpc_cni" {
   cluster_name = local.cluster_name
   addon_name   = "vpc-cni"
 
-  depends_on = var.create_cluster ? [aws_eks_cluster.this] : []
+  depends_on = [aws_eks_cluster.this]
 }
+
 
 ###############################################################################
 # Node group IAM role example                                                #
@@ -298,9 +315,9 @@ resource "aws_iam_policy_attachment" "nodegroup_ecr_ptc_attach" {
 ###############################################################################
 resource "aws_eks_node_group" "core_nodegroup" {
   cluster_name    = local.cluster_name
-  node_group_name = "core_nodegroup"
+  node_group_name_prefix = "core_nodegroup"
   node_role_arn   = aws_iam_role.eks_nodegroup.arn
-  subnet_ids      = concat(data.aws_subnets.private.ids, data.aws_subnets.public.ids)
+  subnet_ids      = concat(data.aws_subnets.private.ids)
 
   scaling_config {
     desired_size = 2
@@ -317,7 +334,7 @@ resource "aws_eks_node_group" "core_nodegroup" {
   # Use depends_on to ensure the VPC CNI add-on is installed before node creation
   # If we're creating the cluster, ensure the cluster resource is built first.
   # If we're using an existing cluster, the depends_on is effectively empty.
-  depends_on = var.create_cluster? [aws_eks_cluster.this, aws_iam_role_policy_attachment.eks_nodegroup_worker_policy, aws_iam_role_policy_attachment.eks_nodegroup_cni_policy, aws_iam_role_policy_attachment.eks_nodegroup_ec2_registry, aws_iam_role_policy_attachment.eks_nodegroup_ssm, aws_iam_policy_attachment.nodegroup_ecr_ptc_attach] : [aws_iam_role_policy_attachment.eks_nodegroup_worker_policy, aws_iam_role_policy_attachment.eks_nodegroup_cni_policy, aws_iam_role_policy_attachment.eks_nodegroup_ec2_registry, aws_iam_role_policy_attachment.eks_nodegroup_ssm, aws_iam_policy_attachment.nodegroup_ecr_ptc_attach]
+  depends_on = [aws_eks_cluster.this, aws_iam_role.eks_nodegroup, aws_iam_role_policy_attachment.eks_nodegroup_worker_policy, aws_iam_role_policy_attachment.eks_nodegroup_cni_policy, aws_iam_role_policy_attachment.eks_nodegroup_ec2_registry, aws_iam_role_policy_attachment.eks_nodegroup_ssm, aws_iam_policy_attachment.nodegroup_ecr_ptc_attach, kubernetes_config_map.aws_auth]#, aws_iam_role_policy_attachment.eks_cluster_policy_2]
 
   # Example tags
   tags = local.tags
