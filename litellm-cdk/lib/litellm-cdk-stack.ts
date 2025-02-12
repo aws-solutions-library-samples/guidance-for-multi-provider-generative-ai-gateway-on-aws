@@ -416,12 +416,14 @@ export class LitellmCdkStack extends cdk.Stack {
           LANGSMITH_API_KEY: ecs.Secret.fromSecretsManager(litellmOtherSecrets, 'LANGSMITH_API_KEY'),
         },
         environment: {
+          LITELLM_LOG: "DEBUG",
           LITELLM_CONFIG_BUCKET_NAME: configBucket.bucketName,
           LITELLM_CONFIG_BUCKET_OBJECT_KEY: 'config.yaml',
           UI_USERNAME: "admin",
           REDIS_URL: `redis://${props.redisHostName}:${props.redisPort}`,
           LANGSMITH_PROJECT: props.langsmithProject,
-          LANGSMITH_DEFAULT_RUN_NAME: props.langsmithDefaultRunName
+          LANGSMITH_DEFAULT_RUN_NAME: props.langsmithDefaultRunName,
+          LITELLM_LOCAL_MODEL_COST_MAP: "True"
         }
       });
 

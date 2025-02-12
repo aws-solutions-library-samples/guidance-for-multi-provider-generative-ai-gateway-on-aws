@@ -186,6 +186,11 @@ resource "kubernetes_deployment" "litellm" {
             value = var.region
           }
 
+          env {
+            name = "LITELLM_LOG"
+            value = "DEBUG"
+          }
+
           env_from {
             secret_ref {
               name = kubernetes_secret.litellm_api_keys.metadata[0].name

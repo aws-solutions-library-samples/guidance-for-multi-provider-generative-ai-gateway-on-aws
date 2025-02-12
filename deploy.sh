@@ -174,6 +174,7 @@ npm install
 echo "Deploying the database CDK stack..."
 cdk deploy "$DATABASE_STACK_NAME" --require-approval never \
 --context vpcId=$EXISTING_VPC_ID \
+--context deploymentPlatform=$DEPLOYMENT_PLATFORM \
 --outputs-file ./outputs.json
 
 if [ $? -eq 0 ]; then
