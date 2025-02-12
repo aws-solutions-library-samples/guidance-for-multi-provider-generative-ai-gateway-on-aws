@@ -84,6 +84,7 @@ echo "LANGSMITH_DEFAULT_RUN_NAME: $LANGSMITH_DEFAULT_RUN_NAME"
 echo "DEPLOYMENT_PLATFORM: $DEPLOYMENT_PLATFORM"
 echo "EXISTING_EKS_CLUSTER_NAME: $EXISTING_EKS_CLUSTER_NAME"
 echo "EXISTING_VPC_ID: $EXISTING_VPC_ID"
+echo "DISABLE_OUTBOUND_NETWORK_ACCESS: $DISABLE_OUTBOUND_NETWORK_ACCESS"
 
 if [ "$SKIP_BUILD" = false ]; then
     echo "Building and pushing docker image..."
@@ -175,6 +176,7 @@ echo "Deploying the database CDK stack..."
 cdk deploy "$DATABASE_STACK_NAME" --require-approval never \
 --context vpcId=$EXISTING_VPC_ID \
 --context deploymentPlatform=$DEPLOYMENT_PLATFORM \
+--context disableOutboundNetworkAccess=$DISABLE_OUTBOUND_NETWORK_ACCESS \
 --outputs-file ./outputs.json
 
 if [ $? -eq 0 ]; then
@@ -242,6 +244,7 @@ cdk deploy "$STACK_NAME" --require-approval never \
 --context redisPort=$REDIS_PORT \
 --context rdsSecurityGroupId=$RDS_SECURITY_GROUP_ID \
 --context redisSecurityGroupId=$REDIS_SECURITY_GROUP_ID \
+--context disableOutboundNetworkAccess=$DISABLE_OUTBOUND_NETWORK_ACCESS \
 --outputs-file ./outputs.json
 
 if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
@@ -351,6 +354,8 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
 
     export TF_VAR_db_security_group_id=$(jq -r ".\"${STACK_NAME}\".DbSecurityGroupId" ./outputs.json)
     export TF_VAR_redis_security_group_id=$(jq -r ".\"${STACK_NAME}\".RedisSecurityGroupId" ./outputs.json)
+
+    export TF_VAR_disable_outbound_network_access=$DISABLE_OUTBOUND_NETWORK_ACCESS
 
     cd ..
     cd litellm-eks-terraform

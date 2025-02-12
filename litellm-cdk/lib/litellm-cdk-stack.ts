@@ -65,6 +65,7 @@ interface LiteLLMStackProps extends cdk.StackProps {
   redisPort: string;
   rdsSecurityGroupId: string;
   redisSecurityGroupId: string;
+  disableOutboundNetworkAccess: boolean;
 }
 
 class IngressAlias implements route53.IAliasRecordTarget {
@@ -423,7 +424,7 @@ export class LitellmCdkStack extends cdk.Stack {
           REDIS_URL: `redis://${props.redisHostName}:${props.redisPort}`,
           LANGSMITH_PROJECT: props.langsmithProject,
           LANGSMITH_DEFAULT_RUN_NAME: props.langsmithDefaultRunName,
-          LITELLM_LOCAL_MODEL_COST_MAP: "True"
+          LITELLM_LOCAL_MODEL_COST_MAP: props.disableOutboundNetworkAccess ? "True" : "False"
         }
       });
 

@@ -274,3 +274,9 @@ variable "architecture" {
     error_message = "Architecture must be either 'x86' or 'arm64'."
   }
 }
+
+variable "disable_outbound_network_access" {
+    description = "Whether to disable outbound network access for the EKS Cluster"
+    type = bool
+    default = false
+}
