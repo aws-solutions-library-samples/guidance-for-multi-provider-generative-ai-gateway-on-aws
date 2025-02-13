@@ -121,7 +121,7 @@ const vpc = new ec2.Vpc(this, 'LiteLLMVpcPreExisting', { maxAzs: 2, natGateways:
 * If you'd like to bring your own EKS cluster, set `EXISTING_EKS_CLUSTER_NAME` to your EKS Cluster name. You must also set `EXISTING_VPC_ID`, and the VPC must be the vpc your EKS Cluster exists in. This has been tested with an new EKS cluster created with with no existing add-ons, EKS Auto Mode disabled. EKS ConfigMap enabled (see below image). Other configurations are not guaranteed to work. You may have to tweak the terraform yourself to work with your particular existing EKS cluster configuration.
 ![Verified EKS Cluster Configuration](./media/Tested-Bring-Your-Own-EKS-Cluster-Configuration.png)
 
-* If you'd like to run LiteLLM in subnets without outbound internet access, set `DISABLE_OUTBOUND_NETWORK_ACCESS="true"`. Due to lack of internet access, this configuration will only work with AWS Bedrock models. Because of this, you must remove all non-bedrock models from your `config/config.yaml` file. If you do not do this, LiteLLM will fail to start as it will attempt to call third party models over the internet.
+* If you'd like to run LiteLLM in subnets without outbound internet access, set `DISABLE_OUTBOUND_NETWORK_ACCESS="true"`. Due to lack of internet access, this configuration will only work with AWS Bedrock or SageMaker models. Because of this, you must remove all non-Bedrock/non-SageMaker models from your `config/config.yaml` file. If you do not do this, LiteLLM will fail to start as it will attempt to call third party models over the internet.
 
 #### Usage Instructions
 
