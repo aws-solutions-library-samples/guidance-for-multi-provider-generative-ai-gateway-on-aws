@@ -68,6 +68,7 @@ echo "LANGSMITH_DEFAULT_RUN_NAME: $LANGSMITH_DEFAULT_RUN_NAME"
 echo "DEPLOYMENT_PLATFORM: $DEPLOYMENT_PLATFORM"
 echo "EXISTING_EKS_CLUSTER_NAME: $EXISTING_EKS_CLUSTER_NAME"
 echo "EXISTING_VPC_ID: $EXISTING_VPC_ID"
+echo "DISABLE_OUTBOUND_NETWORK_ACCESS: $DISABLE_OUTBOUND_NETWORK_ACCESS"
 
 ARCH=$(uname -m)
 case $ARCH in
@@ -184,7 +185,8 @@ cdk destroy "$STACK_NAME" -f \
 --context redisHostName=$REDIS_HOST_NAME \
 --context redisPort=$REDIS_PORT \
 --context rdsSecurityGroupId=$RDS_SECURITY_GROUP_ID \
---context redisSecurityGroupId=$REDIS_SECURITY_GROUP_ID
+--context redisSecurityGroupId=$REDIS_SECURITY_GROUP_ID \
+--context disableOutboundNetworkAccess=$DISABLE_OUTBOUND_NETWORK_ACCESS
 
 if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     # Standard variables from CloudFormation outputs
@@ -293,6 +295,12 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
 
     export TF_VAR_db_security_group_id=$(jq -r ".\"${STACK_NAME}\".DbSecurityGroupId" ./outputs.json)
     export TF_VAR_redis_security_group_id=$(jq -r ".\"${STACK_NAME}\".RedisSecurityGroupId" ./outputs.json)
+
+    export TF_VAR_disable_outbound_network_access=$DISABLE_OUTBOUND_NETWORK_ACCESS
+
+    if echo "$DISABLE_OUTBOUND_NETWORK_ACCESS" | grep -iq "^true$"; then
+        export TF_VAR_eks_alb_controller_private_ecr_repository_name=$EKS_ALB_CONTROLLER_PRIVATE_ECR_REPOSITORY_NAME
+    fi
 
     cd ..
     cd litellm-eks-terraform
