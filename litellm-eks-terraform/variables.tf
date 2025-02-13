@@ -280,3 +280,9 @@ variable "disable_outbound_network_access" {
     type = bool
     default = false
 }
+
+variable "eks_alb_controller_private_ecr_repository_name" {
+  description = "The name of the ECR repo that is used to store the EKS ALB Controller Container Image in EKS deployments with outbound network access disabled"
+  type        = string
+  default = ""
+}

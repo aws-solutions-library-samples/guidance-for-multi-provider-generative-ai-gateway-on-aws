@@ -25,7 +25,6 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
 
     const natGatewayCount = props.disableOutboundNetworkAccess ? 0 : 1
     const subnetType = props.disableOutboundNetworkAccess ? ec2.SubnetType.PRIVATE_ISOLATED : ec2.SubnetType.PRIVATE_WITH_EGRESS;
-
     if (props.disableOutboundNetworkAccess && props.deploymentPlatform == DeploymentPlatform.EKS) {
       const repository = new ecr.Repository(this, 'MyEcrRepository', {
         repositoryName: "my-public-ecr-cache-repo",
@@ -35,7 +34,12 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
       const albPullThroughCache = new CfnPullThroughCacheRule(this, 'AlbPullThroughCache', {
         ecrRepositoryPrefix: repository.repositoryName,
         upstreamRegistryUrl: 'public.ecr.aws',
-      });  
+      });
+
+      new cdk.CfnOutput(this, 'EksAlbControllerPrivateEcrRepositoryName', {
+        value: repository.repositoryName,
+        description: 'The name of the ECR repo that is used to store the EKS ALB Controller Container Image in EKS deployments with outbound network access disabled',
+      });
     }
 
     // Create VPC or import one if provided
@@ -51,6 +55,8 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
       }
     }
    });
+
+   const subnetIds = props.disableOutboundNetworkAccess ? vpc.isolatedSubnets.map(subnet => subnet.subnetId) : vpc.privateSubnets.map(subnet => subnet.subnetId)
 
    // ------------------------------------------------------------------------
     // --- VPC Endpoints ------------------------------------------------------
@@ -305,7 +311,7 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
     // Create Redis Subnet Group
     const redisSubnetGroup = new elasticache.CfnSubnetGroup(this, 'RedisSubnetGroup', {
       description: 'Subnet group for Redis cluster',
-      subnetIds: vpc.isolatedSubnets.map(subnet => subnet.subnetId),//vpc.privateSubnets.map(subnet => subnet.subnetId),
+      subnetIds: subnetIds,
       cacheSubnetGroupName: 'litellm-redis-subnet-group',
     });
 
