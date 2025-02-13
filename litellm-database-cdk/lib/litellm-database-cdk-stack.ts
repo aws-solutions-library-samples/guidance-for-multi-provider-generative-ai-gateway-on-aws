@@ -57,7 +57,7 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
         trafficType: ec2.FlowLogTrafficType.ALL,
         maxAggregationInterval: ec2.FlowLogMaxAggregationInterval.ONE_MINUTE,
       }
-     });
+     }});
 
    const subnetIds = props.disableOutboundNetworkAccess ? vpc.isolatedSubnets.map(subnet => subnet.subnetId) : vpc.privateSubnets.map(subnet => subnet.subnetId)
 
