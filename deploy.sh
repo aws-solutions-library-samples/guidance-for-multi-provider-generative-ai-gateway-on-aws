@@ -85,6 +85,7 @@ echo "DEPLOYMENT_PLATFORM: $DEPLOYMENT_PLATFORM"
 echo "EXISTING_EKS_CLUSTER_NAME: $EXISTING_EKS_CLUSTER_NAME"
 echo "EXISTING_VPC_ID: $EXISTING_VPC_ID"
 echo "DISABLE_OUTBOUND_NETWORK_ACCESS: $DISABLE_OUTBOUND_NETWORK_ACCESS"
+echo "PRIVATE_LOAD_BALANCER: $PRIVATE_LOAD_BALANCER"
 
 if [ "$SKIP_BUILD" = false ]; then
     echo "Building and pushing docker image..."
@@ -249,6 +250,7 @@ cdk deploy "$STACK_NAME" --require-approval never \
 --context rdsSecurityGroupId=$RDS_SECURITY_GROUP_ID \
 --context redisSecurityGroupId=$REDIS_SECURITY_GROUP_ID \
 --context disableOutboundNetworkAccess=$DISABLE_OUTBOUND_NETWORK_ACCESS \
+--context privateLoadBalancer=$PRIVATE_LOAD_BALANCER \
 --outputs-file ./outputs.json
 
 if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then

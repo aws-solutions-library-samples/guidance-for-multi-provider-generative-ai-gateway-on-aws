@@ -66,6 +66,7 @@ interface LiteLLMStackProps extends cdk.StackProps {
   rdsSecurityGroupId: string;
   redisSecurityGroupId: string;
   disableOutboundNetworkAccess: boolean;
+  privateLoadBalancer: boolean;
 }
 
 class IngressAlias implements route53.IAliasRecordTarget {
@@ -94,10 +95,20 @@ export class LitellmCdkStack extends cdk.Stack {
     const domainName = domainParts.slice(1).join(".");
     const hostName = domainParts[0];
 
-    // Retrieve the existing Route 53 hosted zone
-    const hostedZone = route53.HostedZone.fromLookup(this, 'Zone', {
-      domainName: `${domainName}.`
-    });
+    const vpc = ec2.Vpc.fromLookup(this, 'ImportedVpc', { vpcId: props.vpcId })
+
+    let hostedZone : route53.IHostedZone;
+    if(props.privateLoadBalancer) {
+      hostedZone = new route53.PrivateHostedZone(this, 'LiteLLMPrivateHostedZone', {
+        zoneName: 'mirodrr.people.aws.dev',
+        vpc,  // associate with the same VPC
+      });
+    }
+    else {
+      hostedZone = route53.HostedZone.fromLookup(this, 'Zone', {
+        domainName: `${domainName}.`
+      });
+    }
 
     const certificate = certificatemanager.Certificate.fromCertificateArn(this, 'Certificate',
       props.certificateArn
@@ -116,7 +127,6 @@ export class LitellmCdkStack extends cdk.Stack {
       exclude: ['*'],
     });
 
-    const vpc = ec2.Vpc.fromLookup(this, 'ImportedVpc', { vpcId: props.vpcId })
 
     const databaseSecret = secretsmanager.Secret.fromSecretCompleteArn(
       this,
@@ -449,8 +459,8 @@ export class LitellmCdkStack extends cdk.Stack {
         loadBalancers: [
           {
             name: 'ALB',
-            publicLoadBalancer: true,
-            domainName: `${domainName}.`,
+            publicLoadBalancer: !props.privateLoadBalancer,
+            domainName: props.domainName,
             domainZone: hostedZone,
             listeners: [
               {
@@ -591,18 +601,22 @@ export class LitellmCdkStack extends cdk.Stack {
         interval: cdk.Duration.seconds(30),
       });
 
-      new route53.ARecord(this, 'DNSRecord', {
-        zone: hostedZone,
-        target: route53.RecordTarget.fromAlias(
-          new targets.LoadBalancerTarget(fargateService.loadBalancers[0])
-        ),
-        recordName: props.domainName,  // This will be the full domain name
-      });
-      // Associate the WAF Web ACL with your existing ALB
-      new wafv2.CfnWebACLAssociation(this, 'LiteLLMWAFALBAssociation', {
-        resourceArn: fargateService.loadBalancers[0].loadBalancerArn,
-        webAclArn: webAcl.attrArn,
-      });
+      // if (!props.privateLoadBalancer && hostedZone) {
+      //   new route53.ARecord(this, 'DNSRecord', {
+      //     zone: hostedZone,
+      //     target: route53.RecordTarget.fromAlias(
+      //       new targets.LoadBalancerTarget(fargateService.loadBalancers[0])
+      //     ),
+      //     recordName: props.domainName,  // e.g. "api.example.com"
+      //   });
+      // }
+
+      if (!props.privateLoadBalancer) {
+        new wafv2.CfnWebACLAssociation(this, 'LiteLLMWAFALBAssociation', {
+          resourceArn: fargateService.loadBalancers[0].loadBalancerArn,
+          webAclArn: webAcl.attrArn,
+        });
+      }
 
       dbSecurityGroup.addIngressRule(
         fargateService.service.connections.securityGroups[0],
