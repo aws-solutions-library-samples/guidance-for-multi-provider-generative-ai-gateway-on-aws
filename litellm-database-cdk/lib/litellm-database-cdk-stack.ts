@@ -18,6 +18,7 @@ interface LiteLLMStackProps extends cdk.StackProps {
   vpcId: string;
   deploymentPlatform: DeploymentPlatform;
   disableOutboundNetworkAccess: boolean;
+  createVpcEndpointsInExistingVpc: boolean;
 }
 
 export class LitellmDatabaseCdkStack extends cdk.Stack {
@@ -61,105 +62,25 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
 
    const subnetIds = props.disableOutboundNetworkAccess ? vpc.isolatedSubnets.map(subnet => subnet.subnetId) : vpc.privateSubnets.map(subnet => subnet.subnetId)
 
-   // ------------------------------------------------------------------------
+    // ------------------------------------------------------------------------
     // --- VPC Endpoints ------------------------------------------------------
     // ------------------------------------------------------------------------
-    // Create a security group for Interface Endpoints if you want to control ingress
-    // For many use cases, allowing inbound on port 443 from inside the VPC is sufficient.
-    const vpcEndpointSG = new ec2.SecurityGroup(this, 'VPCEndpointsSG', {
-      vpc,
-      description: 'Security group for Interface VPC Endpoints',
-      allowAllOutbound: true,
-    });
-    vpcEndpointSG.addIngressRule(ec2.Peer.ipv4(vpc.vpcCidrBlock), ec2.Port.tcp(443));
-
-    vpc.addGatewayEndpoint('S3Endpoint', {
-      service: ec2.GatewayVpcEndpointAwsService.S3,
-      subnets: [{ subnetType: subnetType }],
-    });
-
-    vpc.addInterfaceEndpoint('SecretsManagerEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-      subnets: {
-        subnetType: subnetType,
-      },
-      securityGroups: [vpcEndpointSG],
-      lookupSupportedAzs: true
-    });
-
-    vpc.addInterfaceEndpoint('ECREndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.ECR,
-      subnets: {
-        subnetType: subnetType,
-      },
-      securityGroups: [vpcEndpointSG],
-      lookupSupportedAzs: true,
-    });
-
-    vpc.addInterfaceEndpoint('ECRDockerEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
-      subnets: {
-        subnetType: subnetType,
-      },
-      securityGroups: [vpcEndpointSG],
-      lookupSupportedAzs: true
-    });
-
-    // CloudWatch Logs - used by ECS tasks, Flow Logs, etc.
-    vpc.addInterfaceEndpoint('CloudWatchLogsEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
-      subnets: {
-        subnetType: subnetType,
-      },
-      securityGroups: [vpcEndpointSG],
-      lookupSupportedAzs: true
-    });
-
-    // STS (Interface) - used by ECS tasks to assume roles
-    vpc.addInterfaceEndpoint('STSEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.STS,
-      subnets: {
-        subnetType: subnetType,
-      },
-      securityGroups: [vpcEndpointSG],
-      lookupSupportedAzs: true
-    });
-
-    vpc.addInterfaceEndpoint('SageMakerRuntimeEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.SAGEMAKER_RUNTIME,
-      subnets: {
-        subnetType: subnetType,
-      },
-      securityGroups: [vpcEndpointSG],
-      lookupSupportedAzs: true
-    });
-
-    vpc.addInterfaceEndpoint('BedrockEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.BEDROCK,
-      subnets: { subnetType: subnetType },
-      securityGroups: [vpcEndpointSG],
-      lookupSupportedAzs: true
-    });
-
-    vpc.addInterfaceEndpoint('BedrockRuntimeEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.BEDROCK_RUNTIME,
-      subnets: { subnetType: subnetType },
-      securityGroups: [vpcEndpointSG],
-      lookupSupportedAzs: true
-    });
-
-    //Bedrock Agent - Used by middleware to get bedrock managed prompts
-    vpc.addInterfaceEndpoint('BedrockAgentEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.BEDROCK_AGENT,
-      subnets: { subnetType: subnetType },
-      securityGroups: [vpcEndpointSG],
-      lookupSupportedAzs: true
-    });
-
-    if(props.deploymentPlatform == "EKS") {
-      // EKS API endpoint - required for cluster communication
-      vpc.addInterfaceEndpoint('EKSEndpoint', {
-        service: ec2.InterfaceVpcEndpointAwsService.EKS,
+    // Always create vpc endpoints in new vpc. Optionally create vpc endpoints in imported vpc
+    if(props.vpcId && props.createVpcEndpointsInExistingVpc) {
+      const vpcEndpointSG = new ec2.SecurityGroup(this, 'VPCEndpointsSG', {
+        vpc,
+        description: 'Security group for Interface VPC Endpoints',
+        allowAllOutbound: true,
+      });
+      vpcEndpointSG.addIngressRule(ec2.Peer.ipv4(vpc.vpcCidrBlock), ec2.Port.tcp(443));
+  
+      vpc.addGatewayEndpoint('S3Endpoint', {
+        service: ec2.GatewayVpcEndpointAwsService.S3,
+        subnets: [{ subnetType: subnetType }],
+      });
+  
+      vpc.addInterfaceEndpoint('SecretsManagerEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
         subnets: {
           subnetType: subnetType,
         },
@@ -167,85 +88,166 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
         lookupSupportedAzs: true
       });
   
-      // EC2 API - required for node bootstrapping and operations
-      vpc.addInterfaceEndpoint('EC2Endpoint', {
-        service: ec2.InterfaceVpcEndpointAwsService.EC2,
+      vpc.addInterfaceEndpoint('ECREndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.ECR,
         subnets: {
           subnetType: subnetType,
         },
-        securityGroups: [vpcEndpointSG],
-        lookupSupportedAzs: true
-      });
-  
-      // EC2 Messages - required for node communication
-      vpc.addInterfaceEndpoint('EC2MessagesEndpoint', {
-        service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES,
-        subnets: {
-          subnetType: subnetType,
-        },
-        securityGroups: [vpcEndpointSG],
-        lookupSupportedAzs: true
-      });
-  
-      // SSM - required for node management
-      vpc.addInterfaceEndpoint('SSMEndpoint', {
-        service: ec2.InterfaceVpcEndpointAwsService.SSM,
-        subnets: {
-          subnetType: subnetType,
-        },
-        securityGroups: [vpcEndpointSG],
-        lookupSupportedAzs: true
-      });
-  
-      // SSM Messages - required for node management
-      vpc.addInterfaceEndpoint('SSMMessagesEndpoint', {
-        service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES,
-        subnets: {
-          subnetType: subnetType,
-        },
-        securityGroups: [vpcEndpointSG],
-        lookupSupportedAzs: true
-      });
-  
-      // CloudWatch Monitoring - required for metrics
-      vpc.addInterfaceEndpoint('MonitoringEndpoint', {
-        service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_MONITORING,
-        subnets: {
-          subnetType: subnetType,
-        },
-        securityGroups: [vpcEndpointSG],
-        lookupSupportedAzs: true
-      });
-  
-      // Elastic Load Balancing - required if using AWS Load Balancer Controller
-      vpc.addInterfaceEndpoint('ElasticLoadBalancingEndpoint', {
-        service: ec2.InterfaceVpcEndpointAwsService.ELASTIC_LOAD_BALANCING,
-        subnets: {
-          subnetType: subnetType,
-        },
-        securityGroups: [vpcEndpointSG],
-        lookupSupportedAzs: true
-      });
-  
-      // Auto Scaling - required if using Cluster Autoscaler
-      vpc.addInterfaceEndpoint('AutoScalingEndpoint', {
-        service: ec2.InterfaceVpcEndpointAwsService.AUTOSCALING,
-        subnets: {
-          subnetType: subnetType,
-        },
-        securityGroups: [vpcEndpointSG],
-        lookupSupportedAzs: true
-      });
-
-      vpc.addInterfaceEndpoint('WAFv2Endpoint', {
-        service: new ec2.InterfaceVpcEndpointService(`com.amazonaws.${this.region}.wafv2`, 443),
-        subnets: { subnetType: subnetType },
         securityGroups: [vpcEndpointSG],
         lookupSupportedAzs: true,
-        privateDnsEnabled: true
       });
-  }
   
+      vpc.addInterfaceEndpoint('ECRDockerEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
+        subnets: {
+          subnetType: subnetType,
+        },
+        securityGroups: [vpcEndpointSG],
+        lookupSupportedAzs: true
+      });
+  
+      // CloudWatch Logs - used by ECS tasks, Flow Logs, etc.
+      vpc.addInterfaceEndpoint('CloudWatchLogsEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
+        subnets: {
+          subnetType: subnetType,
+        },
+        securityGroups: [vpcEndpointSG],
+        lookupSupportedAzs: true
+      });
+  
+      // STS (Interface) - used by ECS tasks to assume roles
+      vpc.addInterfaceEndpoint('STSEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.STS,
+        subnets: {
+          subnetType: subnetType,
+        },
+        securityGroups: [vpcEndpointSG],
+        lookupSupportedAzs: true
+      });
+  
+      vpc.addInterfaceEndpoint('SageMakerRuntimeEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.SAGEMAKER_RUNTIME,
+        subnets: {
+          subnetType: subnetType,
+        },
+        securityGroups: [vpcEndpointSG],
+        lookupSupportedAzs: true
+      });
+  
+      vpc.addInterfaceEndpoint('BedrockEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.BEDROCK,
+        subnets: { subnetType: subnetType },
+        securityGroups: [vpcEndpointSG],
+        lookupSupportedAzs: true
+      });
+  
+      vpc.addInterfaceEndpoint('BedrockRuntimeEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.BEDROCK_RUNTIME,
+        subnets: { subnetType: subnetType },
+        securityGroups: [vpcEndpointSG],
+        lookupSupportedAzs: true
+      });
+  
+      //Bedrock Agent - Used by middleware to get bedrock managed prompts
+      vpc.addInterfaceEndpoint('BedrockAgentEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.BEDROCK_AGENT,
+        subnets: { subnetType: subnetType },
+        securityGroups: [vpcEndpointSG],
+        lookupSupportedAzs: true
+      });
+  
+      if(props.deploymentPlatform == "EKS") {
+        // EKS API endpoint - required for cluster communication
+        vpc.addInterfaceEndpoint('EKSEndpoint', {
+          service: ec2.InterfaceVpcEndpointAwsService.EKS,
+          subnets: {
+            subnetType: subnetType,
+          },
+          securityGroups: [vpcEndpointSG],
+          lookupSupportedAzs: true
+        });
+    
+        // EC2 API - required for node bootstrapping and operations
+        vpc.addInterfaceEndpoint('EC2Endpoint', {
+          service: ec2.InterfaceVpcEndpointAwsService.EC2,
+          subnets: {
+            subnetType: subnetType,
+          },
+          securityGroups: [vpcEndpointSG],
+          lookupSupportedAzs: true
+        });
+    
+        // EC2 Messages - required for node communication
+        vpc.addInterfaceEndpoint('EC2MessagesEndpoint', {
+          service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES,
+          subnets: {
+            subnetType: subnetType,
+          },
+          securityGroups: [vpcEndpointSG],
+          lookupSupportedAzs: true
+        });
+    
+        // SSM - required for node management
+        vpc.addInterfaceEndpoint('SSMEndpoint', {
+          service: ec2.InterfaceVpcEndpointAwsService.SSM,
+          subnets: {
+            subnetType: subnetType,
+          },
+          securityGroups: [vpcEndpointSG],
+          lookupSupportedAzs: true
+        });
+    
+        // SSM Messages - required for node management
+        vpc.addInterfaceEndpoint('SSMMessagesEndpoint', {
+          service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES,
+          subnets: {
+            subnetType: subnetType,
+          },
+          securityGroups: [vpcEndpointSG],
+          lookupSupportedAzs: true
+        });
+    
+        // CloudWatch Monitoring - required for metrics
+        vpc.addInterfaceEndpoint('MonitoringEndpoint', {
+          service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_MONITORING,
+          subnets: {
+            subnetType: subnetType,
+          },
+          securityGroups: [vpcEndpointSG],
+          lookupSupportedAzs: true
+        });
+    
+        // Elastic Load Balancing - required if using AWS Load Balancer Controller
+        vpc.addInterfaceEndpoint('ElasticLoadBalancingEndpoint', {
+          service: ec2.InterfaceVpcEndpointAwsService.ELASTIC_LOAD_BALANCING,
+          subnets: {
+            subnetType: subnetType,
+          },
+          securityGroups: [vpcEndpointSG],
+          lookupSupportedAzs: true
+        });
+    
+        // Auto Scaling - required if using Cluster Autoscaler
+        vpc.addInterfaceEndpoint('AutoScalingEndpoint', {
+          service: ec2.InterfaceVpcEndpointAwsService.AUTOSCALING,
+          subnets: {
+            subnetType: subnetType,
+          },
+          securityGroups: [vpcEndpointSG],
+          lookupSupportedAzs: true
+        });
+  
+        vpc.addInterfaceEndpoint('WAFv2Endpoint', {
+          service: new ec2.InterfaceVpcEndpointService(`com.amazonaws.${this.region}.wafv2`, 443),
+          subnets: { subnetType: subnetType },
+          securityGroups: [vpcEndpointSG],
+          lookupSupportedAzs: true,
+          privateDnsEnabled: true
+        });
+      }
+    }
+
     // Create RDS Instance
     const databaseSecret = new secretsmanager.Secret(this, 'DBSecret', {
       generateSecretString: {

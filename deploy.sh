@@ -85,6 +85,7 @@ echo "DEPLOYMENT_PLATFORM: $DEPLOYMENT_PLATFORM"
 echo "EXISTING_EKS_CLUSTER_NAME: $EXISTING_EKS_CLUSTER_NAME"
 echo "EXISTING_VPC_ID: $EXISTING_VPC_ID"
 echo "DISABLE_OUTBOUND_NETWORK_ACCESS: $DISABLE_OUTBOUND_NETWORK_ACCESS"
+echo "CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC: $CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC"
 
 if [ "$SKIP_BUILD" = false ]; then
     echo "Building and pushing docker image..."
@@ -177,6 +178,7 @@ cdk deploy "$DATABASE_STACK_NAME" --require-approval never \
 --context vpcId=$EXISTING_VPC_ID \
 --context deploymentPlatform=$DEPLOYMENT_PLATFORM \
 --context disableOutboundNetworkAccess=$DISABLE_OUTBOUND_NETWORK_ACCESS \
+--context createVpcEndpointsInExistingVpc=$CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC \
 --outputs-file ./outputs.json
 
 if [ $? -eq 0 ]; then

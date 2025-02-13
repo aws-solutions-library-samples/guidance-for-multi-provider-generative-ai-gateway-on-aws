@@ -7,6 +7,7 @@ const app = new cdk.App();
 const vpcId = String(app.node.tryGetContext("vpcId"));
 const deploymentPlatformString = String(app.node.tryGetContext("deploymentPlatform"));
 const disableOutboundNetworkAccess = String(app.node.tryGetContext("disableOutboundNetworkAccess")).toLowerCase() === 'true';
+const createVpcEndpointsInExistingVpc = String(app.node.tryGetContext("createVpcEndpointsInExistingVpc")).toLowerCase() === 'true';
 
 // Validate and convert deployment platform string to enum
 const deploymentPlatform = (() => {
@@ -26,7 +27,7 @@ new LitellmDatabaseCdkStack(app, 'LitellmDatabaseCdkStack', {
   vpcId: vpcId,
   deploymentPlatform: deploymentPlatform,
   disableOutboundNetworkAccess: disableOutboundNetworkAccess,
-
+  createVpcEndpointsInExistingVpc: createVpcEndpointsInExistingVpc,
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
     region: process.env.CDK_DEFAULT_REGION
