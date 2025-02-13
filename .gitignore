@@ -2,6 +2,7 @@
 config/config.yaml
 config/local-config.yaml
 
+.*.sw?
 **/.DS_Store
 .idea/
 .aws-sam/

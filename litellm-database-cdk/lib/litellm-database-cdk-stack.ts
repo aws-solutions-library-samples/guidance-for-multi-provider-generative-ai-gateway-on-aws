@@ -15,18 +15,20 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
     super(scope, id, props);
 
     // Create VPC or import one if provided
-    const vpc = props.vpcId ? ec2.Vpc.fromLookup(this, 'ImportedVpc', { vpcId: props.vpcId }) : new ec2.Vpc(this, 'LiteLLMVpc', { maxAzs: 2, natGateways: 1, flowLogs: {
-      'flowlog1': {
-        destination: ec2.FlowLogDestination.toCloudWatchLogs(
-          new logs.LogGroup(this, 'VPCFlowLogs', {
-            retention: logs.RetentionDays.ONE_MONTH,
-          })
-        ),
-        trafficType: ec2.FlowLogTrafficType.ALL,
-        maxAggregationInterval: ec2.FlowLogMaxAggregationInterval.ONE_MINUTE,
+    const vpc = props.vpcId ?
+      ec2.Vpc.fromLookup(this, 'LiteLLMVpc', { vpcId: props.vpcId }) :
+      new ec2.Vpc(this, 'LiteLLMVpc', { maxAzs: 2, natGateways: 1, flowLogs: {
+        'flowlog1': {
+          destination: ec2.FlowLogDestination.toCloudWatchLogs(
+            new logs.LogGroup(this, 'VPCFlowLogs', {
+              retention: logs.RetentionDays.ONE_MONTH,
+            })
+          ),
+          trafficType: ec2.FlowLogTrafficType.ALL,
+          maxAggregationInterval: ec2.FlowLogMaxAggregationInterval.ONE_MINUTE,
+        }
       }
-    }
-   });
+     });
 
    // ------------------------------------------------------------------------
     // --- VPC Endpoints ------------------------------------------------------
