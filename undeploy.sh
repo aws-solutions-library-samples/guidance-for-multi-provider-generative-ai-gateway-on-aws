@@ -165,24 +165,18 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
 
     # Get the connection strings
     MAIN_DB_URL=$(aws secretsmanager get-secret-value \
-    --secret-id "$MAIN_DB_SECRET_ARN" \
-    --query 'SecretString' \
-    --output text)
-
-    MIDDLEWARE_DB_URL=$(aws secretsmanager get-secret-value \
-    --secret-id "$MIDDLEWARE_DB_SECRET_ARN" \
-    --query 'SecretString' \
-    --output text)
-
-    # Database and Redis URLs
-    export TF_VAR_database_url=$(aws secretsmanager get-secret-value \
         --secret-id "$MAIN_DB_SECRET_ARN" \
         --query 'SecretString' \
-        --output text)
-    export TF_VAR_database_middleware_url=$(aws secretsmanager get-secret-value \
+        --output text 2>/dev/null || echo "")
+
+    MIDDLEWARE_DB_URL=$(aws secretsmanager get-secret-value \
         --secret-id "$MIDDLEWARE_DB_SECRET_ARN" \
         --query 'SecretString' \
-        --output text)
+        --output text 2>/dev/null || echo "")
+
+    # Database and Redis URLs
+    export TF_VAR_database_url=$MAIN_DB_URL
+    export TF_VAR_database_middleware_url=$MIDDLEWARE_DB_URL
 
     export TF_VAR_redis_url=$(jq -r ".\"${STACK_NAME}\".RedisUrl" ./outputs.json)
 
@@ -198,7 +192,7 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     LITELLM_MASTER_AND_SALT_KEY_SECRET_JSON=$(aws secretsmanager get-secret-value \
     --secret-id "$LITELLM_MASTER_AND_SALT_KEY_SECRET_ARN" \
     --query 'SecretString' \
-    --output text)
+    --output text 2>/dev/null || echo '{"LITELLM_MASTER_KEY":"","LITELLM_SALT_KEY":""}')
 
     # Extract individual values using jq
     export TF_VAR_litellm_master_key=$(echo $LITELLM_MASTER_AND_SALT_KEY_SECRET_JSON | jq -r '.LITELLM_MASTER_KEY')

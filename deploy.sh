@@ -299,14 +299,8 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     --output text)
 
     # Database and Redis URLs
-    export TF_VAR_database_url=$(aws secretsmanager get-secret-value \
-        --secret-id "$MAIN_DB_SECRET_ARN" \
-        --query 'SecretString' \
-        --output text)
-    export TF_VAR_database_middleware_url=$(aws secretsmanager get-secret-value \
-        --secret-id "$MIDDLEWARE_DB_SECRET_ARN" \
-        --query 'SecretString' \
-        --output text)
+    export TF_VAR_database_url=$MAIN_DB_URL
+    export TF_VAR_database_middleware_url=$MIDDLEWARE_DB_URL
 
     export TF_VAR_redis_url=$(jq -r ".\"${STACK_NAME}\".RedisUrl" ./outputs.json)
 
