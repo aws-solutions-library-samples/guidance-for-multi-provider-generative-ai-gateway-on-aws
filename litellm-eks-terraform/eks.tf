@@ -190,6 +190,7 @@ resource "kubernetes_config_map" "aws_auth" {
   metadata {
     name      = "aws-auth"
     namespace = "kube-system"
+    labels    = local.common_labels
   }
 
   # Wait until the cluster and its endpoint are actually ready

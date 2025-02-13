@@ -14,10 +14,23 @@ export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output t
 REPO_EXISTS=$(aws ecr describe-repositories --repository-names $APP_NAME 2>/dev/null)
 
 if [ -z "$REPO_EXISTS" ]; then
-    # Repository does not exist, create it
-    aws ecr create-repository --repository-name $APP_NAME
+    # Repository does not exist, create it with tag
+    aws ecr create-repository --repository-name $APP_NAME --tags Key=project,Value=llmgateway
 else
-    echo "Repository $APP_NAME already exists, skipping creation."
+    echo "Repository $APP_NAME already exists, checking tags..."
+    
+    # Get current tags for the repository
+    CURRENT_TAGS=$(aws ecr list-tags-for-resource --resource-arn arn:aws:ecr:${AWS_REGION}:${AWS_ACCOUNT_ID}:repository/${APP_NAME})
+    
+    # Check if project=llmgateway tag exists
+    if ! echo "$CURRENT_TAGS" | grep -q '"Key": "project".*"Value": "llmgateway"'; then
+        echo "Adding project=llmgateway tag..."
+        aws ecr tag-resource \
+            --resource-arn arn:aws:ecr:${AWS_REGION}:${AWS_ACCOUNT_ID}:repository/${APP_NAME} \
+            --tags Key=project,Value=llmgateway
+    else
+        echo "Tag project=llmgateway already exists."
+    fi
 fi
 
 ARCH=$(uname -m)

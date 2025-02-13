@@ -6,8 +6,9 @@ import { Tag, Aspects } from 'aws-cdk-lib';
 export class LogBucketCdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-
     Aspects.of(this).add(new Tag('stack-id', this.stackName));
+    Aspects.of(this).add(new Tag('project', 'llmgateway'));
+
 
     const bucket = new s3.Bucket(this, 'LitellmLogBucket', {
       removalPolicy: cdk.RemovalPolicy.DESTROY,

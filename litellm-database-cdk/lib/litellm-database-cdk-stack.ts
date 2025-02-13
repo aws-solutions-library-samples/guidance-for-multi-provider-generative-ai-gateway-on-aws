@@ -7,6 +7,7 @@ import * as elasticache from 'aws-cdk-lib/aws-elasticache';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import { CfnPullThroughCacheRule } from 'aws-cdk-lib/aws-ecr';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
+import { Tag, Aspects } from 'aws-cdk-lib';
 
 export enum DeploymentPlatform {
   ECS = 'ECS',
@@ -22,6 +23,9 @@ interface LiteLLMStackProps extends cdk.StackProps {
 export class LitellmDatabaseCdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: LiteLLMStackProps) {
     super(scope, id, props);
+
+    Aspects.of(this).add(new Tag('stack-id', this.stackName));
+    Aspects.of(this).add(new Tag('project', 'llmgateway'));
 
     const natGatewayCount = props.disableOutboundNetworkAccess ? 0 : 1
     const subnetType = props.disableOutboundNetworkAccess ? ec2.SubnetType.PRIVATE_ISOLATED : ec2.SubnetType.PRIVATE_WITH_EGRESS;

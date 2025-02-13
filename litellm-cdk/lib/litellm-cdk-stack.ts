@@ -88,6 +88,7 @@ export class LitellmCdkStack extends cdk.Stack {
     super(scope, id, props);
 
     Aspects.of(this).add(new Tag('stack-id', this.stackName));
+    Aspects.of(this).add(new Tag('project', 'llmgateway'));
 
     const domainParts = props.domainName.split(".");
     const domainName = domainParts.slice(1).join(".");
