@@ -65,6 +65,7 @@ interface LiteLLMStackProps extends cdk.StackProps {
   redisPort: string;
   rdsSecurityGroupId: string;
   redisSecurityGroupId: string;
+  disableOutboundNetworkAccess: boolean;
 }
 
 class IngressAlias implements route53.IAliasRecordTarget {
@@ -87,6 +88,7 @@ export class LitellmCdkStack extends cdk.Stack {
     super(scope, id, props);
 
     Aspects.of(this).add(new Tag('stack-id', this.stackName));
+    Aspects.of(this).add(new Tag('project', 'llmgateway'));
 
     const domainParts = props.domainName.split(".");
     const domainName = domainParts.slice(1).join(".");
@@ -416,12 +418,14 @@ export class LitellmCdkStack extends cdk.Stack {
           LANGSMITH_API_KEY: ecs.Secret.fromSecretsManager(litellmOtherSecrets, 'LANGSMITH_API_KEY'),
         },
         environment: {
+          LITELLM_LOG: "DEBUG",
           LITELLM_CONFIG_BUCKET_NAME: configBucket.bucketName,
           LITELLM_CONFIG_BUCKET_OBJECT_KEY: 'config.yaml',
           UI_USERNAME: "admin",
           REDIS_URL: `redis://${props.redisHostName}:${props.redisPort}`,
           LANGSMITH_PROJECT: props.langsmithProject,
-          LANGSMITH_DEFAULT_RUN_NAME: props.langsmithDefaultRunName
+          LANGSMITH_DEFAULT_RUN_NAME: props.langsmithDefaultRunName,
+          LITELLM_LOCAL_MODEL_COST_MAP: props.disableOutboundNetworkAccess ? "True" : "False"
         }
       });
 

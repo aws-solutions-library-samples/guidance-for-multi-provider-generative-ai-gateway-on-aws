@@ -5,30 +5,61 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as rds from 'aws-cdk-lib/aws-rds';
 import * as elasticache from 'aws-cdk-lib/aws-elasticache';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import { CfnPullThroughCacheRule } from 'aws-cdk-lib/aws-ecr';
+import * as ecr from 'aws-cdk-lib/aws-ecr';
+import { Tag, Aspects } from 'aws-cdk-lib';
+
+export enum DeploymentPlatform {
+  ECS = 'ECS',
+  EKS = 'EKS'
+}
 
 interface LiteLLMStackProps extends cdk.StackProps {
   vpcId: string;
+  deploymentPlatform: DeploymentPlatform;
+  disableOutboundNetworkAccess: boolean;
 }
 
 export class LitellmDatabaseCdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: LiteLLMStackProps) {
     super(scope, id, props);
 
+    Aspects.of(this).add(new Tag('stack-id', this.stackName));
+    Aspects.of(this).add(new Tag('project', 'llmgateway'));
+
+    const natGatewayCount = props.disableOutboundNetworkAccess ? 0 : 1
+    const subnetType = props.disableOutboundNetworkAccess ? ec2.SubnetType.PRIVATE_ISOLATED : ec2.SubnetType.PRIVATE_WITH_EGRESS;
+    if (props.disableOutboundNetworkAccess && props.deploymentPlatform == DeploymentPlatform.EKS) {
+      const repository = new ecr.Repository(this, 'MyEcrRepository', {
+        repositoryName: "my-public-ecr-cache-repo",
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      });
+  
+      const albPullThroughCache = new CfnPullThroughCacheRule(this, 'AlbPullThroughCache', {
+        ecrRepositoryPrefix: repository.repositoryName,
+        upstreamRegistryUrl: 'public.ecr.aws',
+      });
+
+      new cdk.CfnOutput(this, 'EksAlbControllerPrivateEcrRepositoryName', {
+        value: repository.repositoryName,
+        description: 'The name of the ECR repo that is used to store the EKS ALB Controller Container Image in EKS deployments with outbound network access disabled',
+      });
+    }
+
     // Create VPC or import one if provided
-    const vpc = props.vpcId ?
-      ec2.Vpc.fromLookup(this, 'LiteLLMVpc', { vpcId: props.vpcId }) :
-      new ec2.Vpc(this, 'LiteLLMVpc', { maxAzs: 2, natGateways: 1, flowLogs: {
-        'flowlog1': {
-          destination: ec2.FlowLogDestination.toCloudWatchLogs(
-            new logs.LogGroup(this, 'VPCFlowLogs', {
-              retention: logs.RetentionDays.ONE_MONTH,
-            })
-          ),
-          trafficType: ec2.FlowLogTrafficType.ALL,
-          maxAggregationInterval: ec2.FlowLogMaxAggregationInterval.ONE_MINUTE,
-        }
+    const vpc = props.vpcId ? ec2.Vpc.fromLookup(this, 'ImportedVpc', { vpcId: props.vpcId }) : new ec2.Vpc(this, 'LiteLLMVpc', { maxAzs: 2, natGateways: natGatewayCount, flowLogs: {
+      'flowlog1': {
+        destination: ec2.FlowLogDestination.toCloudWatchLogs(
+          new logs.LogGroup(this, 'VPCFlowLogs', {
+            retention: logs.RetentionDays.ONE_MONTH,
+          })
+        ),
+        trafficType: ec2.FlowLogTrafficType.ALL,
+        maxAggregationInterval: ec2.FlowLogMaxAggregationInterval.ONE_MINUTE,
       }
      });
+
+   const subnetIds = props.disableOutboundNetworkAccess ? vpc.isolatedSubnets.map(subnet => subnet.subnetId) : vpc.privateSubnets.map(subnet => subnet.subnetId)
 
    // ------------------------------------------------------------------------
     // --- VPC Endpoints ------------------------------------------------------
@@ -44,13 +75,13 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
 
     vpc.addGatewayEndpoint('S3Endpoint', {
       service: ec2.GatewayVpcEndpointAwsService.S3,
-      subnets: [{ subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }],
+      subnets: [{ subnetType: subnetType }],
     });
 
     vpc.addInterfaceEndpoint('SecretsManagerEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
       subnets: {
-        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        subnetType: subnetType,
       },
       securityGroups: [vpcEndpointSG],
       lookupSupportedAzs: true
@@ -59,16 +90,16 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
     vpc.addInterfaceEndpoint('ECREndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.ECR,
       subnets: {
-        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        subnetType: subnetType,
       },
       securityGroups: [vpcEndpointSG],
-      lookupSupportedAzs: true
+      lookupSupportedAzs: true,
     });
 
     vpc.addInterfaceEndpoint('ECRDockerEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
       subnets: {
-        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        subnetType: subnetType,
       },
       securityGroups: [vpcEndpointSG],
       lookupSupportedAzs: true
@@ -78,7 +109,7 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
     vpc.addInterfaceEndpoint('CloudWatchLogsEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
       subnets: {
-        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        subnetType: subnetType,
       },
       securityGroups: [vpcEndpointSG],
       lookupSupportedAzs: true
@@ -88,7 +119,7 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
     vpc.addInterfaceEndpoint('STSEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.STS,
       subnets: {
-        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        subnetType: subnetType,
       },
       securityGroups: [vpcEndpointSG],
       lookupSupportedAzs: true
@@ -97,7 +128,7 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
     vpc.addInterfaceEndpoint('SageMakerRuntimeEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.SAGEMAKER_RUNTIME,
       subnets: {
-        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        subnetType: subnetType,
       },
       securityGroups: [vpcEndpointSG],
       lookupSupportedAzs: true
@@ -105,14 +136,14 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
 
     vpc.addInterfaceEndpoint('BedrockEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.BEDROCK,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      subnets: { subnetType: subnetType },
       securityGroups: [vpcEndpointSG],
       lookupSupportedAzs: true
     });
 
     vpc.addInterfaceEndpoint('BedrockRuntimeEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.BEDROCK_RUNTIME,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      subnets: { subnetType: subnetType },
       securityGroups: [vpcEndpointSG],
       lookupSupportedAzs: true
     });
@@ -120,11 +151,101 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
     //Bedrock Agent - Used by middleware to get bedrock managed prompts
     vpc.addInterfaceEndpoint('BedrockAgentEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.BEDROCK_AGENT,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      subnets: { subnetType: subnetType },
       securityGroups: [vpcEndpointSG],
       lookupSupportedAzs: true
     });
 
+    if(props.deploymentPlatform == "EKS") {
+      // EKS API endpoint - required for cluster communication
+      vpc.addInterfaceEndpoint('EKSEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.EKS,
+        subnets: {
+          subnetType: subnetType,
+        },
+        securityGroups: [vpcEndpointSG],
+        lookupSupportedAzs: true
+      });
+  
+      // EC2 API - required for node bootstrapping and operations
+      vpc.addInterfaceEndpoint('EC2Endpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.EC2,
+        subnets: {
+          subnetType: subnetType,
+        },
+        securityGroups: [vpcEndpointSG],
+        lookupSupportedAzs: true
+      });
+  
+      // EC2 Messages - required for node communication
+      vpc.addInterfaceEndpoint('EC2MessagesEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES,
+        subnets: {
+          subnetType: subnetType,
+        },
+        securityGroups: [vpcEndpointSG],
+        lookupSupportedAzs: true
+      });
+  
+      // SSM - required for node management
+      vpc.addInterfaceEndpoint('SSMEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.SSM,
+        subnets: {
+          subnetType: subnetType,
+        },
+        securityGroups: [vpcEndpointSG],
+        lookupSupportedAzs: true
+      });
+  
+      // SSM Messages - required for node management
+      vpc.addInterfaceEndpoint('SSMMessagesEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES,
+        subnets: {
+          subnetType: subnetType,
+        },
+        securityGroups: [vpcEndpointSG],
+        lookupSupportedAzs: true
+      });
+  
+      // CloudWatch Monitoring - required for metrics
+      vpc.addInterfaceEndpoint('MonitoringEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_MONITORING,
+        subnets: {
+          subnetType: subnetType,
+        },
+        securityGroups: [vpcEndpointSG],
+        lookupSupportedAzs: true
+      });
+  
+      // Elastic Load Balancing - required if using AWS Load Balancer Controller
+      vpc.addInterfaceEndpoint('ElasticLoadBalancingEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.ELASTIC_LOAD_BALANCING,
+        subnets: {
+          subnetType: subnetType,
+        },
+        securityGroups: [vpcEndpointSG],
+        lookupSupportedAzs: true
+      });
+  
+      // Auto Scaling - required if using Cluster Autoscaler
+      vpc.addInterfaceEndpoint('AutoScalingEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.AUTOSCALING,
+        subnets: {
+          subnetType: subnetType,
+        },
+        securityGroups: [vpcEndpointSG],
+        lookupSupportedAzs: true
+      });
+
+      vpc.addInterfaceEndpoint('WAFv2Endpoint', {
+        service: new ec2.InterfaceVpcEndpointService(`com.amazonaws.${this.region}.wafv2`, 443),
+        subnets: { subnetType: subnetType },
+        securityGroups: [vpcEndpointSG],
+        lookupSupportedAzs: true,
+        privateDnsEnabled: true
+      });
+  }
+  
     // Create RDS Instance
     const databaseSecret = new secretsmanager.Secret(this, 'DBSecret', {
       generateSecretString: {
@@ -159,7 +280,7 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
       instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO),
       vpc,
       vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        subnetType: subnetType,
       },
       securityGroups: [dbSecurityGroup],
       credentials: rds.Credentials.fromSecret(databaseSecret),
@@ -175,7 +296,7 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
       instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO),
       vpc,
       vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        subnetType: subnetType,
       },
       securityGroups: [dbSecurityGroup],
       credentials: rds.Credentials.fromSecret(databaseMiddlewareSecret),
@@ -193,7 +314,7 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
     // Create Redis Subnet Group
     const redisSubnetGroup = new elasticache.CfnSubnetGroup(this, 'RedisSubnetGroup', {
       description: 'Subnet group for Redis cluster',
-      subnetIds: vpc.privateSubnets.map(subnet => subnet.subnetId),
+      subnetIds: subnetIds,
       cacheSubnetGroupName: 'litellm-redis-subnet-group',
     });
 

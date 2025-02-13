@@ -50,6 +50,7 @@ const redisPort = String(app.node.tryGetContext("redisPort"));
 const rdsSecurityGroupId = String(app.node.tryGetContext("rdsSecurityGroupId"));
 const redisSecurityGroupId = String(app.node.tryGetContext("redisSecurityGroupId"));
 
+const disableOutboundNetworkAccess = String(app.node.tryGetContext("disableOutboundNetworkAccess")).toLowerCase() === 'true';
 
 // Validate and convert deployment platform string to enum
 const deploymentPlatform = (() => {
@@ -108,6 +109,7 @@ new LitellmCdkStack(app, 'LitellmCdkStack', {
   redisPort: redisPort,
   rdsSecurityGroupId: rdsSecurityGroupId,
   redisSecurityGroupId: redisSecurityGroupId,
+  disableOutboundNetworkAccess: disableOutboundNetworkAccess,
 
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
