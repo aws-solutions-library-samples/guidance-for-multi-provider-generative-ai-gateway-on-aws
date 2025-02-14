@@ -186,62 +186,6 @@ resource "aws_iam_openid_connect_provider" "this" {
   thumbprint_list = [data.tls_certificate.eks_oidc.certificates[0].sha1_fingerprint]
 }
 
-# Get the existing aws-auth ConfigMap
-data "kubernetes_config_map" "aws_auth" {
-  metadata {
-    name      = "aws-auth"
-    namespace = "kube-system"
-  }
-}
-
-locals {
-  # Parse the existing mapRoles YAML
-  existing_map_roles = try(yamldecode(data.kubernetes_config_map.aws_auth.data.mapRoles), [])
-  
-  # New roles to add
-  new_map_roles = [
-    {
-      rolearn  = aws_iam_role.eks_nodegroup.arn
-      username = "system:node:{{EC2PrivateDNSName}}"
-      groups   = ["system:bootstrappers", "system:nodes"]
-    },
-    {
-      rolearn  = aws_iam_role.eks_developers.arn
-      username = "eks-developers"
-      groups   = ["eks-developers"]
-    },
-    {
-      rolearn  = aws_iam_role.eks_operators.arn
-      username = "eks-operators"
-      groups   = ["eks-operators"]
-    }
-  ]
-
-  # Combine existing and new roles, removing duplicates based on rolearn
-  combined_map_roles = distinct(concat(
-    local.existing_map_roles,
-    local.new_map_roles
-  ))
-}
-
-resource "kubernetes_config_map" "aws_auth" {
-  metadata {
-    name      = "aws-auth"
-    namespace = "kube-system"
-    labels    = local.common_labels
-  }
-
-  # Wait until the cluster and its endpoint are actually ready
-  depends_on = [
-    aws_eks_cluster.this,
-    aws_iam_role.eks_nodegroup
-  ]
-
-  data = {
-    mapRoles = yamlencode(local.combined_map_roles)
-  }
-}
-
 ###############################################################################
 # EKS Addons (replacing cluster_addons in the module)                         #
 ###############################################################################
@@ -273,80 +217,13 @@ resource "aws_eks_addon" "vpc_cni" {
   depends_on = [aws_eks_cluster.this]
 }
 
-
-###############################################################################
-# Node group IAM role example                                                #
-###############################################################################
-resource "aws_iam_role" "eks_nodegroup" {
-  name = "${var.name}-eks-nodegroup-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          Service = "ec2.amazonaws.com"
-        }
-        Action = "sts:AssumeRole"
-      }
-    ]
-  })
-}
-
-# Attach required policies to the node group role
-resource "aws_iam_role_policy_attachment" "eks_nodegroup_worker_policy" {
-  role       = aws_iam_role.eks_nodegroup.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-}
-
-resource "aws_iam_role_policy_attachment" "eks_nodegroup_cni_policy" {
-  role       = aws_iam_role.eks_nodegroup.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-}
-
-resource "aws_iam_role_policy_attachment" "eks_nodegroup_ec2_registry" {
-  role       = aws_iam_role.eks_nodegroup.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-}
-
-resource "aws_iam_role_policy_attachment" "eks_nodegroup_ssm" {
-  role       = aws_iam_role.eks_nodegroup.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-}
-
-# Example of attaching a custom inline policy statement
-data "aws_iam_policy_document" "nodegroup_ecr_ptc" {
-  statement {
-    sid     = "ECRPullThroughCache"
-    effect  = "Allow"
-    actions = [
-      "ecr:CreateRepository",
-      "ecr:BatchImportUpstreamImage",
-    ]
-    resources = ["*"]
-  }
-}
-
-resource "aws_iam_policy" "nodegroup_ecr_ptc" {
-  name        = "${var.name}-nodegroup-ecr-ptc"
-  policy      = data.aws_iam_policy_document.nodegroup_ecr_ptc.json
-  description = "Allow ECR Pull Through Cache"
-}
-
-resource "aws_iam_policy_attachment" "nodegroup_ecr_ptc_attach" {
-  name       = "${var.name}-nodegroup-ecr-ptc-attach"
-  policy_arn = aws_iam_policy.nodegroup_ecr_ptc.arn
-  roles      = [aws_iam_role.eks_nodegroup.name]
-}
-
 ###############################################################################
 # EKS Managed Node Group (replacing eks_managed_node_groups in the module)    #
 ###############################################################################
 resource "aws_eks_node_group" "core_nodegroup" {
   cluster_name    = local.cluster_name
   node_group_name_prefix = "core_nodegroup"
-  node_role_arn   = aws_iam_role.eks_nodegroup.arn
+  node_role_arn   = var.nodegroup_role_arn
   subnet_ids      = concat(data.aws_subnets.private.ids)
 
   scaling_config {
@@ -364,10 +241,44 @@ resource "aws_eks_node_group" "core_nodegroup" {
   # Use depends_on to ensure the VPC CNI add-on is installed before node creation
   # If we're creating the cluster, ensure the cluster resource is built first.
   # If we're using an existing cluster, the depends_on is effectively empty.
-  depends_on = [aws_eks_cluster.this, aws_iam_role.eks_nodegroup, aws_iam_role_policy_attachment.eks_nodegroup_worker_policy, aws_iam_role_policy_attachment.eks_nodegroup_cni_policy, aws_iam_role_policy_attachment.eks_nodegroup_ec2_registry, aws_iam_role_policy_attachment.eks_nodegroup_ssm, aws_iam_policy_attachment.nodegroup_ecr_ptc_attach, kubernetes_config_map.aws_auth]#, aws_iam_role_policy_attachment.eks_cluster_policy_2]
+  depends_on = [aws_eks_cluster.this, kubernetes_config_map.aws_auth]#, aws_iam_role_policy_attachment.eks_cluster_policy_2]
 
   # Example tags
   tags = local.tags
+}
+
+resource "kubernetes_config_map" "aws_auth" {
+  count = var.create_cluster || var.create_aws_auth_in_existing_eks_cluster ? 1 : 0
+  metadata {
+    name      = "aws-auth"
+    namespace = "kube-system"
+    labels    = local.common_labels
+  }
+
+  # Wait until the cluster and its endpoint are actually ready
+  depends_on = [
+    aws_eks_cluster.this
+  ]
+
+  # The 'data' block is YAML that instructs EKS how to map IAM roles to Kubernetes RBAC
+  data = {
+    # Map IAM roles for the Node Group
+    mapRoles = <<-YAML
+      - rolearn: ${var.nodegroup_role_arn}
+        username: system:node:{{EC2PrivateDNSName}}
+        groups:
+          - system:bootstrappers
+          - system:nodes
+      - rolearn: ${var.developers_role_arn}
+        username: eks-developers
+        groups:
+          - eks-developers
+      - rolearn: ${var.operators_role_arn}
+        username: eks-operators
+        groups:
+          - eks-operators
+    YAML
+  }
 }
 
 

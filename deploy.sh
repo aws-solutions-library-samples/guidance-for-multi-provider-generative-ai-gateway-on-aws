@@ -87,6 +87,7 @@ echo "EXISTING_VPC_ID: $EXISTING_VPC_ID"
 echo "DISABLE_OUTBOUND_NETWORK_ACCESS: $DISABLE_OUTBOUND_NETWORK_ACCESS"
 echo "CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC: $CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC"
 echo "INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER: $INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER"
+echo "CREATE_AWS_AUTH_IN_EXISTING_EKS_CLUSTER: $CREATE_AWS_AUTH_IN_EXISTING_EKS_CLUSTER"
 
 if [ "$SKIP_BUILD" = false ]; then
     echo "Building and pushing docker image..."
@@ -370,12 +371,99 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
 
     export TF_VAR_install_add_ons_in_existing_eks_cluster=$INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER
 
+    echo "Deploying litellm-eks-terraform-roles stack"
+    cd ..
+    cd litellm-eks-terraform-roles
+    terraform init
+    terraform apply -auto-approve
+    if [ $? -eq 0 ]; then
+        echo "Deployment successful. Extracting role arn outputs..."
+        DEVELOPERS_ROLE_ARN=$(terraform output -raw developers_role_arn)
+        OPERATORS_ROLE_ARN=$(terraform output -raw operators_role_arn)
+        NODEGROUP_ROLE_ARN=$(terraform output -raw nodegroup_role_arn)
+        export TF_VAR_developers_role_arn=$DEVELOPERS_ROLE_ARN
+        export TF_VAR_operators_role_arn=$OPERATORS_ROLE_ARN
+        export TF_VAR_nodegroup_role_arn=$NODEGROUP_ROLE_ARN
+    else
+        echo "Deployment failed"
+    fi
+
+    if echo "$CREATE_AWS_AUTH_IN_EXISTING_EKS_CLUSTER" | grep -iq "^false$" && [ -n "$EXISTING_EKS_CLUSTER_NAME" ]; then
+        echo "Updating existing aws-auth with additional roles..."
+
+        # Temporary files
+        AWS_AUTH_YAML="$(mktemp)"
+        AWS_AUTH_PARTIAL_YAML="$(mktemp)"
+        CURRENT_ROLES_YAML="$(mktemp)"
+        NEW_ROLES_YAML="$(mktemp)"
+        AWS_AUTH_UPDATED_YAML="$(mktemp)"
+
+        # Use a trap to clean up temp files even if the script fails
+        cleanup() {
+          rm -f "$AWS_AUTH_YAML" "$AWS_AUTH_PARTIAL_YAML" \
+                "$CURRENT_ROLES_YAML" "$NEW_ROLES_YAML" "$AWS_AUTH_UPDATED_YAML"
+        }
+        trap cleanup EXIT
+
+        # 1) Get the entire aws-auth ConfigMap
+        kubectl get configmap aws-auth -n kube-system -o yaml > "$AWS_AUTH_YAML"
+
+        # 2) Extract current mapRoles *as raw text* (important!)
+        #    Without '-r', yq might parse it as a YAML sequence.
+        yq e -r '.data.mapRoles' "$AWS_AUTH_YAML" > "$CURRENT_ROLES_YAML"
+
+        # 2a) Check if any of the role ARNs already exist
+        if grep -qF "$NODEGROUP_ROLE_ARN" "$CURRENT_ROLES_YAML" || \
+            grep -qF "$DEVELOPERS_ROLE_ARN" "$CURRENT_ROLES_YAML" || \
+            grep -qF "$OPERATORS_ROLE_ARN"  "$CURRENT_ROLES_YAML"; then
+            echo "At least one of the roles already exists in aws-auth. Skipping update."
+        else
+            #3) Define the new roles with proper indentation
+            cat <<EOF > "$NEW_ROLES_YAML"
+- rolearn: ${NODEGROUP_ROLE_ARN}
+  username: system:node:{{EC2PrivateDNSName}}
+  groups:
+    - system:bootstrappers
+    - system:nodes
+
+- rolearn: ${DEVELOPERS_ROLE_ARN}
+  username: eks-developers
+  groups:
+    - eks-developers
+
+- rolearn: ${OPERATORS_ROLE_ARN}
+  username: eks-operators
+  groups:
+    - eks-operators
+EOF
+
+            # 4) Append the new roles to the existing roles (just text concatenation)
+            cat "$NEW_ROLES_YAML" >> "$CURRENT_ROLES_YAML"
+
+            # 5) Remove the old mapRoles field from the ConfigMap
+            yq e 'del(.data.mapRoles)' "$AWS_AUTH_YAML" > "$AWS_AUTH_PARTIAL_YAML"
+
+            # 6) Inject the merged roles back in as a multiline string
+            #    Use strenv() to ensure the shell variable is inserted as text
+            export MERGED_ROLES="$(cat "$CURRENT_ROLES_YAML")"
+            yq e '.data.mapRoles = strenv(MERGED_ROLES)' \
+                "$AWS_AUTH_PARTIAL_YAML" \
+                > "$AWS_AUTH_UPDATED_YAML"
+
+            # 7) Apply the updated ConfigMap
+            kubectl apply -f "$AWS_AUTH_UPDATED_YAML"
+
+            echo "Successfully updated aws-auth with additional roles."
+        fi
+    fi
+
+    export TF_VAR_create_aws_auth_in_existing_eks_cluster=$CREATE_AWS_AUTH_IN_EXISTING_EKS_CLUSTER
+
     cd ..
     cd litellm-eks-terraform
     terraform init
     #terraform destroy -auto-approve
     terraform apply -auto-approve
-
 fi
 
 if [ $? -eq 0 ]; then

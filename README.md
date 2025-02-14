@@ -126,6 +126,8 @@ const vpc = new ec2.Vpc(this, 'LiteLLMVpcPreExisting', { maxAzs: 2, natGateways:
 
 If you'd like the terraform to install the required add-ons for you, you can set `INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER="true"`
 
+Also, our deployment is assuming you already have an `aws-auth` config map set up on your cluster, and don't want us to overwrite it. By default, we will apend to your existing `aws-auth` instead of trying to create a new one. If you don't already have an `aws-auth` config map on your cluster, you can set `CREATE_AWS_AUTH_IN_EXISTING_EKS_CLUSTER="true"`, which will make it so that terraform creates and manages the `aws-auth` config map.
+
 Other configurations are not guaranteed to work. You may have to tweak the terraform yourself to work with your particular existing EKS cluster configuration.
 ![Verified EKS Cluster Configuration](./media/Tested-Bring-Your-Own-EKS-Cluster-Configuration.png)
 ![Required add ons](./media/Required-EKS-Add-ons.png)

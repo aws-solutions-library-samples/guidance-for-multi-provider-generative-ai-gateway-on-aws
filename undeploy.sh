@@ -71,6 +71,7 @@ echo "EXISTING_VPC_ID: $EXISTING_VPC_ID"
 echo "DISABLE_OUTBOUND_NETWORK_ACCESS: $DISABLE_OUTBOUND_NETWORK_ACCESS"
 echo "CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC: $CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC"
 echo "INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER: $INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER"
+echo "CREATE_AWS_AUTH_IN_EXISTING_EKS_CLUSTER: $CREATE_AWS_AUTH_IN_EXISTING_EKS_CLUSTER"
 
 ARCH=$(uname -m)
 case $ARCH in
@@ -246,11 +247,26 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     fi
 
     export TF_VAR_install_add_ons_in_existing_eks_cluster=$INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER
+    export TF_VAR_create_aws_auth_in_existing_eks_cluster=$CREATE_AWS_AUTH_IN_EXISTING_EKS_CLUSTER
+
+    cd ../litellm-eks-terraform-roles
+    DEVELOPERS_ROLE_ARN=$(terraform output -raw developers_role_arn)
+    OPERATORS_ROLE_ARN=$(terraform output -raw operators_role_arn)
+    NODEGROUP_ROLE_ARN=$(terraform output -raw nodegroup_role_arn)
+    export TF_VAR_developers_role_arn=$DEVELOPERS_ROLE_ARN
+    export TF_VAR_operators_role_arn=$OPERATORS_ROLE_ARN
+    export TF_VAR_nodegroup_role_arn=$NODEGROUP_ROLE_ARN
 
     echo "Undeploying the litellm-eks-terraform"
     cd ../litellm-eks-terraform
     terraform init
     terraform destroy -auto-approve
+    
+    echo "Undeploying the litellm-eks-terraform-roles"
+    cd ../litellm-eks-terraform-roles
+    terraform init
+    terraform destroy -auto-approve
+
     cd ..
 fi
 

@@ -29,32 +29,6 @@ locals {
   }
 }
 
-################################################################################
-# IAM Roles
-################################################################################
-
-data "aws_iam_policy_document" "assume_role" {
-
-  statement {
-    sid     = "AssumeRole"
-    actions = ["sts:AssumeRole"]
-
-    principals {
-      type        = "AWS"
-      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
-    }
-  }
-}
-
-resource "aws_iam_role" "eks_developers" {
-  name               = "${var.name}-developers"
-  assume_role_policy = data.aws_iam_policy_document.assume_role.json
-}
-
-resource "aws_iam_role" "eks_operators" {
-  name               = "${var.name}-operators"
-  assume_role_policy = data.aws_iam_policy_document.assume_role.json
-}
 #--------------------------------------------------------------
 # Adding guidance solution ID via AWS CloudFormation resource
 #--------------------------------------------------------------
@@ -543,53 +517,6 @@ resource "helm_release" "aws_load_balancer_controller" {
     aws_eks_node_group.core_nodegroup,
     module.aws_load_balancer_controller_irsa_role
   ]
-}
-
-# Add additional IAM policies to node groups
-resource "aws_iam_role_policy" "node_additional_policies" {
-  name = "${var.name}-eks-node-additional"
-  role = aws_iam_role.eks_nodegroup.name
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:ListBucket"
-        ]
-        Resource = [
-          var.config_bucket_arn,
-          "${var.config_bucket_arn}/*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:*"
-        ]
-        Resource = [
-          var.log_bucket_arn,
-          "${var.log_bucket_arn}/*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "bedrock:*"
-        ]
-        Resource = ["*"]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "sagemaker:InvokeEndpoint"
-        ]
-        Resource = ["*"]
-      }
-    ]
-  })
 }
 
 # Get the ALB details using data source

@@ -457,7 +457,7 @@ export class LitellmCdkStack extends cdk.Stack {
                 name: 'Listener',
                 protocol: elasticloadbalancingv2.ApplicationProtocol.HTTPS,
                 certificate: certificate,
-                sslPolicy: elasticloadbalancingv2.SslPolicy.RECOMMENDED,
+                sslPolicy: elasticloadbalancingv2.SslPolicy.RECOMMENDED_TLS,
               },
             ],
           },
