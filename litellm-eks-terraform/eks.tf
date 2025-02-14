@@ -186,6 +186,44 @@ resource "aws_iam_openid_connect_provider" "this" {
   thumbprint_list = [data.tls_certificate.eks_oidc.certificates[0].sha1_fingerprint]
 }
 
+# Get the existing aws-auth ConfigMap
+data "kubernetes_config_map" "aws_auth" {
+  metadata {
+    name      = "aws-auth"
+    namespace = "kube-system"
+  }
+}
+
+locals {
+  # Parse the existing mapRoles YAML
+  existing_map_roles = try(yamldecode(data.kubernetes_config_map.aws_auth.data.mapRoles), [])
+  
+  # New roles to add
+  new_map_roles = [
+    {
+      rolearn  = aws_iam_role.eks_nodegroup.arn
+      username = "system:node:{{EC2PrivateDNSName}}"
+      groups   = ["system:bootstrappers", "system:nodes"]
+    },
+    {
+      rolearn  = aws_iam_role.eks_developers.arn
+      username = "eks-developers"
+      groups   = ["eks-developers"]
+    },
+    {
+      rolearn  = aws_iam_role.eks_operators.arn
+      username = "eks-operators"
+      groups   = ["eks-operators"]
+    }
+  ]
+
+  # Combine existing and new roles, removing duplicates based on rolearn
+  combined_map_roles = distinct(concat(
+    local.existing_map_roles,
+    local.new_map_roles
+  ))
+}
+
 resource "kubernetes_config_map" "aws_auth" {
   metadata {
     name      = "aws-auth"
@@ -195,27 +233,12 @@ resource "kubernetes_config_map" "aws_auth" {
 
   # Wait until the cluster and its endpoint are actually ready
   depends_on = [
-    aws_eks_cluster.this, aws_iam_role.eks_nodegroup
+    aws_eks_cluster.this,
+    aws_iam_role.eks_nodegroup
   ]
 
-  # The 'data' block is YAML that instructs EKS how to map IAM roles to Kubernetes RBAC
   data = {
-    # Map IAM roles for the Node Group
-    mapRoles = <<-YAML
-      - rolearn: ${aws_iam_role.eks_nodegroup.arn}
-        username: system:node:{{EC2PrivateDNSName}}
-        groups:
-          - system:bootstrappers
-          - system:nodes
-      - rolearn: ${aws_iam_role.eks_developers.arn}
-        username: eks-developers
-        groups:
-          - eks-developers
-      - rolearn: ${aws_iam_role.eks_operators.arn}
-        username: eks-operators
-        groups:
-          - eks-operators
-    YAML
+    mapRoles = yamlencode(local.combined_map_roles)
   }
 }
 
@@ -223,6 +246,8 @@ resource "kubernetes_config_map" "aws_auth" {
 # EKS Addons (replacing cluster_addons in the module)                         #
 ###############################################################################
 resource "aws_eks_addon" "coredns" {
+  count = var.create_cluster || var.install_add_ons_in_existing_eks_cluster ? 1 : 0
+
   cluster_name = local.cluster_name
   addon_name   = "coredns"
 
@@ -231,6 +256,8 @@ resource "aws_eks_addon" "coredns" {
 }
 
 resource "aws_eks_addon" "kube_proxy" {
+  count = var.create_cluster || var.install_add_ons_in_existing_eks_cluster ? 1 : 0
+
   cluster_name = local.cluster_name
   addon_name   = "kube-proxy"
 
@@ -238,6 +265,8 @@ resource "aws_eks_addon" "kube_proxy" {
 }
 
 resource "aws_eks_addon" "vpc_cni" {
+  count = var.create_cluster || var.install_add_ons_in_existing_eks_cluster ? 1 : 0
+
   cluster_name = local.cluster_name
   addon_name   = "vpc-cni"
 

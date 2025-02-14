@@ -118,8 +118,18 @@ const vpc = new ec2.Vpc(this, 'LiteLLMVpcPreExisting', { maxAzs: 2, natGateways:
 
 * If you'd like to use EKS instead of ECS, switch `DEPLOYMENT_PLATFORM="ECS"` to `DEPLOYMENT_PLATFORM="EKS"` (Still in beta, probably has bugs.) (Note: you currently cannot freely switch between these. You must delete your existing deployment to switch deployment platforms.)
 
-* If you'd like to bring your own EKS cluster, set `EXISTING_EKS_CLUSTER_NAME` to your EKS Cluster name. You must also set `EXISTING_VPC_ID`, and the VPC must be the vpc your EKS Cluster exists in. This has been tested with an new EKS cluster created with with no existing add-ons, EKS Auto Mode disabled. EKS ConfigMap enabled (see below image). Other configurations are not guaranteed to work. You may have to tweak the terraform yourself to work with your particular existing EKS cluster configuration.
+* If you'd like to bring your own EKS cluster, set `EXISTING_EKS_CLUSTER_NAME` to your EKS Cluster name. You must also set `EXISTING_VPC_ID`, and the VPC must be the vpc your EKS Cluster exists in. This has been tested with an new EKS cluster created with EKS Auto Mode disabled. EKS ConfigMap enabled (see below image). It also has the following add-ons pre-installed
+  * Amazon EKS Pod Identity Agent
+  * Amazon VPC CNI
+  * kube-proxy
+  * CoreDNS
+
+If you'd like the terraform to install the required add-ons for you, you can set `INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER="true"`
+
+Other configurations are not guaranteed to work. You may have to tweak the terraform yourself to work with your particular existing EKS cluster configuration.
 ![Verified EKS Cluster Configuration](./media/Tested-Bring-Your-Own-EKS-Cluster-Configuration.png)
+![Required add ons](./media/Required-EKS-Add-ons.png)
+
 
 * If you'd like to run LiteLLM in subnets without outbound internet access, set `DISABLE_OUTBOUND_NETWORK_ACCESS="true"`. Due to lack of internet access, this configuration will only work with AWS Bedrock or SageMaker models. Because of this, you must remove all non-Bedrock/non-SageMaker models from your `config/config.yaml` file. If you do not do this, LiteLLM will fail to start as it will attempt to call third party models over the internet.
 

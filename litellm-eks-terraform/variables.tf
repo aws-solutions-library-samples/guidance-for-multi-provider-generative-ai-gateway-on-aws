@@ -286,3 +286,9 @@ variable "eks_alb_controller_private_ecr_repository_name" {
   type        = string
   default = ""
 }
+
+variable "install_add_ons_in_existing_eks_cluster" {
+  description = "Whether to install add ons onto an existing EKS Cluster"
+  type = bool
+  default = false
+}
