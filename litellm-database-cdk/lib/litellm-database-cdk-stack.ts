@@ -66,7 +66,8 @@ export class LitellmDatabaseCdkStack extends cdk.Stack {
     // --- VPC Endpoints ------------------------------------------------------
     // ------------------------------------------------------------------------
     // Always create vpc endpoints in new vpc. Optionally create vpc endpoints in imported vpc
-    if(props.vpcId && props.createVpcEndpointsInExistingVpc) {
+    // i.e. "If not importing existing vpc, or createVpcEndpointsInExistingVpc="true", create vpc endpoints."
+    if(!props.vpcId || props.createVpcEndpointsInExistingVpc) {
       const vpcEndpointSG = new ec2.SecurityGroup(this, 'VPCEndpointsSG', {
         vpc,
         description: 'Security group for Interface VPC Endpoints',
