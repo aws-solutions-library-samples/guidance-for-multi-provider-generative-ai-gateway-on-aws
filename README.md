@@ -118,7 +118,9 @@ const vpc = new ec2.Vpc(this, 'LiteLLMVpcPreExisting', { maxAzs: 2, natGateways:
 
 * If you'd like to use EKS instead of ECS, switch `DEPLOYMENT_PLATFORM="ECS"` to `DEPLOYMENT_PLATFORM="EKS"` (Still in beta, probably has bugs.) (Note: you currently cannot freely switch between these. You must delete your existing deployment to switch deployment platforms.)
 
-* If you'd like to bring your own EKS cluster, set `EXISTING_EKS_CLUSTER_NAME` to your EKS Cluster name. You must also set `EXISTING_VPC_ID`, and the VPC must be the vpc your EKS Cluster exists in. This has been tested with an new EKS cluster created with EKS Auto Mode disabled. EKS ConfigMap enabled (see below image). It also has the following add-ons pre-installed
+* If you'd like to bring your own EKS cluster, set `EXISTING_EKS_CLUSTER_NAME` to your EKS Cluster name. You must also set `EXISTING_VPC_ID`, and the VPC must be the vpc your EKS Cluster exists in. This has been tested with an new EKS cluster created with EKS Auto Mode disabled, and EKS ConfigMap enabled (see below image). 
+
+It also has the following add-ons pre-installed
   * Amazon EKS Pod Identity Agent
   * Amazon VPC CNI
   * kube-proxy
