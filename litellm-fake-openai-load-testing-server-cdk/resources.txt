@@ -1,0 +1,1 @@
+ServiceURL=https://fakeserver.mirodrr.people.aws.dev

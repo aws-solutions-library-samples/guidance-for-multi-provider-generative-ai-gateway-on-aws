@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+slowapi
+httpx
+openai

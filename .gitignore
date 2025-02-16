@@ -31,3 +31,6 @@ terraform.tfstate
 terraform.tfstate.backup
 .terraform.tfstate.lock.info
 terraform.tfstate.*
+
+**.env.testing
+**error.txt
