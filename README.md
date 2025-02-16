@@ -599,6 +599,7 @@ response = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             stream=False,
+            extra_body={"enable_history": True}
         )
 
 session_id = response.model_extra.get("session_id")
@@ -619,6 +620,7 @@ stream = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             stream=True,
+            extra_body={"enable_history": True}
         )
 
 session_id = None
@@ -646,14 +648,15 @@ To use this with the Bedrock interface, do the following:
 response = client.converse(
                 modelId=model_id,
                 messages=[{"role": "user", "content": [{"text": message}]}],
+                additionalModelRequestFields={"enable_history": True}
             )
 
 session_id = response["ResponseMetadata"]["HTTPHeaders"].get("x-session-id")
 
 response2 = client.converse(
                 modelId=model_id,
-                additionalModelRequestFields={"session_id": session_id},
                 messages=[{"role": "user", "content": [{"text": message2}]}],
+                additionalModelRequestFields={"session_id": session_id},
             )
 ```
 The `session_id` is returned as a header in `response["ResponseMetadata"]["HTTPHeaders"]`. And you pass that `session_id` in the `additionalModelRequestFields` parameter to continue the same conversation
@@ -663,6 +666,7 @@ The approach with Bedrock interface with streaming is identical, but included he
 response = client.converse_stream(
                 modelId=model_id,
                 messages=[{"role": "user", "content": [{"text": message}]}],
+                additionalModelRequestFields={"enable_history": True},
             )
 session_id = response["ResponseMetadata"]["HTTPHeaders"].get("x-session-id")
 

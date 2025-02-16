@@ -76,6 +76,7 @@ def send_message(
                 # promptVariables={
                 #     "topic": {"text": "fruit"},
                 # },
+                additionalModelRequestFields={"enable_history": True},
                 messages=[{"role": "user", "content": [{"text": message}]}],
             )
 

@@ -119,6 +119,7 @@ def send_message_stream(
                     "maxTokens": max_tokens,
                     "temperature": temperature,
                 },
+                additionalModelRequestFields={"enable_history": True},
             )
         global_session_id = extract_session_id(response)
         if global_session_id:
