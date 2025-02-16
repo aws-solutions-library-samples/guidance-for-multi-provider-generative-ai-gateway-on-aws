@@ -710,19 +710,6 @@ async def handle_bedrock_request(model_id: str, request: Request):
         )
 
 
-async def forward_openai_stream(stream) -> AsyncGenerator[bytes, None]:
-    """
-    Forward the streaming response from OpenAI client.
-    """
-    try:
-        async for chunk in stream:
-            # Convert the chunk to the same format as the API response
-            yield f"data: {json.dumps(chunk.model_dump())}\n\n".encode("utf-8")
-    except Exception as e:
-        print(f"Streaming error: {e}")
-        raise
-
-
 async def get_chat_stream(
     api_key: str,
     data: dict,
@@ -731,107 +718,122 @@ async def get_chat_stream(
     history_enabled: bool,
 ):
     """
-    This function returns a StreamingResponse that continuously yields
-    messages from the LLM endpoint using aiohttp instead of httpx.
+    Returns a StreamingResponse that continuously yields messages from the LLM endpoint
+    using aiohttp, and also returns the upstream headers in the response.
     """
 
-    assistant_content_parts = []
-
-    async def read_linewise(stream, chunk_size=1024):
+    async def read_linewise(aiohttp_body, chunk_size=1024):
         """
-        Helper generator that reads raw chunks from `stream` and yields complete lines.
+        Reads raw chunks from the aiohttp response body and yields complete lines.
         """
         buffer = ""
-        async for chunk in stream.iter_chunked(chunk_size):
+        async for chunk in aiohttp_body.iter_chunked(chunk_size):
             buffer += chunk.decode("utf-8")
             while "\n" in buffer:
                 line, buffer = buffer.split("\n", 1)
                 yield line
-        # If anything remains in the buffer after the stream closes, yield it as a final line
+        # If anything remains in the buffer, yield it as a final line
         if buffer:
             yield buffer
 
-    async def stream_wrapper():
+    # We create our session manually (instead of `async with`) so that we can
+    # keep it open for the entire duration of the stream and close it later.
+    session = aiohttp.ClientSession()
+
+    # Make the POST request up front (so we can capture headers right away).
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+    }
+    response = await session.post(
+        f"{LITELLM_ENDPOINT}/v1/chat/completions",
+        json=data,
+        headers=headers,
+        timeout=None,  # or aiohttp.ClientTimeout(...)
+    )
+
+    # Extract upstream headers
+    response_headers = dict(response.headers)
+
+    # Define an async generator that will yield SSE data from the response.
+    async def stream_events():
+        assistant_content_parts = []
         first_chunk = True
 
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        }
+        try:
+            # Read the response line by line
+            async for line in read_linewise(response.content):
+                line = line.strip()
+                if not line:
+                    continue
 
-        # Make the streaming POST request using aiohttp
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{LITELLM_ENDPOINT}/v1/chat/completions",
-                json=data,
-                headers=headers,
-                timeout=None,  # Adjust as needed, or use aiohttp.ClientTimeout
-            ) as response:
-                print(f"response: {response}")
+                # Check for sentinel lines
+                if line.startswith("data: [DONE]"):
+                    break
 
-                # Iterate line-by-line using our helper
-                async for line in read_linewise(response.content):
-                    print(f"line: {line}")
+                # The OpenAI-like endpoints often prepend "data: " before JSON
+                if line.startswith("data: "):
+                    line = line[len("data: ") :]
 
-                    # Skip empty or whitespace-only lines
-                    line = line.strip()
-                    if not line:
-                        continue
+                # Attempt to parse JSON from the line
+                try:
+                    chunk_dict = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
 
-                    # Check for sentinel lines (e.g. "data: [DONE]")
-                    if line.startswith("data: [DONE]"):
-                        break
+                # Inject session_id only into the first chunk if you wish
+                if first_chunk and history_enabled:
+                    chunk_dict["session_id"] = session_id
+                first_chunk = False
 
-                    # Some endpoints prepend "data: " before the actual JSON
-                    if line.startswith("data: "):
-                        line = line[len("data: ") :]
+                # Yield as a Server-Sent Event
+                yield f"data: {json.dumps(chunk_dict)}\n\n".encode("utf-8")
 
-                    # Attempt to parse JSON. If it fails, skip the line
-                    try:
-                        chunk_dict = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
+                # Optionally accumulate partial content
+                choice = chunk_dict["choices"][0]
+                delta = choice.get("delta", {})
+                finish_reason = choice.get("finish_reason", None)
 
-                    print(f"chunk_dict: {chunk_dict}")
+                if history_enabled and "content" in delta and delta["content"]:
+                    assistant_content_parts.append(delta["content"])
 
-                    # Optionally add a session_id only to the first chunk
-                    if first_chunk:
-                        if history_enabled:
-                            chunk_dict["session_id"] = session_id
-                        first_chunk = False
+                # You could break if finish_reason == "stop", if desired
+                # if finish_reason == "stop":
+                #     break
 
-                    # Yield the SSE event
-                    yield f"data: {json.dumps(chunk_dict)}\n\n".encode("utf-8")
+            # Once streaming ends (for any reason), finalize chat history if desired
+            if history_enabled and assistant_content_parts:
+                assistant_message = {
+                    "role": "assistant",
+                    "content": "".join(assistant_content_parts),
+                }
+                chat_history.append(assistant_message)
+                update_chat_history(session_id, chat_history)
 
-                    # If you want to concatenate partial content for storing after the stream:
-                    choice = chunk_dict["choices"][0]
-                    delta = choice.get("delta", {})
-                    finish_reason = choice.get("finish_reason")
+        finally:
+            # Very important: Close the session once we're done streaming.
+            await session.close()
 
-                    if history_enabled and "content" in delta and delta["content"]:
-                        assistant_content_parts.append(delta["content"])
+    # Build the StreamingResponse using our generator
+    sresponse = StreamingResponse(stream_events(), media_type="text/event-stream")
 
-                    # If there's an explicit finish signal from the server, handle it if needed
-                    # if finish_reason == "stop":
-                    #     break
+    # Exclude certain hop-by-hop or irrelevant headers
+    excluded_headers = {
+        "content-length",
+        "transfer-encoding",
+        "content-encoding",
+        "connection",
+        "keep-alive",
+        "server",
+        "date",
+    }
 
-    async def finalizing_stream():
-        # First, yield each streamed chunk
-        async for event in stream_wrapper():
-            print(f"event: {event}")
-            yield event
+    # Attach upstream headers to our outgoing response
+    for k, v in response_headers.items():
+        if k.lower() not in excluded_headers:
+            sresponse.headers[k] = v
 
-        # Once done, combine the content and store in chat history if desired
-        if history_enabled and assistant_content_parts:
-            assistant_message = {
-                "role": "assistant",
-                "content": "".join(assistant_content_parts),
-            }
-            chat_history.append(assistant_message)
-            # Save to DB or other persistent storage
-            update_chat_history(session_id, chat_history)
-
-    return StreamingResponse(finalizing_stream(), media_type="text/event-stream")
+    return sresponse
 
 
 @app.post("/v1/chat/completions")
@@ -954,6 +956,9 @@ async def proxy_request(request: Request):
                     json=data,  # Sending the data in the body
                 ) as resp:
                     # Parse the response JSON
+                    response_headers = dict(resp.headers)
+                    response_headers.pop("Content-Length")
+                    print(response_headers)
                     response_dict = await resp.json()
 
             if response_dict.get("choices"):
@@ -969,6 +974,7 @@ async def proxy_request(request: Request):
 
             return Response(
                 content=json.dumps(response_dict),
+                headers=response_headers,
                 media_type="application/json",
             )
 
