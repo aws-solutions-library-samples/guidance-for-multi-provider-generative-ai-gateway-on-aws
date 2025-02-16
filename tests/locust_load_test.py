@@ -30,6 +30,7 @@ class MyUser(HttpUser):
         if response.status_code != 200:
             # log the errors in error.txt
             with open("error.txt", "a") as error_log:
+                print(f"error: {response}")
                 error_log.write(response.text + "\n")
 
     def on_start(self):

@@ -24,7 +24,7 @@ export class LitellmFakeOpenaiLoadTestingServerCdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: LiteLLMStackProps) {
     super(scope, id, props);
 
-    const vpc = ec2.Vpc.fromLookup(this, 'VPC', {
+    const vpc = ec2.Vpc.fromLookup(this, 'FakeServerVPC', {
       vpcId: props.vpcId
     });
 
@@ -34,11 +34,11 @@ export class LitellmFakeOpenaiLoadTestingServerCdkStack extends cdk.Stack {
 
     const certificate = certificatemanager.Certificate.fromCertificateArn(
       this,
-      'MyCert',
+      'FakeServerMyCert',
       props.certificateArn
     );
 
-    const hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
+    const hostedZone = route53.HostedZone.fromLookup(this, 'FakeServerHostedZone', {
       domainName: props.hostedZoneName
     });
 
@@ -49,7 +49,7 @@ export class LitellmFakeOpenaiLoadTestingServerCdkStack extends cdk.Stack {
     );
 
     // Create Task Definition
-    const taskDefinition = new ecs.FargateTaskDefinition(this, 'LiteLLMTaskDef', {
+    const taskDefinition = new ecs.FargateTaskDefinition(this, 'FakeServerTaskDef', {
       memoryLimitMiB: 1024,
       cpu: 512,
       runtimePlatform: {
@@ -59,24 +59,24 @@ export class LitellmFakeOpenaiLoadTestingServerCdkStack extends cdk.Stack {
     });
 
     // Add container to task definition
-    const container = taskDefinition.addContainer('LiteLLMContainer', {
+    const container = taskDefinition.addContainer('FakeServerContainer', {
       image: ecs.ContainerImage.fromEcrRepository(ecrFakeServerRepository, "latest"),
       logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'FakeServer' }),
     });
 
-    const fargateService = new ecs_patterns.ApplicationMultipleTargetGroupsFargateService(this, 'LiteLLMService', {
+    const fargateService = new ecs_patterns.ApplicationMultipleTargetGroupsFargateService(this, 'FakeServerService', {
       cluster,
       taskDefinition,
       serviceName: "FakeServer",
       loadBalancers: [
         {
-          name: 'ALB',
+          name: 'FakeServer-ALB',
           publicLoadBalancer: true,
           domainName: props.domainName,
           domainZone: hostedZone,
           listeners: [
             {
-              name: 'Listener',
+              name: 'FakeServer-Listener',
               protocol: elasticloadbalancingv2.ApplicationProtocol.HTTPS,
               certificate: certificate,
               sslPolicy: elasticloadbalancingv2.SslPolicy.RECOMMENDED_TLS,
@@ -87,7 +87,7 @@ export class LitellmFakeOpenaiLoadTestingServerCdkStack extends cdk.Stack {
       targetGroups: [
         {
           containerPort: 8080,
-          listener: 'Listener',
+          listener: 'FakeServer-Listener',
         }
       ],
       desiredCount: 1,
@@ -96,17 +96,17 @@ export class LitellmFakeOpenaiLoadTestingServerCdkStack extends cdk.Stack {
 
     //fargateService.service.connections.allowFromAnyIpv4(ec2.Port.tcp(443), 'Allow inbound HTTPS');
 
-    new cdk.CfnOutput(this, 'LitellmEcsCluster', {
+    new cdk.CfnOutput(this, 'FakeServerEcsCluster', {
       value: cluster.clusterName,
       description: 'Name of the ECS Cluster'
     });
 
-    new cdk.CfnOutput(this, 'LitellmEcsTask', {
+    new cdk.CfnOutput(this, 'FakeServerEcsTask', {
       value: fargateService.service.serviceName,
       description: 'Name of the task service'
     });
 
-    new cdk.CfnOutput(this, 'ServiceURL', {
+    new cdk.CfnOutput(this, 'FakeServerServiceURL', {
       value: `https://${props.domainName}`,
     });
   }

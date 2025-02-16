@@ -281,12 +281,6 @@ export class LitellmCdkStack extends cdk.Stack {
     // ------------------------------------------------------------------------
     if (props.deploymentPlatform == DeploymentPlatform.EKS) {
 
-      new cdk.CfnOutput(this, 'VpcId', {
-        value: vpc.vpcId,
-        description: 'The ID of the VPC',
-        exportName: 'VpcId'
-      });
-
       new cdk.CfnOutput(this, 'ConfigBucketName', {
         value: configBucket.bucketName,
         description: 'The Name of the configuration bucket',
@@ -637,6 +631,12 @@ export class LitellmCdkStack extends cdk.Stack {
         description: 'Name of the task service'
       });
     }
+
+    new cdk.CfnOutput(this, 'VpcId', {
+      value: vpc.vpcId,
+      description: 'The ID of the VPC',
+      exportName: 'VpcId'
+    });
 
     new cdk.CfnOutput(this, 'ServiceURL', {
       value: `https://${props.domainName}`,
