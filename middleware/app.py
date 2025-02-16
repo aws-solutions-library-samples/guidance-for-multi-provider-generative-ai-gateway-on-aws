@@ -26,6 +26,7 @@ import hashlib
 from okta_jwt_verifier import AccessTokenVerifier
 from okta_jwt_verifier.jwt_utils import JWTUtils
 from fastapi.middleware.cors import CORSMiddleware
+import aiohttp
 
 app = FastAPI()
 
@@ -684,6 +685,115 @@ async def forward_openai_stream(stream) -> AsyncGenerator[bytes, None]:
         raise
 
 
+async def get_chat_stream(
+    api_key: str,
+    data: dict,
+    session_id: str,
+    chat_history: list,
+):
+    """
+    This function returns a StreamingResponse that continuously yields
+    messages from the LLM endpoint using aiohttp instead of httpx.
+    """
+
+    assistant_content_parts = []
+
+    async def read_linewise(stream, chunk_size=1024):
+        """
+        Helper generator that reads raw chunks from `stream` and yields complete lines.
+        """
+        buffer = ""
+        async for chunk in stream.iter_chunked(chunk_size):
+            buffer += chunk.decode("utf-8")
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+                yield line
+        # If anything remains in the buffer after the stream closes, yield it as a final line
+        if buffer:
+            yield buffer
+
+    async def stream_wrapper():
+        first_chunk = True
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        }
+
+        # Make the streaming POST request using aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{LITELLM_ENDPOINT}/v1/chat/completions",
+                json=data,
+                headers=headers,
+                timeout=None,  # Adjust as needed, or use aiohttp.ClientTimeout
+            ) as response:
+                print(f"response: {response}")
+
+                # Iterate line-by-line using our helper
+                async for line in read_linewise(response.content):
+                    print(f"line: {line}")
+
+                    # Skip empty or whitespace-only lines
+                    line = line.strip()
+                    if not line:
+                        continue
+
+                    # Check for sentinel lines (e.g. "data: [DONE]")
+                    if line.startswith("data: [DONE]"):
+                        break
+
+                    # Some endpoints prepend "data: " before the actual JSON
+                    if line.startswith("data: "):
+                        line = line[len("data: ") :]
+
+                    # Attempt to parse JSON. If it fails, skip the line
+                    try:
+                        chunk_dict = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+
+                    print(f"chunk_dict: {chunk_dict}")
+
+                    # Optionally add a session_id only to the first chunk
+                    if first_chunk:
+                        chunk_dict["session_id"] = session_id
+                        first_chunk = False
+
+                    # Yield the SSE event
+                    yield f"data: {json.dumps(chunk_dict)}\n\n".encode("utf-8")
+
+                    # If you want to concatenate partial content for storing after the stream:
+                    choice = chunk_dict["choices"][0]
+                    delta = choice.get("delta", {})
+                    finish_reason = choice.get("finish_reason")
+
+                    if "content" in delta and delta["content"]:
+                        assistant_content_parts.append(delta["content"])
+
+                    # If there's an explicit finish signal from the server, handle it if needed
+                    # if finish_reason == "stop":
+                    #     break
+
+    async def finalizing_stream():
+        # First, yield each streamed chunk
+        async for event in stream_wrapper():
+            print(f"event: {event}")
+            yield event
+
+        # Once done, combine the content and store in chat history if desired
+        if assistant_content_parts:
+            assistant_message = {
+                "role": "assistant",
+                "content": "".join(assistant_content_parts),
+            }
+            chat_history.append(assistant_message)
+            # Save to DB or other persistent storage
+            update_chat_history(session_id, chat_history)
+
+    return StreamingResponse(finalizing_stream(), media_type="text/event-stream")
+
+
 @app.post("/v1/chat/completions")
 @app.post("/chat/completions")
 async def proxy_request(request: Request):
@@ -763,51 +873,25 @@ async def proxy_request(request: Request):
         if final_prompt_text:
             data["messages"] = [{"role": "user", "content": final_prompt_text}]
 
-        client = AsyncOpenAI(api_key=api_key, base_url=LITELLM_ENDPOINT)
+        # client = AsyncOpenAI(api_key=api_key, base_url=LITELLM_ENDPOINT)
 
         if is_streaming:
-            stream = await client.chat.completions.create(**data)
-
-            assistant_content_parts = []
-
-            async def stream_wrapper():
-                first_chunk = True
-                async for chunk in stream:
-                    chunk_dict = chunk.model_dump()
-                    if first_chunk:
-                        chunk_dict["session_id"] = session_id
-                        first_chunk = False
-                    yield f"data: {json.dumps(chunk_dict)}\n\n".encode("utf-8")
-
-                    choice = chunk_dict["choices"][0]
-                    delta = choice.get("delta", {})
-                    finish_reason = choice.get("finish_reason")
-                    if "content" in delta and delta["content"]:
-                        assistant_content_parts.append(delta["content"])
-
-                    if finish_reason == "stop":
-                        break
-
-            async def finalizing_stream():
-                async for event in stream_wrapper():
-                    yield event
-
-                if assistant_content_parts:
-                    assistant_message = {
-                        "role": "assistant",
-                        "content": "".join(assistant_content_parts),
-                    }
-                    chat_history.append(assistant_message)
-                    update_chat_history(session_id, chat_history)
-
-            response = StreamingResponse(
-                finalizing_stream(), media_type="text/event-stream"
-            )
-            return response
-
+            print(f"streaming")
+            return await get_chat_stream(api_key, data, session_id, chat_history)
         else:
-            response = await client.chat.completions.create(**data)
-            response_dict = response.model_dump()
+            print(f"not streaming")
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            }
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{LITELLM_ENDPOINT}/v1/chat/completions",
+                    headers=headers,
+                    json=data,  # Sending the data in the body
+                ) as resp:
+                    # Parse the response JSON
+                    response_dict = await resp.json()
 
             if response_dict.get("choices"):
                 assistant_message = response_dict["choices"][0]["message"]
