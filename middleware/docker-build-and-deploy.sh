@@ -1,11 +1,12 @@
 #!/bin/bash
 
-if [ $# -ne 1 ]; then
-  echo "Usage: $0 <APP_NAME>"
+if [ $# -ne 2 ]; then
+  echo "Usage: $0 <APP_NAME> <ARCH>"
   exit 1
 fi
 
 APP_NAME=$1
+ARCH=$2
 
 AWS_REGION=$(aws configure get region)
 export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
@@ -33,13 +34,13 @@ else
     fi
 fi
 
-ARCH=$(uname -m)
+echo $ARCH
 case $ARCH in
-    x86_64)
-        ARCH="linux/amd64"
+    "x86")
+        DOCKER_ARCH="linux/amd64"
         ;;
-    arm64)
-        ARCH="linux/arm64"
+    "arm")
+        DOCKER_ARCH="linux/arm64"
         ;;
     *)
         echo "Unsupported architecture: $ARCH"
@@ -47,9 +48,9 @@ case $ARCH in
         ;;
 esac
 
-echo $ARCH
+echo $DOCKER_ARCH
 
 aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-docker build --platform $ARCH -t $APP_NAME .
+docker build --platform $DOCKER_ARCH -t $APP_NAME .
 docker tag $APP_NAME\:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$APP_NAME\:latest
 docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$APP_NAME\:latest

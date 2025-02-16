@@ -88,33 +88,53 @@ echo "DISABLE_OUTBOUND_NETWORK_ACCESS: $DISABLE_OUTBOUND_NETWORK_ACCESS"
 echo "CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC: $CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC"
 echo "INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER: $INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER"
 echo "CREATE_AWS_AUTH_IN_EXISTING_EKS_CLUSTER: $CREATE_AWS_AUTH_IN_EXISTING_EKS_CLUSTER"
+echo "DESIRED_CAPACITY: $DESIRED_CAPACITY"
+echo "MIN_CAPACITY: $MIN_CAPACITY"
+echo "MAX_CAPACITY: $MAX_CAPACITY"
+echo "ECS_CPU_TARGET_UTILIZATION_PERCENTAGE: $ECS_CPU_TARGET_UTILIZATION_PERCENTAGE"
+echo "ECS_MEMORY_LIMIT_MiB: $ECS_MEMORY_LIMIT_MiB"
+echo "ECS_CPU_UNITS: $ECS_CPU_UNITS"
+
+if [ -n "$CPU_ARCHITECTURE" ]; then
+    # Check if CPU_ARCHITECTURE is either "x86" or "arm"
+    case "$CPU_ARCHITECTURE" in
+        "x86"|"arm")
+            ARCH="$CPU_ARCHITECTURE"
+            ;;
+        *)
+            echo "Error: CPU_ARCHITECTURE must be either 'x86' or 'arm'"
+            exit 1
+            ;;
+    esac
+else
+    # Determine architecture from system
+    ARCH=$(uname -m)
+    case $ARCH in
+        x86_64)
+            ARCH="x86"
+            ;;
+        arm64)
+            ARCH="arm"
+            ;;
+        *)
+            echo "Unsupported architecture: $ARCH"
+            exit 1
+            ;;
+    esac
+fi
+
+echo $ARCH
 
 if [ "$SKIP_BUILD" = false ]; then
     echo "Building and pushing docker image..."
-    ./docker-build-and-deploy.sh $APP_NAME $BUILD_FROM_SOURCE
+    ./docker-build-and-deploy.sh $APP_NAME $BUILD_FROM_SOURCE $ARCH
 else
     echo "Skipping docker build and deploy step..."
 fi
 
 cd middleware
-./docker-build-and-deploy.sh $MIDDLEWARE_APP_NAME
+./docker-build-and-deploy.sh $MIDDLEWARE_APP_NAME $ARCH
 cd ..
-
-ARCH=$(uname -m)
-case $ARCH in
-    x86_64)
-        ARCH="x86"
-        ;;
-    arm64)
-        ARCH="arm"
-        ;;
-    *)
-        echo "Unsupported architecture: $ARCH"
-        exit 1
-        ;;
-esac
-
-echo $ARCH
 
 cd litellm-s3-log-bucket-cdk
 echo "Installing log bucket dependencies..."
@@ -253,6 +273,12 @@ cdk deploy "$STACK_NAME" --require-approval never \
 --context rdsSecurityGroupId=$RDS_SECURITY_GROUP_ID \
 --context redisSecurityGroupId=$REDIS_SECURITY_GROUP_ID \
 --context disableOutboundNetworkAccess=$DISABLE_OUTBOUND_NETWORK_ACCESS \
+--context desiredCapacity=$DESIRED_CAPACITY \
+--context minCapacity=$MIN_CAPACITY \
+--context maxCapacity=$MAX_CAPACITY \
+--context cpuTargetUtilizationPercent=$ECS_CPU_TARGET_UTILIZATION_PERCENTAGE \
+--context memoryLimitMiB=$ECS_MEMORY_LIMIT_MiB \
+--context cpuUnits=$ECS_CPU_UNITS \
 --outputs-file ./outputs.json
 
 if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
@@ -370,6 +396,10 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     fi
 
     export TF_VAR_install_add_ons_in_existing_eks_cluster=$INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER
+
+    export TF_VAR_desired_capacity=$DESIRED_CAPACITY
+    export TF_VAR_min_capacity=$MIN_CAPACITY
+    export TF_VAR_max_capacity=$MAX_CAPACITY
 
     echo "Deploying litellm-eks-terraform-roles stack"
     cd ..

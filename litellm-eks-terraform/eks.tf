@@ -227,9 +227,9 @@ resource "aws_eks_node_group" "core_nodegroup" {
   subnet_ids      = concat(data.aws_subnets.private.ids)
 
   scaling_config {
-    desired_size = 2
-    min_size     = 1
-    max_size     = 4
+    desired_size = var.desired_capacity
+    min_size     = var.min_capacity
+    max_size     = var.max_capacity
   }
 
   # Architecture-sensitive instance types + AMI type

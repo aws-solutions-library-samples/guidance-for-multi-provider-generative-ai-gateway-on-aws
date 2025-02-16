@@ -51,6 +51,12 @@ const rdsSecurityGroupId = String(app.node.tryGetContext("rdsSecurityGroupId"));
 const redisSecurityGroupId = String(app.node.tryGetContext("redisSecurityGroupId"));
 
 const disableOutboundNetworkAccess = String(app.node.tryGetContext("disableOutboundNetworkAccess")).toLowerCase() === 'true';
+const desiredCapacity = Number(app.node.tryGetContext("desiredCapacity"));
+const minCapacity = Number(app.node.tryGetContext("minCapacity"));
+const maxCapacity = Number(app.node.tryGetContext("maxCapacity"));
+const cpuTargetUtilizationPercent = Number(app.node.tryGetContext("cpuTargetUtilizationPercent"));
+const memoryLimitMiB = Number(app.node.tryGetContext("memoryLimitMiB"));
+const cpuUnits = Number(app.node.tryGetContext("cpuUnits"));
 
 // Validate and convert deployment platform string to enum
 const deploymentPlatform = (() => {
@@ -110,6 +116,12 @@ new LitellmCdkStack(app, 'LitellmCdkStack', {
   rdsSecurityGroupId: rdsSecurityGroupId,
   redisSecurityGroupId: redisSecurityGroupId,
   disableOutboundNetworkAccess: disableOutboundNetworkAccess,
+  desiredCapacity: desiredCapacity,
+  minCapacity: minCapacity,
+  maxCapacity: maxCapacity,
+  cpuTargetUtilizationPercent: cpuTargetUtilizationPercent,
+  memoryLimitMiB: memoryLimitMiB,
+  cpuUnits: cpuUnits,
 
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,

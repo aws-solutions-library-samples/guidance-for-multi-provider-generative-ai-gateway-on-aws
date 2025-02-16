@@ -313,3 +313,18 @@ variable "create_aws_auth_in_existing_eks_cluster" {
   type = bool
   default = false
 }
+
+variable "desired_capacity" {
+  description = "Desired Capacity on the node group and deployment"
+  type = number
+}
+
+variable "min_capacity" {
+  description = "Min Capacity on the node group"
+  type = number
+}
+
+variable "max_capacity" {
+  description = "Max Capacity on the node group"
+  type = number
+}

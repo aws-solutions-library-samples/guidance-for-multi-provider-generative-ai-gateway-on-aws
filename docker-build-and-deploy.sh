@@ -1,12 +1,13 @@
 #!/bin/bash
 
-if [ $# -ne 2 ]; then
-  echo "Usage: $0 <APP_NAME> <BUILD_FROM_SOURCE>"
+if [ $# -ne 3 ]; then
+  echo "Usage: $0 <APP_NAME> <BUILD_FROM_SOURCE> <ARCH>"
   exit 1
 fi
 
 APP_NAME=$1
 BUILD_FROM_SOURCE=$(echo "$2" | tr '[:upper:]' '[:lower:]')
+ARCH=$3
 
 # check again if LITELLM_VERSION is set if script is used standalone
 source .env
@@ -61,13 +62,14 @@ else
     fi
 fi
 
-ARCH=$(uname -m)
+echo $ARCH
+
 case $ARCH in
-    x86_64)
-        ARCH="linux/amd64"
+    "x86")
+        DOCKER_ARCH="linux/amd64"
         ;;
-    arm64)
-        ARCH="linux/arm64"
+    "arm")
+        DOCKER_ARCH="linux/arm64"
         ;;
     *)
         echo "Unsupported architecture: $ARCH"
@@ -75,10 +77,10 @@ case $ARCH in
         ;;
 esac
 
-echo $ARCH
+echo $DOCKER_ARCH
 
 aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-docker build --platform $ARCH --build-arg LITELLM_VERSION=${LITELLM_VERSION} -t $APP_NAME\:${LITELLM_VERSION} .
+docker build --platform $DOCKER_ARCH --build-arg LITELLM_VERSION=${LITELLM_VERSION} -t $APP_NAME\:${LITELLM_VERSION} .
 echo "Tagging image with ${APP_NAME}:${LITELLM_VERSION}"
 docker tag $APP_NAME\:${LITELLM_VERSION} $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$APP_NAME\:${LITELLM_VERSION}
 docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$APP_NAME\:${LITELLM_VERSION}

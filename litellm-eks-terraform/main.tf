@@ -112,7 +112,7 @@ resource "kubernetes_deployment" "litellm" {
   }
 
   spec {
-    replicas = 1
+    replicas = var.desired_capacity
 
     selector {
       match_labels = {

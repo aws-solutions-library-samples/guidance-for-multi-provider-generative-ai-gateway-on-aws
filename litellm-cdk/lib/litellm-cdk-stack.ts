@@ -66,6 +66,12 @@ interface LiteLLMStackProps extends cdk.StackProps {
   rdsSecurityGroupId: string;
   redisSecurityGroupId: string;
   disableOutboundNetworkAccess: boolean;
+  desiredCapacity: number;
+  minCapacity: number;
+  maxCapacity: number;
+  cpuTargetUtilizationPercent: number;
+  memoryLimitMiB: number;
+  cpuUnits: number;
 }
 
 class IngressAlias implements route53.IAliasRecordTarget {
@@ -348,8 +354,8 @@ export class LitellmCdkStack extends cdk.Stack {
 
       // Create Task Definition
       const taskDefinition = new ecs.FargateTaskDefinition(this, 'LiteLLMTaskDef', {
-        memoryLimitMiB: 1024,
-        cpu: 512,
+        memoryLimitMiB: props.memoryLimitMiB,
+        cpu: props.cpuUnits,
         runtimePlatform: {
           cpuArchitecture: props.architecture == "x86" ? ecs.CpuArchitecture.X86_64 : ecs.CpuArchitecture.ARM64,
           operatingSystemFamily: ecs.OperatingSystemFamily.LINUX
@@ -472,7 +478,7 @@ export class LitellmCdkStack extends cdk.Stack {
             listener: 'Listener',
           },
         ],
-        desiredCount: 1,
+        desiredCount: props.desiredCapacity,
         healthCheckGracePeriod: cdk.Duration.seconds(300),
       });
 
@@ -611,12 +617,12 @@ export class LitellmCdkStack extends cdk.Stack {
       );
 
       const scaling = fargateService.service.autoScaleTaskCount({
-        maxCapacity: 4,
-        minCapacity: 1,
+        maxCapacity: props.maxCapacity,
+        minCapacity: props.minCapacity,
       });
 
       scaling.scaleOnCpuUtilization('CpuScaling', {
-        targetUtilizationPercent: 70,
+        targetUtilizationPercent: props.cpuTargetUtilizationPercent,
       });
 
       

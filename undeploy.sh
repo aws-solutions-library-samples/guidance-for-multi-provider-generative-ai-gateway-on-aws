@@ -72,20 +72,40 @@ echo "DISABLE_OUTBOUND_NETWORK_ACCESS: $DISABLE_OUTBOUND_NETWORK_ACCESS"
 echo "CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC: $CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC"
 echo "INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER: $INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER"
 echo "CREATE_AWS_AUTH_IN_EXISTING_EKS_CLUSTER: $CREATE_AWS_AUTH_IN_EXISTING_EKS_CLUSTER"
+echo "DESIRED_CAPACITY: $DESIRED_CAPACITY"
+echo "MIN_CAPACITY: $MIN_CAPACITY"
+echo "MAX_CAPACITY: $MAX_CAPACITY"
+echo "ECS_CPU_TARGET_UTILIZATION_PERCENTAGE: $ECS_CPU_TARGET_UTILIZATION_PERCENTAGE"
+echo "ECS_MEMORY_LIMIT_MiB: $ECS_MEMORY_LIMIT_MiB"
+echo "ECS_CPU_UNITS: $ECS_CPU_UNITS"
 
-ARCH=$(uname -m)
-case $ARCH in
-    x86_64)
-        ARCH="x86"
-        ;;
-    arm64)
-        ARCH="arm"
-        ;;
-    *)
-        echo "Unsupported architecture: $ARCH"
-        exit 1
-        ;;
-esac
+if [ -n "$CPU_ARCHITECTURE" ]; then
+    # Check if CPU_ARCHITECTURE is either "x86" or "arm"
+    case "$CPU_ARCHITECTURE" in
+        "x86"|"arm")
+            ARCH="$CPU_ARCHITECTURE"
+            ;;
+        *)
+            echo "Error: CPU_ARCHITECTURE must be either 'x86' or 'arm'"
+            exit 1
+            ;;
+    esac
+else
+    # Determine architecture from system
+    ARCH=$(uname -m)
+    case $ARCH in
+        x86_64)
+            ARCH="x86"
+            ;;
+        arm64)
+            ARCH="arm"
+            ;;
+        *)
+            echo "Unsupported architecture: $ARCH"
+            exit 1
+            ;;
+    esac
+fi
 
 echo $ARCH
 
@@ -249,6 +269,10 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     export TF_VAR_install_add_ons_in_existing_eks_cluster=$INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER
     export TF_VAR_create_aws_auth_in_existing_eks_cluster=$CREATE_AWS_AUTH_IN_EXISTING_EKS_CLUSTER
 
+    export TF_VAR_desired_capacity=$DESIRED_CAPACITY
+    export TF_VAR_min_capacity=$MIN_CAPACITY
+    export TF_VAR_max_capacity=$MAX_CAPACITY
+
     cd ../litellm-eks-terraform-roles
     DEVELOPERS_ROLE_ARN=$(terraform output -raw developers_role_arn)
     OPERATORS_ROLE_ARN=$(terraform output -raw operators_role_arn)
@@ -328,7 +352,13 @@ cdk destroy "$STACK_NAME" -f \
 --context redisPort=$REDIS_PORT \
 --context rdsSecurityGroupId=$RDS_SECURITY_GROUP_ID \
 --context redisSecurityGroupId=$REDIS_SECURITY_GROUP_ID \
---context disableOutboundNetworkAccess=$DISABLE_OUTBOUND_NETWORK_ACCESS
+--context disableOutboundNetworkAccess=$DISABLE_OUTBOUND_NETWORK_ACCESS \
+--context desiredCapacity=$DESIRED_CAPACITY \
+--context minCapacity=$MIN_CAPACITY \
+--context maxCapacity=$MAX_CAPACITY \
+--context cpuTargetUtilizationPercent=$ECS_CPU_TARGET_UTILIZATION_PERCENTAGE \
+--context memoryLimitMiB=$ECS_MEMORY_LIMIT_MiB \
+--context cpuUnits=$ECS_CPU_UNITS
 
 if [ $? -eq 0 ]; then
     echo "Undeployment successful"
