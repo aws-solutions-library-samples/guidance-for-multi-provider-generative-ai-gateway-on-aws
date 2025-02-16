@@ -328,3 +328,23 @@ variable "max_capacity" {
   description = "Max Capacity on the node group"
   type = number
 }
+
+variable "arm_instance_type" {
+  description = "Instance type for arm deployment"
+  type = string
+}
+
+variable "x86_instance_type" {
+  description = "Instance type for x86 deployment"
+  type = string
+}
+
+variable "arm_ami_type" {
+  description = "AMI type for arm deployment"
+  type = string
+}
+
+variable "x86_ami_type" {
+  description = "AMI type for x86 deployment"
+  type = string
+}

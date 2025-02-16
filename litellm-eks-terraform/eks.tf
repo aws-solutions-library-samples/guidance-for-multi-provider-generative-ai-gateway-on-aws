@@ -234,9 +234,9 @@ resource "aws_eks_node_group" "core_nodegroup" {
 
   # Architecture-sensitive instance types + AMI type
   instance_types = [
-    var.architecture == "x86" ? "t3.medium" : "t4g.medium"
+    var.architecture == "x86" ? var.x86_instance_type : var.arm_instance_type
   ]
-  ami_type = var.architecture == "x86" ? "AL2_X86_64" : "AL2_ARM_64"
+  ami_type = var.architecture == "x86" ? var.x86_ami_type : var.arm_ami_type
 
   # Use depends_on to ensure the VPC CNI add-on is installed before node creation
   # If we're creating the cluster, ensure the cluster resource is built first.

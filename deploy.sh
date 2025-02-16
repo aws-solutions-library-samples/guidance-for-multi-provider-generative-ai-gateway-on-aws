@@ -94,6 +94,10 @@ echo "MAX_CAPACITY: $MAX_CAPACITY"
 echo "ECS_CPU_TARGET_UTILIZATION_PERCENTAGE: $ECS_CPU_TARGET_UTILIZATION_PERCENTAGE"
 echo "ECS_MEMORY_LIMIT_MiB: $ECS_MEMORY_LIMIT_MiB"
 echo "ECS_CPU_UNITS: $ECS_CPU_UNITS"
+echo "EKS_ARM_INSTANCE_TYPE: $EKS_ARM_INSTANCE_TYPE"
+echo "EKS_X86_INSTANCE_TYPE: $EKS_X86_INSTANCE_TYPE"
+echo "EKS_ARM_AMI_TYPE: $EKS_ARM_AMI_TYPE"
+echo "EKS_X86_AMI_TYPE: $EKS_X86_AMI_TYPE"
 
 if [ -n "$CPU_ARCHITECTURE" ]; then
     # Check if CPU_ARCHITECTURE is either "x86" or "arm"
@@ -400,6 +404,11 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     export TF_VAR_desired_capacity=$DESIRED_CAPACITY
     export TF_VAR_min_capacity=$MIN_CAPACITY
     export TF_VAR_max_capacity=$MAX_CAPACITY
+
+    export TF_VAR_arm_instance_type=$EKS_ARM_INSTANCE_TYPE
+    export TF_VAR_x86_instance_type=$EKS_X86_INSTANCE_TYPE
+    export TF_VAR_arm_ami_type=$EKS_ARM_AMI_TYPE
+    export TF_VAR_x86_ami_type=$EKS_X86_AMI_TYPE
 
     echo "Deploying litellm-eks-terraform-roles stack"
     cd ..
