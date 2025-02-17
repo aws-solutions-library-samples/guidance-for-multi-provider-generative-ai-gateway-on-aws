@@ -135,6 +135,8 @@ Other configurations are not guaranteed to work. You may have to tweak the terra
 
 * If you'd like to run LiteLLM in subnets without outbound internet access, set `DISABLE_OUTBOUND_NETWORK_ACCESS="true"`. Due to lack of internet access, this configuration will only work with AWS Bedrock or SageMaker models. Because of this, you must remove all non-Bedrock/non-SageMaker models from your `config/config.yaml` file. If you do not do this, LiteLLM will fail to start as it will attempt to call third party models over the internet.
 
+* If you'd like the Application Load Balancer to be private to your vpc, set `PUBLIC_LOAD_BALANCER="false"`
+
 #### Usage Instructions
 
 Using LiteLLM is practically Identical to using OpenAI, you just need to replace the baseurl and the api key with your LiteLLM ones
