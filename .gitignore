@@ -34,3 +34,4 @@ terraform.tfstate.*
 
 **.env.testing
 **error.txt
+**.env

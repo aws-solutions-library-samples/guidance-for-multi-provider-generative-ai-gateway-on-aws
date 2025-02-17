@@ -52,6 +52,7 @@ fi
 
 echo "Certificate Arn: " $CERTIFICATE_ARN
 echo "Domain Name: " $DOMAIN_NAME
+echo "HOSTED_ZONE_NAME: $HOSTED_ZONE_NAME"
 echo "OKTA_ISSUER: $OKTA_ISSUER"
 echo "OKTA_AUDIENCE: $OKTA_AUDIENCE"
 echo "LiteLLM Version: " $LITELLM_VERSION
@@ -98,6 +99,7 @@ echo "EKS_ARM_INSTANCE_TYPE: $EKS_ARM_INSTANCE_TYPE"
 echo "EKS_X86_INSTANCE_TYPE: $EKS_X86_INSTANCE_TYPE"
 echo "EKS_ARM_AMI_TYPE: $EKS_ARM_AMI_TYPE"
 echo "EKS_X86_AMI_TYPE: $EKS_X86_AMI_TYPE"
+echo "PUBLIC_LOAD_BALANCER: $PUBLIC_LOAD_BALANCER"
 
 if [ -n "$CPU_ARCHITECTURE" ]; then
     # Check if CPU_ARCHITECTURE is either "x86" or "arm"
@@ -232,7 +234,6 @@ cd litellm-cdk
 echo "Installing dependencies..."
 npm install
 echo "Deploying the CDK stack..."
-
 cdk deploy "$STACK_NAME" --require-approval never \
 --context architecture=$ARCH \
 --context liteLLMVersion=$LITELLM_VERSION \
@@ -240,6 +241,7 @@ cdk deploy "$STACK_NAME" --require-approval never \
 --context ecrMiddlewareRepository=$MIDDLEWARE_APP_NAME \
 --context certificateArn=$CERTIFICATE_ARN \
 --context domainName=$DOMAIN_NAME \
+--context hostedZoneName=$HOSTED_ZONE_NAME \
 --context oktaIssuer=$OKTA_ISSUER \
 --context oktaAudience=$OKTA_AUDIENCE \
 --context logBucketArn=$LOG_BUCKET_ARN \
@@ -283,6 +285,7 @@ cdk deploy "$STACK_NAME" --require-approval never \
 --context cpuTargetUtilizationPercent=$ECS_CPU_TARGET_UTILIZATION_PERCENTAGE \
 --context memoryTargetUtilizationPercent=$ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE \
 --context vcpus=$ECS_VCPUS \
+--context publicLoadBalancer=$PUBLIC_LOAD_BALANCER \
 --outputs-file ./outputs.json
 
 if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then

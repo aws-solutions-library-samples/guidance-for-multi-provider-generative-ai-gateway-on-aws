@@ -24,6 +24,7 @@ export enum DeploymentPlatform {
 
 interface LiteLLMStackProps extends cdk.StackProps {
   domainName: string;
+  hostedZoneName: string;
   certificateArn: string;
   oktaIssuer: string;
   oktaAudience: string;
@@ -72,6 +73,7 @@ interface LiteLLMStackProps extends cdk.StackProps {
   cpuTargetUtilizationPercent: number;
   memoryTargetUtilizationPercent: number
   vcpus: number;
+  publicLoadBalancer: boolean;
 }
 
 class IngressAlias implements route53.IAliasRecordTarget {
@@ -96,15 +98,6 @@ export class LitellmCdkStack extends cdk.Stack {
     Aspects.of(this).add(new Tag('stack-id', this.stackName));
     Aspects.of(this).add(new Tag('project', 'llmgateway'));
 
-    const domainParts = props.domainName.split(".");
-    const domainName = domainParts.slice(1).join(".");
-    const hostName = domainParts[0];
-
-    // Retrieve the existing Route 53 hosted zone
-    const hostedZone = route53.HostedZone.fromLookup(this, 'Zone', {
-      domainName: `${domainName}.`
-    });
-
     const certificate = certificatemanager.Certificate.fromCertificateArn(this, 'Certificate',
       props.certificateArn
     );
@@ -123,6 +116,16 @@ export class LitellmCdkStack extends cdk.Stack {
     });
 
     const vpc = ec2.Vpc.fromLookup(this, 'ImportedVpc', { vpcId: props.vpcId })
+
+    // Retrieve the existing Route 53 hosted zone
+    const hostedZone = props.publicLoadBalancer ? 
+      route53.HostedZone.fromLookup(this, 'Zone', {
+        domainName: props.hostedZoneName
+      }) : 
+      new route53.PrivateHostedZone(this, 'MyPrivateHostedZone', {
+        zoneName: props.hostedZoneName,
+        vpc: vpc,
+      });
 
     const databaseSecret = secretsmanager.Secret.fromSecretCompleteArn(
       this,
@@ -443,19 +446,21 @@ export class LitellmCdkStack extends cdk.Stack {
         }
       });
 
+      const albName = props.publicLoadBalancer ? 'ALB-Public' : 'ALB-Private';
+      const listenerName = props.publicLoadBalancer ? 'Listener-Public' : 'Listener-Private';
       const fargateService = new ecs_patterns.ApplicationMultipleTargetGroupsFargateService(this, 'LiteLLMService', {
         cluster,
         taskDefinition,
         serviceName: "LiteLLMService",
         loadBalancers: [
           {
-            name: 'ALB',
-            publicLoadBalancer: true,
-            domainName: `${domainName}.`,
+            name: albName,
+            publicLoadBalancer: props.publicLoadBalancer,
+            domainName: props.domainName,
             domainZone: hostedZone,
             listeners: [
               {
-                name: 'Listener',
+                name: listenerName,
                 protocol: elasticloadbalancingv2.ApplicationProtocol.HTTPS,
                 certificate: certificate,
                 sslPolicy: elasticloadbalancingv2.SslPolicy.RECOMMENDED_TLS,
@@ -466,11 +471,11 @@ export class LitellmCdkStack extends cdk.Stack {
         targetGroups: [
           {
             containerPort: 3000,
-            listener: 'Listener',
+            listener: listenerName,
           },
           {
             containerPort: 4000,
-            listener: 'Listener',
+            listener: listenerName,
           },
         ],
         desiredCount: props.desiredCapacity,
@@ -592,13 +597,6 @@ export class LitellmCdkStack extends cdk.Stack {
         interval: cdk.Duration.seconds(30),
       });
 
-      new route53.ARecord(this, 'DNSRecord', {
-        zone: hostedZone,
-        target: route53.RecordTarget.fromAlias(
-          new targets.LoadBalancerTarget(fargateService.loadBalancers[0])
-        ),
-        recordName: props.domainName,  // This will be the full domain name
-      });
       // Associate the WAF Web ACL with your existing ALB
       new wafv2.CfnWebACLAssociation(this, 'LiteLLMWAFALBAssociation', {
         resourceArn: fargateService.loadBalancers[0].loadBalancerArn,

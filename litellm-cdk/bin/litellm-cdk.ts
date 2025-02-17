@@ -11,6 +11,7 @@ const ecrLitellmRepository = String(app.node.tryGetContext("ecrLitellmRepository
 const ecrMiddlewareRepository = String(app.node.tryGetContext("ecrMiddlewareRepository"));
 const certificateArn = String(app.node.tryGetContext("certificateArn"));
 const domainName = String(app.node.tryGetContext("domainName"));
+const hostedZoneName = String(app.node.tryGetContext("hostedZoneName"));
 const oktaIssuer = String(app.node.tryGetContext("oktaIssuer"));
 const oktaAudience = String(app.node.tryGetContext("oktaAudience"));
 const logBucketArn = String(app.node.tryGetContext("logBucketArn"));
@@ -58,6 +59,8 @@ const cpuTargetUtilizationPercent = Number(app.node.tryGetContext("cpuTargetUtil
 const memoryTargetUtilizationPercent = Number(app.node.tryGetContext("memoryTargetUtilizationPercent"));
 const vcpus = Number(app.node.tryGetContext("vcpus"));
 
+const publicLoadBalancer = String(app.node.tryGetContext("publicLoadBalancer")).toLowerCase() === 'true';
+
 // Validate and convert deployment platform string to enum
 const deploymentPlatform = (() => {
   if (!deploymentPlatformString) {
@@ -74,6 +77,7 @@ const deploymentPlatform = (() => {
 
 new LitellmCdkStack(app, 'LitellmCdkStack', {
   domainName: domainName,
+  hostedZoneName: hostedZoneName,
   certificateArn: certificateArn,
   oktaIssuer: oktaIssuer,
   oktaAudience: oktaAudience,
@@ -121,6 +125,7 @@ new LitellmCdkStack(app, 'LitellmCdkStack', {
   maxCapacity: maxCapacity,
   cpuTargetUtilizationPercent: cpuTargetUtilizationPercent,
   memoryTargetUtilizationPercent: memoryTargetUtilizationPercent,
+  publicLoadBalancer: publicLoadBalancer,
   vcpus: vcpus,
 
   env: {
