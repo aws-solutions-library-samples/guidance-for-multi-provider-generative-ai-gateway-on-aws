@@ -32,7 +32,7 @@ data "aws_subnets" "public" {
 # Tag public subnets for internet-facing ALB
 resource "aws_ec2_tag" "public_subnet_elb" {
   # Use for_each to tag all public subnets
-  for_each    = toset(data.aws_subnets.public.ids)
+  for_each    = var.public_load_balancer ? toset(data.aws_subnets.public.ids) : toset([])
   resource_id = each.value
   key         = "kubernetes.io/role/elb"
   value       = "1"

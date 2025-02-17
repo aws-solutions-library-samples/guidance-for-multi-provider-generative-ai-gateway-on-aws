@@ -1,7 +1,7 @@
 
 data "aws_route53_zone" "selected" {
-  name = "${join(".", slice(split(".", var.domain_name), 1, length(split(".", var.domain_name))))}"
-  private_zone = false
+  name = var.hosted_zone_name
+  private_zone = var.public_load_balancer ? false : true
 }
 
 

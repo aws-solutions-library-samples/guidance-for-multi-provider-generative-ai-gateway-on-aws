@@ -243,6 +243,11 @@ variable "domain_name" {
   type        = string
 }
 
+variable "hosted_zone_name" {
+  description = "Hosted zone name for the ingress"
+  type        = string
+}
+
 # Variables
 variable "create_cluster" {
   description = "Controls if EKS cluster should be created"
@@ -347,4 +352,9 @@ variable "arm_ami_type" {
 variable "x86_ami_type" {
   description = "AMI type for x86 deployment"
   type = string
+}
+
+variable "public_load_balancer" {
+  description = "whether the load balancer is public"
+  type = bool
 }

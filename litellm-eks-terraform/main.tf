@@ -276,7 +276,7 @@ resource "kubernetes_ingress_v1" "litellm" {
     labels      = local.common_labels
     annotations = {
       "kubernetes.io/ingress.class"                = "alb"
-      "alb.ingress.kubernetes.io/scheme"           = "internet-facing"
+      "alb.ingress.kubernetes.io/scheme"           = var.public_load_balancer ? "internet-facing" : "internal"
       "alb.ingress.kubernetes.io/target-type"      = "ip"
       "alb.ingress.kubernetes.io/listen-ports"     = jsonencode([{"HTTP" = 80}, {"HTTPS" = 443}])
       "alb.ingress.kubernetes.io/certificate-arn"  = var.certificate_arn
