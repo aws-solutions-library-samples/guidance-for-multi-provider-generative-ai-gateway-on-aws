@@ -70,8 +70,8 @@ interface LiteLLMStackProps extends cdk.StackProps {
   minCapacity: number;
   maxCapacity: number;
   cpuTargetUtilizationPercent: number;
-  memoryLimitMiB: number;
-  cpuUnits: number;
+  memoryTargetUtilizationPercent: number
+  vcpus: number;
 }
 
 class IngressAlias implements route53.IAliasRecordTarget {
@@ -348,8 +348,9 @@ export class LitellmCdkStack extends cdk.Stack {
 
       // Create Task Definition
       const taskDefinition = new ecs.FargateTaskDefinition(this, 'LiteLLMTaskDef', {
-        memoryLimitMiB: props.memoryLimitMiB,
-        cpu: props.cpuUnits,
+        memoryLimitMiB: props.vcpus * 1024 * 2,
+        cpu: props.vcpus * 1024,
+
         runtimePlatform: {
           cpuArchitecture: props.architecture == "x86" ? ecs.CpuArchitecture.X86_64 : ecs.CpuArchitecture.ARM64,
           operatingSystemFamily: ecs.OperatingSystemFamily.LINUX
@@ -619,7 +620,9 @@ export class LitellmCdkStack extends cdk.Stack {
         targetUtilizationPercent: props.cpuTargetUtilizationPercent,
       });
 
-      
+      scaling.scaleOnMemoryUtilization('Memory', {
+        targetUtilizationPercent: props.memoryTargetUtilizationPercent,
+      });
 
       new cdk.CfnOutput(this, 'LitellmEcsCluster', {
         value: cluster.clusterName,

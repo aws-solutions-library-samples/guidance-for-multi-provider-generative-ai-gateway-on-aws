@@ -92,8 +92,8 @@ echo "DESIRED_CAPACITY: $DESIRED_CAPACITY"
 echo "MIN_CAPACITY: $MIN_CAPACITY"
 echo "MAX_CAPACITY: $MAX_CAPACITY"
 echo "ECS_CPU_TARGET_UTILIZATION_PERCENTAGE: $ECS_CPU_TARGET_UTILIZATION_PERCENTAGE"
-echo "ECS_MEMORY_LIMIT_MiB: $ECS_MEMORY_LIMIT_MiB"
-echo "ECS_CPU_UNITS: $ECS_CPU_UNITS"
+echo "ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE: $ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE"
+echo "ECS_VCPUS: $ECS_VCPUS"
 echo "EKS_ARM_INSTANCE_TYPE: $EKS_ARM_INSTANCE_TYPE"
 echo "EKS_X86_INSTANCE_TYPE: $EKS_X86_INSTANCE_TYPE"
 echo "EKS_ARM_AMI_TYPE: $EKS_ARM_AMI_TYPE"
@@ -281,8 +281,8 @@ cdk deploy "$STACK_NAME" --require-approval never \
 --context minCapacity=$MIN_CAPACITY \
 --context maxCapacity=$MAX_CAPACITY \
 --context cpuTargetUtilizationPercent=$ECS_CPU_TARGET_UTILIZATION_PERCENTAGE \
---context memoryLimitMiB=$ECS_MEMORY_LIMIT_MiB \
---context cpuUnits=$ECS_CPU_UNITS \
+--context memoryTargetUtilizationPercent=$ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE \
+--context vcpus=$ECS_VCPUS \
 --outputs-file ./outputs.json
 
 if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
@@ -518,7 +518,7 @@ if [ $? -eq 0 ]; then
             --cluster $LITELLM_ECS_CLUSTER \
             --service $LITELLM_ECS_TASK \
             --force-new-deployment \
-            --desired-count 1 \
+            --desired-count $DESIRED_CAPACITY \
             --no-cli-pager
     fi
 

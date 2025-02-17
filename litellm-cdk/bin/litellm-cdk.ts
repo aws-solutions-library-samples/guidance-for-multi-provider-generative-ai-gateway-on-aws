@@ -55,8 +55,8 @@ const desiredCapacity = Number(app.node.tryGetContext("desiredCapacity"));
 const minCapacity = Number(app.node.tryGetContext("minCapacity"));
 const maxCapacity = Number(app.node.tryGetContext("maxCapacity"));
 const cpuTargetUtilizationPercent = Number(app.node.tryGetContext("cpuTargetUtilizationPercent"));
-const memoryLimitMiB = Number(app.node.tryGetContext("memoryLimitMiB"));
-const cpuUnits = Number(app.node.tryGetContext("cpuUnits"));
+const memoryTargetUtilizationPercent = Number(app.node.tryGetContext("memoryTargetUtilizationPercent"));
+const vcpus = Number(app.node.tryGetContext("vcpus"));
 
 // Validate and convert deployment platform string to enum
 const deploymentPlatform = (() => {
@@ -120,8 +120,8 @@ new LitellmCdkStack(app, 'LitellmCdkStack', {
   minCapacity: minCapacity,
   maxCapacity: maxCapacity,
   cpuTargetUtilizationPercent: cpuTargetUtilizationPercent,
-  memoryLimitMiB: memoryLimitMiB,
-  cpuUnits: cpuUnits,
+  memoryTargetUtilizationPercent: memoryTargetUtilizationPercent,
+  vcpus: vcpus,
 
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,

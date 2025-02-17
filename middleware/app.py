@@ -27,8 +27,19 @@ from okta_jwt_verifier import AccessTokenVerifier
 from okta_jwt_verifier.jwt_utils import JWTUtils
 from fastapi.middleware.cors import CORSMiddleware
 import aiohttp
+from contextlib import asynccontextmanager
+from anyio import to_thread
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    to_thread.current_default_thread_limiter().total_tokens = 1000
+    yield
+
+
+config = {"lifespan": lifespan}
+
+app = FastAPI(**config)
 
 app.add_middleware(
     CORSMiddleware,
@@ -422,13 +433,13 @@ async def process_chat_request(
     session_id = additional_fields.get("session_id", None)
     enable_history = additional_fields.get("enable_history", False)
 
-    print(f"session_id: {session_id}")
-    print(f"enable_history: {enable_history}")
+    # print(f"session_id: {session_id}")
+    # print(f"enable_history: {enable_history}")
     history_enabled = (session_id is not None) or enable_history
-    print(f"history_enabled: {history_enabled}")
+    # print(f"history_enabled: {history_enabled}")
 
     auth_header = request.headers.get("Authorization")
-    print(f"auth_header: {auth_header}")
+    # print(f"auth_header: {auth_header}")
     if auth_header and auth_header.startswith("Bearer "):
         api_key = auth_header[len("Bearer ") :]
     else:
@@ -438,12 +449,12 @@ async def process_chat_request(
         )
 
     provided_hash = hash_api_key(api_key)
-    print(f"provided_hash: {provided_hash}")
+    # print(f"provided_hash: {provided_hash}")
 
     if history_enabled:
         if session_id is not None:
             session_data = get_session_data(session_id)
-            print(f"session_data: {session_data}")
+            # print(f"session_data: {session_data}")
             if session_data is not None:
                 # Verify API key hash matches
                 if session_data["api_key_hash"] != provided_hash:
@@ -457,14 +468,14 @@ async def process_chat_request(
                 chat_history = (
                     session_data["chat_history"] if session_data["chat_history"] else []
                 )
-                print(f"chat_history: {chat_history}")
+                # print(f"chat_history: {chat_history}")
 
             else:
-                print(f"creating chat history and session_id is not None")
+                # print(f"creating chat history and session_id is not None")
                 chat_history = []
                 create_chat_history(session_id, chat_history, provided_hash)
         else:
-            print(f"creating chat history and session_id is None")
+            # print(f"creating chat history and session_id is None")
             session_id = str(uuid.uuid4())
             chat_history = []
             create_chat_history(session_id, chat_history, provided_hash)
@@ -472,7 +483,7 @@ async def process_chat_request(
         chat_history = []
 
     openai_format = await convert_bedrock_to_openai(model_id, body, False)
-    print(f"openai_format: {openai_format}")
+    # print(f"openai_format: {openai_format}")
 
     if history_enabled:
         # Append the last user message to chat_history
@@ -570,7 +581,7 @@ async def process_streaming_chat_request(
 
         openai_params["messages"] = chat_history
 
-    print(f'final message sent to llm: {openai_params["messages"]}')
+    # print(f'final message sent to llm: {openai_params["messages"]}')
 
     client = AsyncOpenAI(api_key=api_key, base_url=LITELLM_ENDPOINT)
     stream = await client.chat.completions.create(**openai_params)
@@ -939,12 +950,12 @@ async def proxy_request(request: Request):
         # client = AsyncOpenAI(api_key=api_key, base_url=LITELLM_ENDPOINT)
 
         if is_streaming:
-            print(f"streaming")
+            # print(f"streaming")
             return await get_chat_stream(
                 api_key, data, session_id, chat_history, history_enabled
             )
         else:
-            print(f"not streaming")
+            # print(f"not streaming")
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {api_key}",
@@ -958,7 +969,7 @@ async def proxy_request(request: Request):
                     # Parse the response JSON
                     response_headers = dict(resp.headers)
                     response_headers.pop("Content-Length")
-                    print(response_headers)
+                    # print(response_headers)
                     response_dict = await resp.json()
 
             if response_dict.get("choices"):

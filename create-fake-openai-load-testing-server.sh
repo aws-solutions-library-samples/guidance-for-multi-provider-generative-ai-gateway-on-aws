@@ -71,8 +71,8 @@ cdk deploy "$FAKE_OPENAI_SERVER_STACK_NAME" --require-approval never \
 echo "deployed"
 
 if [ $? -eq 0 ]; then
-    LITELLM_ECS_CLUSTER=$(jq -r ".\"${FAKE_OPENAI_SERVER_STACK_NAME}\".LitellmEcsCluster" ./outputs.json)
-    LITELLM_ECS_TASK=$(jq -r ".\"${FAKE_OPENAI_SERVER_STACK_NAME}\".LitellmEcsTask" ./outputs.json)
+    LITELLM_ECS_CLUSTER=$(jq -r ".\"${FAKE_OPENAI_SERVER_STACK_NAME}\".FakeServerEcsCluster" ./outputs.json)
+    LITELLM_ECS_TASK=$(jq -r ".\"${FAKE_OPENAI_SERVER_STACK_NAME}\".FakeServerEcsTask" ./outputs.json)
     
     aws ecs update-service \
         --cluster $LITELLM_ECS_CLUSTER \

@@ -1,18 +1,17 @@
-# fake_openai_server.py
-
-from fastapi import FastAPI, Request, status, HTTPException, Depends
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, Request, status
+from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi import FastAPI, Request, HTTPException, UploadFile, File
-import httpx, os, json
-from openai import AsyncOpenAI
+from fastapi import HTTPException
 from typing import Optional
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from fastapi.responses import PlainTextResponse
+import asyncio
+import random
+import json
+import socket
+import uvicorn
 
 
 class ProxyException(Exception):
@@ -67,39 +66,107 @@ async def health_check():
 
 @app.post("/chat/completions")
 @app.post("/v1/chat/completions")
-@limiter.limit("100/minute")
 async def completion(request: Request):
-    return {
-        "id": "chatcmpl-123",
-        "object": "chat.completion",
-        "created": 1677652288,
-        "model": None,
-        "system_fingerprint": "fp_44709d6fcb",
-        "choices": [
-            {
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": "\n\nHello there, how may I assist you today?",
-                },
-                "logprobs": None,
-                "finish_reason": "stop",
+    """
+    Completion endpoint that either returns:
+      - A normal (non-streaming) completion with a random 1–3 second delay
+      - A streaming response with multiple chunks and random 0.2–0.8 second delays
+    """
+    body = await request.json()
+    stream_requested = body.get("stream", False)
+
+    if stream_requested:
+        # Simulate a small initial delay before the streaming starts
+        await asyncio.sleep(random.uniform(0.8, 1.5))
+
+        # Return a streaming response
+        async def stream_generator():
+            # These are pseudo "token" parts of a response.
+            content_parts = [
+                "Hello",
+                " there,",
+                " how ",
+                "can ",
+                "I ",
+                "assist ",
+                "you ",
+                "today?",
+            ]
+
+            # Stream each part in a chunk
+            for i, part in enumerate(content_parts):
+                # Build a chunk that mimics OpenAI's streaming format
+                chunk_data = {
+                    "id": "chatcmpl-123",
+                    "object": "chat.completion.chunk",
+                    "created": 1677652288,
+                    "model": "gpt-3.5-turbo-0301",
+                    "choices": [
+                        {
+                            "delta": {
+                                # The first chunk includes "role"
+                                **({"role": "assistant"} if i == 0 else {}),
+                                "content": part,
+                            },
+                            "index": 0,
+                            "finish_reason": None,
+                        }
+                    ],
+                }
+                yield f"data: {json.dumps(chunk_data)}\n\n"
+                await asyncio.sleep(random.uniform(0.2, 0.8))
+
+            # Final chunk signaling the end
+            final_chunk = {
+                "id": "chatcmpl-123",
+                "object": "chat.completion.chunk",
+                "created": 1677652288,
+                "model": "gpt-3.5-turbo-0301",
+                "choices": [
+                    {
+                        "delta": {},
+                        "index": 0,
+                        "finish_reason": "stop",
+                    }
+                ],
             }
-        ],
-        "usage": {"prompt_tokens": 9, "completion_tokens": 12, "total_tokens": 21},
-    }
+            yield f"data: {json.dumps(final_chunk)}\n\n"
+            # The [DONE] message
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(stream_generator(), media_type="text/event-stream")
+
+    else:
+        # Normal non-streaming response with random 1–3 second delay
+        await asyncio.sleep(random.uniform(1.0, 3.0))
+        return {
+            "id": "chatcmpl-123",
+            "object": "chat.completion",
+            "created": 1677652288,
+            "model": "gpt-3.5-turbo-0301",
+            "system_fingerprint": "fp_44709d6fcb",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": "Hello there, how may I assist you today?",
+                    },
+                    "logprobs": None,
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 9, "completion_tokens": 12, "total_tokens": 21},
+        }
 
 
 if __name__ == "__main__":
-    import socket
-    import uvicorn
-
     port = 8080
     while True:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         result = sock.connect_ex(("0.0.0.0", port))
         if result != 0:
-            print(f"Port {port} is available, starting server...")
+            print(f"Port {port} is available, starting server on {port}...")
             break
         else:
             port += 1
