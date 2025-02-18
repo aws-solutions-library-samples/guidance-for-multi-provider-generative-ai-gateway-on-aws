@@ -1,3 +1,19 @@
+terraform {
+  backend "s3" {}
+}
+
+data "aws_caller_identity" "current" {}
+
+resource "aws_iam_role" "eks_developers" {
+  name               = "${var.name}-developers"
+  assume_role_policy = data.aws_iam_policy_document.assume_role.json
+}
+
+resource "aws_iam_role" "eks_operators" {
+  name               = "${var.name}-operators"
+  assume_role_policy = data.aws_iam_policy_document.assume_role.json
+}
+
 data "aws_iam_policy_document" "assume_role" {
   statement {
     sid     = "AssumeRole"
