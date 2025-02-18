@@ -1,3 +1,7 @@
+terraform {
+  backend "s3" {}
+}
+
 data "aws_caller_identity" "current" {}
 
 resource "aws_iam_role" "eks_developers" {

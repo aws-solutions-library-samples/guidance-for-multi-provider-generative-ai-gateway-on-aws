@@ -38,6 +38,16 @@ DATABASE_STACK_NAME="LitellmDatabaseCdkStack"
 
 # Load environment variables from .env file
 source .env
+
+# Check if bucket exists
+if aws s3api head-bucket --bucket "$TERRAFORM_S3_BUCKET_NAME" 2>/dev/null; then
+    echo "Terraform Bucket $TERRAFORM_S3_BUCKET_NAME already exists, skipping creation"
+else
+    echo "Creating bucket $TERRAFORM_S3_BUCKET_NAME..."
+    aws s3 mb "s3://$TERRAFORM_S3_BUCKET_NAME" --region $aws_region
+    echo "Terraform Bucket created successfully"
+fi
+
 export JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION=1
 
 if [[ (-z "$LITELLM_VERSION") || ("$LITELLM_VERSION" == "placeholder") ]]; then
@@ -419,7 +429,18 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     echo "Deploying litellm-eks-terraform-roles stack"
     cd ..
     cd litellm-eks-terraform-roles
-    terraform init
+
+    # Generate backend.hcl
+    cat > backend.hcl << EOF
+bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
+key     = "terraform.tfstate"
+region  = "${aws_region}"
+encrypt = true
+EOF
+
+    echo "Generated backend.hcl configuration"
+
+    terraform init -backend-config=backend.hcl
     terraform apply -auto-approve
     if [ $? -eq 0 ]; then
         echo "Deployment successful. Extracting role arn outputs..."
@@ -506,7 +527,15 @@ EOF
 
     cd ..
     cd litellm-eks-terraform
-    terraform init
+
+    cat > backend.hcl << EOF
+bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
+key     = "terraform.tfstate"
+region  = "${aws_region}"
+encrypt = true
+EOF
+
+    terraform init -backend-config=backend.hcl
     #terraform destroy -auto-approve
     terraform apply -auto-approve
 fi
