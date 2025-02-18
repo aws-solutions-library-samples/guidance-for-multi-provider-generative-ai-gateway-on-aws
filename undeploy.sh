@@ -17,9 +17,9 @@ echo $aws_region
 
 APP_NAME=litellm
 MIDDLEWARE_APP_NAME=middleware
-STACK_NAME="LitellmCdkStack"
-LOG_BUCKET_STACK_NAME="LogBucketCdkStack"
-DATABASE_STACK_NAME="LitellmDatabaseCdkStack"
+STACK_NAME="litellm-stack"
+LOG_BUCKET_STACK_NAME="log-bucket-stack"
+DATABASE_STACK_NAME="litellm-database-stack"
 
 # Load environment variables from .env file
 source .env
@@ -115,9 +115,9 @@ fi
 
 echo $ARCH
 
-cd litellm-s3-log-bucket-cdk
-LOG_BUCKET_NAME=$(jq -r ".\"${LOG_BUCKET_STACK_NAME}\".LogBucketName" ./outputs.json)
-LOG_BUCKET_ARN=$(jq -r ".\"${LOG_BUCKET_STACK_NAME}\".LogBucketArn" ./outputs.json)
+cd litellm-s3-log-bucket-terraform
+LOG_BUCKET_NAME=$(terraform output -raw LogBucketName)
+LOG_BUCKET_ARN=$(terraform output -raw LogBucketArn)
 
 CONFIG_PATH="../config/config.yaml"
 
@@ -158,7 +158,7 @@ if [ -n "${LANGSMITH_API_KEY}" ] && [ -n "${LANGSMITH_PROJECT}" ] && [ -n "${LAN
 fi
 
 if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
-    cd litellm-cdk
+    cd litellm-terraform
     # Standard variables from CloudFormation outputs
     export TF_VAR_region=$aws_region
     export TF_VAR_name="genai-gateway"
@@ -173,24 +173,27 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     export TF_VAR_existing_cluster_name=$EXISTING_EKS_CLUSTER_NAME
 
     # VPC and Network
-    export TF_VAR_vpc_id=$(jq -r ".\"${STACK_NAME}\".VpcId" ./outputs.json)
+    export TF_VAR_vpc_id=$(terraform output -raw VpcId)
 
     # Architecture
     export TF_VAR_architecture=$ARCH
 
     # Bucket information
-    export TF_VAR_config_bucket_arn=$(jq -r ".\"${STACK_NAME}\".ConfigBucketArn" ./outputs.json)
-    export TF_VAR_config_bucket_name=$(jq -r ".\"${STACK_NAME}\".ConfigBucketName" ./outputs.json)
+    export TF_VAR_config_bucket_arn=$(terraform output -raw ConfigBucketArn)
+    export TF_VAR_config_bucket_name=$(terraform output -raw ConfigBucketName)
     export TF_VAR_log_bucket_arn=$LOG_BUCKET_ARN
 
     # ECR Repositories
-    export TF_VAR_ecr_litellm_repository_url=$(jq -r ".\"${STACK_NAME}\".LiteLLMRepositoryUrl" ./outputs.json)
-    export TF_VAR_ecr_middleware_repository_url=$(jq -r ".\"${STACK_NAME}\".MiddlewareRepositoryUrl" ./outputs.json)
+    export TF_VAR_ecr_litellm_repository_url=$(terraform output -raw LiteLLMRepositoryUrl)
+    export TF_VAR_ecr_middleware_repository_url=$(terraform output -raw MiddlewareRepositoryUrl)
     export TF_VAR_litellm_version=$LITELLM_VERSION
 
 
-    MAIN_DB_SECRET_ARN=$(jq -r ".\"${STACK_NAME}\".DatabaseUrlSecretArn" ./outputs.json)
-    MIDDLEWARE_DB_SECRET_ARN=$(jq -r ".\"${STACK_NAME}\".DatabaseMiddlewareUrlSecretArn" ./outputs.json)
+    MAIN_DB_SECRET_ARN=$(terraform output -raw DatabaseUrlSecretArn)
+    MIDDLEWARE_DB_SECRET_ARN=$(terraform output -raw DatabaseMiddlewareUrlSecretArn)
+
+    export TF_VAR_main_db_secret_arn=$MAIN_DB_SECRET_ARN
+    export TF_VAR_middleware_db_secret_arn=$MIDDLEWARE_DB_SECRET_ARN
 
     # Get the connection strings
     MAIN_DB_URL=$(aws secretsmanager get-secret-value \
@@ -217,12 +220,13 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
 
     # Certificate and WAF
     export TF_VAR_certificate_arn=$CERTIFICATE_ARN
-    export TF_VAR_wafv2_acl_arn=$(jq -r ".\"${STACK_NAME}\".WafAclArn" ./outputs.json)
+    export TF_VAR_wafv2_acl_arn=$(terraform output -raw WafAclArn)
     export TF_VAR_domain_name=$DOMAIN_NAME
     export TF_VAR_hosted_zone_name=$HOSTED_ZONE_NAME
 
     # Get the secret ARN from CloudFormation output
-    LITELLM_MASTER_AND_SALT_KEY_SECRET_ARN=$(jq -r ".\"${STACK_NAME}\".LitellmMasterAndSaltKeySecretArn" ./outputs.json)
+    LITELLM_MASTER_AND_SALT_KEY_SECRET_ARN=$(terraform output -raw LitellmMasterAndSaltKeySecretArn)
+    export TF_VAR_master_and_salt_key_secret_arn=$LITELLM_MASTER_AND_SALT_KEY_SECRET_ARN
 
     # Get the secret JSON and parse out individual values
     LITELLM_MASTER_AND_SALT_KEY_SECRET_JSON=$(aws secretsmanager get-secret-value \
@@ -264,8 +268,8 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     export TF_VAR_okta_issuer=$OKTA_ISSUER
     export TF_VAR_okta_audience=$OKTA_AUDIENCE
 
-    export TF_VAR_db_security_group_id=$(jq -r ".\"${STACK_NAME}\".DbSecurityGroupId" ./outputs.json)
-    export TF_VAR_redis_security_group_id=$(jq -r ".\"${STACK_NAME}\".RedisSecurityGroupId" ./outputs.json)
+    export TF_VAR_db_security_group_id=$(terraform output -raw DbSecurityGroupId)
+    export TF_VAR_redis_security_group_id=$(terraform output -raw RedisSecurityGroupId)
 
     export TF_VAR_disable_outbound_network_access=$DISABLE_OUTBOUND_NETWORK_ACCESS
 
@@ -300,7 +304,7 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     # Generate backend.hcl
     cat > backend.hcl << EOF
 bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
-key     = "terraform-roles.tfstate"
+key     = "terraform-main.tfstate"
 region  = "${aws_region}"
 encrypt = true
 EOF
@@ -323,118 +327,118 @@ EOF
     cd ..
 fi
 
-cd litellm-database-cdk
-EXISTING_VPC_ID=$(jq -r ".\"${DATABASE_STACK_NAME}\".VpcId" ./outputs.json)
-RDS_LITELLM_HOSTNAME=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsLitellmHostname" ./outputs.json)
-RDS_LITELLM_SECRET_ARN=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsLitellmSecretArn" ./outputs.json)
-RDS_MIDDLEWARE_HOSTNAME=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsMiddlewareHostname" ./outputs.json)
-RDS_MIDDLEWARE_SECRET_ARN=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsMiddlewareSecretArn" ./outputs.json)
-REDIS_HOST_NAME=$(jq -r ".\"${DATABASE_STACK_NAME}\".RedisHostName" ./outputs.json)
-REDIS_PORT=$(jq -r ".\"${DATABASE_STACK_NAME}\".RedisPort" ./outputs.json)
-RDS_SECURITY_GROUP_ID=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsSecurityGroupId" ./outputs.json)
-REDIS_SECURITY_GROUP_ID=$(jq -r ".\"${DATABASE_STACK_NAME}\".RedisSecurityGroupId" ./outputs.json)
+# cd litellm-database-cdk
+# EXISTING_VPC_ID=$(jq -r ".\"${DATABASE_STACK_NAME}\".VpcId" ./outputs.json)
+# RDS_LITELLM_HOSTNAME=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsLitellmHostname" ./outputs.json)
+# RDS_LITELLM_SECRET_ARN=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsLitellmSecretArn" ./outputs.json)
+# RDS_MIDDLEWARE_HOSTNAME=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsMiddlewareHostname" ./outputs.json)
+# RDS_MIDDLEWARE_SECRET_ARN=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsMiddlewareSecretArn" ./outputs.json)
+# REDIS_HOST_NAME=$(jq -r ".\"${DATABASE_STACK_NAME}\".RedisHostName" ./outputs.json)
+# REDIS_PORT=$(jq -r ".\"${DATABASE_STACK_NAME}\".RedisPort" ./outputs.json)
+# RDS_SECURITY_GROUP_ID=$(jq -r ".\"${DATABASE_STACK_NAME}\".RdsSecurityGroupId" ./outputs.json)
+# REDIS_SECURITY_GROUP_ID=$(jq -r ".\"${DATABASE_STACK_NAME}\".RedisSecurityGroupId" ./outputs.json)
 
-cd ../litellm-cdk
+# cd ../litellm-cdk
 
-echo "Undeploying the LitellmCdkStack..."
+# echo "Undeploying the LitellmCdkStack..."
 
-cdk destroy "$STACK_NAME" -f \
---context architecture=$ARCH \
---context liteLLMVersion=$LITELLM_VERSION \
---context ecrLitellmRepository=$APP_NAME \
---context ecrMiddlewareRepository=$MIDDLEWARE_APP_NAME \
---context certificateArn=$CERTIFICATE_ARN \
---context domainName=$DOMAIN_NAME \
---context hostedZoneName=$HOSTED_ZONE_NAME \
---context oktaIssuer=$OKTA_ISSUER \
---context oktaAudience=$OKTA_AUDIENCE \
---context logBucketArn=$LOG_BUCKET_ARN \
---context openaiApiKey=$OPENAI_API_KEY \
---context azureOpenAiApiKey=$AZURE_OPENAI_API_KEY \
---context azureApiKey=$AZURE_API_KEY \
---context anthropicApiKey=$ANTHROPIC_API_KEY \
---context groqApiKey=$GROQ_API_KEY \
---context cohereApiKey=$COHERE_API_KEY \
---context coApiKey=$CO_API_KEY \
---context hfToken=$HF_TOKEN \
---context huggingfaceApiKey=$HUGGINGFACE_API_KEY \
---context databricksApiKey=$DATABRICKS_API_KEY \
---context geminiApiKey=$GEMINI_API_KEY \
---context codestralApiKey=$CODESTRAL_API_KEY \
---context mistralApiKey=$MISTRAL_API_KEY \
---context azureAiApiKey=$AZURE_AI_API_KEY \
---context nvidiaNimApiKey=$NVIDIA_NIM_API_KEY \
---context xaiApiKey=$XAI_API_KEY \
---context perplexityaiApiKey=$PERPLEXITYAI_API_KEY \
---context githubApiKey=$GITHUB_API_KEY \
---context deepseekApiKey=$DEEPSEEK_API_KEY \
---context ai21ApiKey=$AI21_API_KEY \
---context langsmithApiKey=$LANGSMITH_API_KEY \
---context langsmithProject=$LANGSMITH_PROJECT \
---context langsmithDefaultRunName=$LANGSMITH_DEFAULT_RUN_NAME \
---context deploymentPlatform=$DEPLOYMENT_PLATFORM \
---context vpcId=$EXISTING_VPC_ID \
---context rdsLitellmHostname=$RDS_LITELLM_HOSTNAME \
---context rdsLitellmSecretArn=$RDS_LITELLM_SECRET_ARN \
---context rdsMiddlewareHostname=$RDS_MIDDLEWARE_HOSTNAME \
---context rdsMiddlewareSecretArn=$RDS_MIDDLEWARE_SECRET_ARN \
---context redisHostName=$REDIS_HOST_NAME \
---context redisPort=$REDIS_PORT \
---context rdsSecurityGroupId=$RDS_SECURITY_GROUP_ID \
---context redisSecurityGroupId=$REDIS_SECURITY_GROUP_ID \
---context disableOutboundNetworkAccess=$DISABLE_OUTBOUND_NETWORK_ACCESS \
---context desiredCapacity=$DESIRED_CAPACITY \
---context minCapacity=$MIN_CAPACITY \
---context maxCapacity=$MAX_CAPACITY \
---context cpuTargetUtilizationPercent=$ECS_CPU_TARGET_UTILIZATION_PERCENTAGE \
---context memoryTargetUtilizationPercent=$ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE \
---context vcpus=$ECS_VCPUS \
---context publicLoadBalancer=$PUBLIC_LOAD_BALANCER
+# cdk destroy "$STACK_NAME" -f \
+# --context architecture=$ARCH \
+# --context liteLLMVersion=$LITELLM_VERSION \
+# --context ecrLitellmRepository=$APP_NAME \
+# --context ecrMiddlewareRepository=$MIDDLEWARE_APP_NAME \
+# --context certificateArn=$CERTIFICATE_ARN \
+# --context domainName=$DOMAIN_NAME \
+# --context hostedZoneName=$HOSTED_ZONE_NAME \
+# --context oktaIssuer=$OKTA_ISSUER \
+# --context oktaAudience=$OKTA_AUDIENCE \
+# --context logBucketArn=$LOG_BUCKET_ARN \
+# --context openaiApiKey=$OPENAI_API_KEY \
+# --context azureOpenAiApiKey=$AZURE_OPENAI_API_KEY \
+# --context azureApiKey=$AZURE_API_KEY \
+# --context anthropicApiKey=$ANTHROPIC_API_KEY \
+# --context groqApiKey=$GROQ_API_KEY \
+# --context cohereApiKey=$COHERE_API_KEY \
+# --context coApiKey=$CO_API_KEY \
+# --context hfToken=$HF_TOKEN \
+# --context huggingfaceApiKey=$HUGGINGFACE_API_KEY \
+# --context databricksApiKey=$DATABRICKS_API_KEY \
+# --context geminiApiKey=$GEMINI_API_KEY \
+# --context codestralApiKey=$CODESTRAL_API_KEY \
+# --context mistralApiKey=$MISTRAL_API_KEY \
+# --context azureAiApiKey=$AZURE_AI_API_KEY \
+# --context nvidiaNimApiKey=$NVIDIA_NIM_API_KEY \
+# --context xaiApiKey=$XAI_API_KEY \
+# --context perplexityaiApiKey=$PERPLEXITYAI_API_KEY \
+# --context githubApiKey=$GITHUB_API_KEY \
+# --context deepseekApiKey=$DEEPSEEK_API_KEY \
+# --context ai21ApiKey=$AI21_API_KEY \
+# --context langsmithApiKey=$LANGSMITH_API_KEY \
+# --context langsmithProject=$LANGSMITH_PROJECT \
+# --context langsmithDefaultRunName=$LANGSMITH_DEFAULT_RUN_NAME \
+# --context deploymentPlatform=$DEPLOYMENT_PLATFORM \
+# --context vpcId=$EXISTING_VPC_ID \
+# --context rdsLitellmHostname=$RDS_LITELLM_HOSTNAME \
+# --context rdsLitellmSecretArn=$RDS_LITELLM_SECRET_ARN \
+# --context rdsMiddlewareHostname=$RDS_MIDDLEWARE_HOSTNAME \
+# --context rdsMiddlewareSecretArn=$RDS_MIDDLEWARE_SECRET_ARN \
+# --context redisHostName=$REDIS_HOST_NAME \
+# --context redisPort=$REDIS_PORT \
+# --context rdsSecurityGroupId=$RDS_SECURITY_GROUP_ID \
+# --context redisSecurityGroupId=$REDIS_SECURITY_GROUP_ID \
+# --context disableOutboundNetworkAccess=$DISABLE_OUTBOUND_NETWORK_ACCESS \
+# --context desiredCapacity=$DESIRED_CAPACITY \
+# --context minCapacity=$MIN_CAPACITY \
+# --context maxCapacity=$MAX_CAPACITY \
+# --context cpuTargetUtilizationPercent=$ECS_CPU_TARGET_UTILIZATION_PERCENTAGE \
+# --context memoryTargetUtilizationPercent=$ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE \
+# --context vcpus=$ECS_VCPUS \
+# --context publicLoadBalancer=$PUBLIC_LOAD_BALANCER
 
-if [ $? -eq 0 ]; then
-    echo "Undeployment successful"
-else
-    echo "Undeployment failed"
-fi
+# if [ $? -eq 0 ]; then
+#     echo "Undeployment successful"
+# else
+#     echo "Undeployment failed"
+# fi
 
-cd ../litellm-database-cdk
-echo "Undeploying the LitellmDatabaseCdkStack stack..."
-# There's a problem with the way the VPC gets looked up as configured in the CDK project.
-# This is a temporary workaround to delete the stack without running into that issue in CDK.
-aws cloudformation delete-stack --stack-name LitellmDatabaseCdkStack
-aws cloudformation wait stack-delete-complete --stack-name LitellmDatabaseCdkStack
+# cd ../litellm-database-cdk
+# echo "Undeploying the LitellmDatabaseCdkStack stack..."
+# # There's a problem with the way the VPC gets looked up as configured in the CDK project.
+# # This is a temporary workaround to delete the stack without running into that issue in CDK.
+# aws cloudformation delete-stack --stack-name LitellmDatabaseCdkStack
+# aws cloudformation wait stack-delete-complete --stack-name LitellmDatabaseCdkStack
 
-if [ $? -eq 0 ]; then
-    echo "Undeployment successful"
-else
-    echo "Undeployment failed"
-fi
+# if [ $? -eq 0 ]; then
+#     echo "Undeployment successful"
+# else
+#     echo "Undeployment failed"
+# fi
 
-cd ..
+# cd ..
 
-cd litellm-s3-log-bucket-cdk
-echo "Undeploying the log bucket CDK stack..."
+# cd litellm-s3-log-bucket-cdk
+# echo "Undeploying the log bucket CDK stack..."
 
-cdk destroy "$LOG_BUCKET_STACK_NAME" -f
+# cdk destroy "$LOG_BUCKET_STACK_NAME" -f
 
-# Function to safely delete a repository
-delete_repo() {
-    local repo_name=$1
+# # Function to safely delete a repository
+# delete_repo() {
+#     local repo_name=$1
     
-    # Check if repository exists
-    if aws ecr describe-repositories --repository-names "$repo_name" 2>/dev/null; then
-        # Delete all images if repository exists
-        aws ecr list-images --repository-name "$repo_name" --query 'imageIds[*]' --output json 2>/dev/null | \
-        aws ecr batch-delete-image --repository-name "$repo_name" --image-ids file:///dev/stdin 2>/dev/null || true
+#     # Check if repository exists
+#     if aws ecr describe-repositories --repository-names "$repo_name" 2>/dev/null; then
+#         # Delete all images if repository exists
+#         aws ecr list-images --repository-name "$repo_name" --query 'imageIds[*]' --output json 2>/dev/null | \
+#         aws ecr batch-delete-image --repository-name "$repo_name" --image-ids file:///dev/stdin 2>/dev/null || true
         
-        # Delete the repository
-        aws ecr delete-repository --repository-name "$repo_name" --force
-        echo "Repository $repo_name deleted successfully"
-    else
-        echo "Repository $repo_name does not exist, skipping"
-    fi
-}
+#         # Delete the repository
+#         aws ecr delete-repository --repository-name "$repo_name" --force
+#         echo "Repository $repo_name deleted successfully"
+#     else
+#         echo "Repository $repo_name does not exist, skipping"
+#     fi
+# }
 
-# Delete both repositories
-delete_repo "$APP_NAME"
-delete_repo "$MIDDLEWARE_APP_NAME"
+# # Delete both repositories
+# delete_repo "$APP_NAME"
+# delete_repo "$MIDDLEWARE_APP_NAME"
