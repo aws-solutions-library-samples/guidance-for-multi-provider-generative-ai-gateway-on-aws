@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
+import * as iam from "aws-cdk-lib/aws-iam";
 
 interface LiteLLMStackProps extends cdk.StackProps {
   vpcId: string;
@@ -19,11 +20,14 @@ export class LitellmPrivateLoadBalancerEc2Stack extends cdk.Stack {
       allowAllOutbound: true,
     });
 
-    // WARNING: This opens RDP from anywhere — not recommended in production!
-    windowsSg.addIngressRule(
-      ec2.Peer.anyIpv4(),
-      ec2.Port.tcp(3389),
-    );
+    const ec2Role = new iam.Role(this, "Ec2SsmRole", {
+      assumedBy: new iam.ServicePrincipal("ec2.amazonaws.com"),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName(
+          "AmazonSSMManagedInstanceCore"
+        ),
+      ],
+    });
 
     // 4) Define a Windows AMI (Server 2019 as an example)
     const windowsAmi = ec2.MachineImage.latestWindows(
@@ -37,7 +41,8 @@ export class LitellmPrivateLoadBalancerEc2Stack extends cdk.Stack {
       securityGroup: windowsSg,
       instanceType: new ec2.InstanceType('t3.small'),
       machineImage: windowsAmi,
-      keyPair: ec2.KeyPair.fromKeyPairName(this, "ec2litellmkeypair", props.keyPairName)
+      keyPair: ec2.KeyPair.fromKeyPairName(this, "ec2litellmkeypair", props.keyPairName),
+      role: ec2Role
     });
   }
 }
