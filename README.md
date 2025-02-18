@@ -100,15 +100,16 @@ If it's easier for you, you can deploy from an AWS Cloud9 environment using the 
 #### Deployment Steps
 
 1. Run `cp .env.template .env`
-2. In `.env`, set the `CERTIFICATE_ARN` to the ARN of the certificate you created in the `Creating your certificate` section of this README.
-3. In `.env`, set the `DOMAIN_NAME` to the sub domain you created in the `Creating your certificate` section of this README.
-4. In `.env`, set the `HOSTED_ZONE_NAME` to the hosted zone you created in the `Creating your certificate` section of this README.
-5. In `.env`, Fill out any API Keys you need for any third party providers. If you only want to use Amazon Bedrock, you can just leave the `.env` file as-is
-6. By default, this solution is deployed with redis caching enabled, and with most popular model providers enabled. If you want to remove support for certain models, or add more models, you can create and edit your own `config/config.yaml` file. If not, the deployment will automatically use the `config/default-config.yaml`. Make sure you [enable model access](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access-modify.html) on Amazon Bedrock.
-7. Make sure you have valid AWS credentials configured in your environment before running the next step
-8. Run `./deploy.sh`
-9. After the deployment is done, you can visit the UI by going to the url at the stack output `LitellmCdkStack.ServiceURL`, which is the `DOMAIN_NAME` you configured earlier.
-10. If you deployed to ECS, the master api key is stored in AWS Secrets Manager in the `LiteLLMSecret` secret. If you deployed to EKS, the master key will be in the stack output `LitellmCdkStack.MasterKey`. We will try to standardize this between the two modes soon. This api key can be used to call the LiteLLM API, and is also the default password for the LiteLLM UI.
+2. In `.env`, set the `TERRAFORM_S3_BUCKET_NAME` to a globally unique bucket name. This will store your `.tfstate` files for your terraform deployment.
+3. In `.env`, set the `CERTIFICATE_ARN` to the ARN of the certificate you created in the `Creating your certificate` section of this README.
+4. In `.env`, set the `DOMAIN_NAME` to the sub domain you created in the `Creating your certificate` section of this README.
+5. In `.env`, set the `HOSTED_ZONE_NAME` to the hosted zone you created in the `Creating your certificate` section of this README.
+6. In `.env`, Fill out any API Keys you need for any third party providers. If you only want to use Amazon Bedrock, you can just leave the `.env` file as-is
+7. By default, this solution is deployed with redis caching enabled, and with most popular model providers enabled. If you want to remove support for certain models, or add more models, you can create and edit your own `config/config.yaml` file. If not, the deployment will automatically use the `config/default-config.yaml`. Make sure you [enable model access](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access-modify.html) on Amazon Bedrock.
+8. Make sure you have valid AWS credentials configured in your environment before running the next step
+9. Run `./deploy.sh`
+10. After the deployment is done, you can visit the UI by going to the url at the stack output `LitellmCdkStack.ServiceURL`, which is the `DOMAIN_NAME` you configured earlier.
+11. If you deployed to ECS, the master api key is stored in AWS Secrets Manager in the `LiteLLMSecret` secret. If you deployed to EKS, the master key will be in the stack output `LitellmCdkStack.MasterKey`. We will try to standardize this between the two modes soon. This api key can be used to call the LiteLLM API, and is also the default password for the LiteLLM UI.
 
 #### Optional Deployment Configurations
 
