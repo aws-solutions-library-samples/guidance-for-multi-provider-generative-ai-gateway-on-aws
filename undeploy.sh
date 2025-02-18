@@ -219,6 +219,7 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     export TF_VAR_certificate_arn=$CERTIFICATE_ARN
     export TF_VAR_wafv2_acl_arn=$(jq -r ".\"${STACK_NAME}\".WafAclArn" ./outputs.json)
     export TF_VAR_domain_name=$DOMAIN_NAME
+    export TF_VAR_hosted_zone_name=$HOSTED_ZONE_NAME
 
     # Get the secret ARN from CloudFormation output
     LITELLM_MASTER_AND_SALT_KEY_SECRET_ARN=$(jq -r ".\"${STACK_NAME}\".LitellmMasterAndSaltKeySecretArn" ./outputs.json)
@@ -284,6 +285,8 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     export TF_VAR_arm_ami_type=$EKS_ARM_AMI_TYPE
     export TF_VAR_x86_ami_type=$EKS_X86_AMI_TYPE
 
+    export TF_VAR_public_load_balancer=$PUBLIC_LOAD_BALANCER
+
     cd ../litellm-eks-terraform-roles
     DEVELOPERS_ROLE_ARN=$(terraform output -raw developers_role_arn)
     OPERATORS_ROLE_ARN=$(terraform output -raw operators_role_arn)
@@ -294,12 +297,27 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
 
     echo "Undeploying the litellm-eks-terraform"
     cd ../litellm-eks-terraform
-    terraform init
+    # Generate backend.hcl
+    cat > backend.hcl << EOF
+bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
+key     = "terraform-roles.tfstate"
+region  = "${aws_region}"
+encrypt = true
+EOF
+
+    echo "Generated backend.hcl configuration"
+    terraform init -backend-config=backend.hcl
     terraform destroy -auto-approve
     
     echo "Undeploying the litellm-eks-terraform-roles"
     cd ../litellm-eks-terraform-roles
-    terraform init
+    cat > backend.hcl << EOF
+bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
+key     = "terraform-roles.tfstate"
+region  = "${aws_region}"
+encrypt = true
+EOF
+    terraform init -backend-config=backend.hcl
     terraform destroy -auto-approve
 
     cd ..

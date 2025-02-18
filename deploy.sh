@@ -433,7 +433,7 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     # Generate backend.hcl
     cat > backend.hcl << EOF
 bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
-key     = "terraform.tfstate"
+key     = "terraform-roles.tfstate"
 region  = "${aws_region}"
 encrypt = true
 EOF
@@ -530,7 +530,7 @@ EOF
 
     cat > backend.hcl << EOF
 bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
-key     = "terraform.tfstate"
+key     = "terraform-main.tfstate"
 region  = "${aws_region}"
 encrypt = true
 EOF
