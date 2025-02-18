@@ -250,8 +250,8 @@ if [ $? -eq 0 ]; then
     RDS_SECURITY_GROUP_ID=$(terraform output -raw RdsSecurityGroupId)
     REDIS_SECURITY_GROUP_ID=$(terraform output -raw RedisSecurityGroupId)
     EXISTING_VPC_ID=$(terraform output -raw VpcId)
-    export PRIVATE_SUBNETS=$(terraform output -raw private_subnet_ids)
-    export PUBLIC_SUBNETS=$(terraform output -raw public_subnet_ids)
+    PRIVATE_SUBNETS=$(terraform output -raw private_subnet_ids)
+    PUBLIC_SUBNETS=$(terraform output -raw public_subnet_ids)
 
     # Conditional output retrieval
     if echo "$DISABLE_OUTBOUND_NETWORK_ACCESS" | grep -iq "^true$"; then
