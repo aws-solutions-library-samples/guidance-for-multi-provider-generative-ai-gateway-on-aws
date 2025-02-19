@@ -30,6 +30,45 @@ locals {
 # - If existing: we just take data.aws_subnets.existing_all[*].ids
 # - If new & disable_outbound => we choose the newly created "private" subnets (because they are effectively isolated if NAT=0)
 # - If new & not disable_outbound => we choose the newly created "private" subnets as normal "private"
+
+# First get all subnets in the VPC with auto-assign public IP enabled
+data "aws_subnets" "public_ip_subnets" {
+  filter {
+    name   = "vpc-id"
+    values = [var.vpc_id]
+  }
+  
+  filter {
+    name   = "map-public-ip-on-launch"
+    values = ["true"]
+  }
+}
+
+# Get route tables for these subnets
+data "aws_route_table" "subnet_route_tables" {
+  for_each  = toset(data.aws_subnets.public_ip_subnets.ids)
+  subnet_id = each.value
+}
+
+# Get all subnets with auto-assign public IP disabled
+data "aws_subnets" "private_ip_subnets" {
+  filter {
+    name   = "vpc-id"
+    values = [var.vpc_id]
+  }
+  
+  filter {
+    name   = "map-public-ip-on-launch"
+    values = ["false"]
+  }
+}
+
+# Get route tables for these subnets
+data "aws_route_table" "private_subnet_route_tables" {
+  for_each  = toset(data.aws_subnets.private_ip_subnets.ids)
+  subnet_id = each.value
+}
+
 locals {
   # For new VPC
   new_private_subnet_ids = flatten([
@@ -40,10 +79,30 @@ locals {
     for s in aws_subnet.public : s.id
   ])
 
+  existing_public_subnet_ids = [
+    for subnet_id, rt in data.aws_route_table.subnet_route_tables : subnet_id
+    if length([
+      for route in rt.routes : route
+      if route.gateway_id != null && 
+         can(regex("^igw-", route.gateway_id)) && 
+         route.cidr_block == "0.0.0.0/0"
+    ]) > 0
+  ]
+
+  existing_private_subnet_ids = [
+    for subnet_id, rt in data.aws_route_table.private_subnet_route_tables : subnet_id
+    if length([
+      for route in rt.routes : route
+      if route.gateway_id != null && 
+        can(regex("^igw-", route.gateway_id)) && 
+        route.cidr_block == "0.0.0.0/0"
+    ]) == 0
+  ]
+
   # The final chosen subnets for "private_with_egress" or "private_isolated" usage.
   # If existing VPC => data subnets (you must do your own filtering in real usage).
   # If new VPC => the private subnets we created.
-  chosen_subnet_ids = length(trimspace(var.vpc_id)) > 0 ? (length(data.aws_subnets.existing_all) > 0 ? data.aws_subnets.existing_all[0].ids : []) : local.new_private_subnet_ids
+  chosen_subnet_ids = length(trimspace(var.vpc_id)) > 0 ? local.existing_private_subnet_ids : local.new_private_subnet_ids
 }
 
 locals {

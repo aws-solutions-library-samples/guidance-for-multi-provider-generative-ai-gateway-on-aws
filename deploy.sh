@@ -12,7 +12,7 @@ if [ ! -f ".env" ]; then
     cp .env.template .env
 fi
 
-aws_region=$(aws configure get region)
+aws_region=$(aws ec2 describe-availability-zones --output text --query 'AvailabilityZones[0].[RegionName]')
 echo $aws_region
 
 SKIP_BUILD=false
@@ -479,127 +479,12 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     # Cluster information
     export TF_VAR_existing_cluster_name=$EXISTING_EKS_CLUSTER_NAME
 
-    # VPC and Network
-    export TF_VAR_vpc_id=$(jq -r ".\"${STACK_NAME}\".VpcId" ./outputs.json)
-
-    # Architecture
-    export TF_VAR_architecture=$ARCH
-
-    # Bucket information
-    export TF_VAR_config_bucket_arn=$(jq -r ".\"${STACK_NAME}\".ConfigBucketArn" ./outputs.json)
-    export TF_VAR_config_bucket_name=$(jq -r ".\"${STACK_NAME}\".ConfigBucketName" ./outputs.json)
-    export TF_VAR_log_bucket_arn=$LOG_BUCKET_ARN
-
-    # ECR Repositories
-    export TF_VAR_ecr_litellm_repository_url=$(jq -r ".\"${STACK_NAME}\".LiteLLMRepositoryUrl" ./outputs.json)
-    export TF_VAR_ecr_middleware_repository_url=$(jq -r ".\"${STACK_NAME}\".MiddlewareRepositoryUrl" ./outputs.json)
-    export TF_VAR_litellm_version=$LITELLM_VERSION
-
-
-    MAIN_DB_SECRET_ARN=$(jq -r ".\"${STACK_NAME}\".DatabaseUrlSecretArn" ./outputs.json)
-    MIDDLEWARE_DB_SECRET_ARN=$(jq -r ".\"${STACK_NAME}\".DatabaseMiddlewareUrlSecretArn" ./outputs.json)
-
-    # Get the connection strings
-    MAIN_DB_URL=$(aws secretsmanager get-secret-value \
-    --secret-id "$MAIN_DB_SECRET_ARN" \
-    --query 'SecretString' \
-    --output text)
-
-    MIDDLEWARE_DB_URL=$(aws secretsmanager get-secret-value \
-    --secret-id "$MIDDLEWARE_DB_SECRET_ARN" \
-    --query 'SecretString' \
-    --output text)
-
-    # Database and Redis URLs
-    export TF_VAR_database_url=$(aws secretsmanager get-secret-value \
-        --secret-id "$MAIN_DB_SECRET_ARN" \
-        --query 'SecretString' \
-        --output text)
-    export TF_VAR_database_middleware_url=$(aws secretsmanager get-secret-value \
-        --secret-id "$MIDDLEWARE_DB_SECRET_ARN" \
-        --query 'SecretString' \
-        --output text)
-
-    export TF_VAR_redis_url=$(jq -r ".\"${STACK_NAME}\".RedisUrl" ./outputs.json)
-
-    # Certificate and WAF
-    export TF_VAR_certificate_arn=$CERTIFICATE_ARN
-    export TF_VAR_wafv2_acl_arn=$(jq -r ".\"${STACK_NAME}\".WafAclArn" ./outputs.json)
-    export TF_VAR_domain_name=$DOMAIN_NAME
-    export TF_VAR_hosted_zone_name=$HOSTED_ZONE_NAME
-
-    # Get the secret ARN from CloudFormation output
-    LITELLM_MASTER_AND_SALT_KEY_SECRET_ARN=$(jq -r ".\"${STACK_NAME}\".LitellmMasterAndSaltKeySecretArn" ./outputs.json)
-
-    # Get the secret JSON and parse out individual values
-    LITELLM_MASTER_AND_SALT_KEY_SECRET_JSON=$(aws secretsmanager get-secret-value \
-    --secret-id "$LITELLM_MASTER_AND_SALT_KEY_SECRET_ARN" \
-    --query 'SecretString' \
-    --output text)
-
-    # Extract individual values using jq
-    export TF_VAR_litellm_master_key=$(echo $LITELLM_MASTER_AND_SALT_KEY_SECRET_JSON | jq -r '.LITELLM_MASTER_KEY')
-    export TF_VAR_litellm_salt_key=$(echo $LITELLM_MASTER_AND_SALT_KEY_SECRET_JSON | jq -r '.LITELLM_SALT_KEY')
-
-    export TF_VAR_openai_api_key=$OPENAI_API_KEY
-    export TF_VAR_azure_openai_api_key=$AZURE_OPENAI_API_KEY
-    export TF_VAR_azure_api_key=$AZURE_API_KEY
-    export TF_VAR_anthropic_api_key=$ANTHROPIC_API_KEY
-    export TF_VAR_groq_api_key=$GROQ_API_KEY
-    export TF_VAR_cohere_api_key=$COHERE_API_KEY
-    export TF_VAR_co_api_key=$CO_API_KEY
-    export TF_VAR_hf_token=$HF_TOKEN
-    export TF_VAR_huggingface_api_key=$HUGGINGFACE_API_KEY
-    export TF_VAR_databricks_api_key=$DATABRICKS_API_KEY
-    export TF_VAR_gemini_api_key=$GEMINI_API_KEY
-    export TF_VAR_codestral_api_key=$CODESTRAL_API_KEY
-    export TF_VAR_mistral_api_key=$MISTRAL_API_KEY
-    export TF_VAR_azure_ai_api_key=$AZURE_API_KEY
-    export TF_VAR_nvidia_nim_api_key=$NVIDIA_NIM_API_KEY
-    export TF_VAR_xai_api_key=$XAI_API_KEY
-    export TF_VAR_perplexityai_api_key=$PERPLEXITYAI_API_KEY
-    export TF_VAR_github_api_key=$GITHUB_API_KEY
-    export TF_VAR_deepseek_api_key=$DEEPSEEK_API_KEY
-    export TF_VAR_ai21_api_key=$AI21_API_KEY
-
-    export TF_VAR_langsmith_api_key=$LANGSMITH_API_KEY
-    export TF_VAR_langsmith_project=$LANGSMITH_PROJECT
-    export TF_VAR_langsmith_default_run_name=$LANGSMITH_DEFAULT_RUN_NAME
-
-
-    # Okta configuration
-    export TF_VAR_okta_issuer=$OKTA_ISSUER
-    export TF_VAR_okta_audience=$OKTA_AUDIENCE
-
-    export TF_VAR_db_security_group_id=$(jq -r ".\"${STACK_NAME}\".DbSecurityGroupId" ./outputs.json)
-    export TF_VAR_redis_security_group_id=$(jq -r ".\"${STACK_NAME}\".RedisSecurityGroupId" ./outputs.json)
-
-    export TF_VAR_disable_outbound_network_access=$DISABLE_OUTBOUND_NETWORK_ACCESS
-
-    if echo "$DISABLE_OUTBOUND_NETWORK_ACCESS" | grep -iq "^true$"; then
-        export TF_VAR_eks_alb_controller_private_ecr_repository_name=$EKS_ALB_CONTROLLER_PRIVATE_ECR_REPOSITORY_NAME
-    fi
-
-    export TF_VAR_install_add_ons_in_existing_eks_cluster=$INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER
-
-    export TF_VAR_desired_capacity=$DESIRED_CAPACITY
-    export TF_VAR_min_capacity=$MIN_CAPACITY
-    export TF_VAR_max_capacity=$MAX_CAPACITY
-
-    export TF_VAR_arm_instance_type=$EKS_ARM_INSTANCE_TYPE
-    export TF_VAR_x86_instance_type=$EKS_X86_INSTANCE_TYPE
-    export TF_VAR_arm_ami_type=$EKS_ARM_AMI_TYPE
-    export TF_VAR_x86_ami_type=$EKS_X86_AMI_TYPE
-
-    export TF_VAR_public_load_balancer=$PUBLIC_LOAD_BALANCER
-
-
     cd ..
     cd litellm-eks-terraform
 
     cat > backend.hcl << EOF
 bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
-key     = "terraform-main.tfstate"
+key     = "terraform-eks.tfstate"
 region  = "${aws_region}"
 encrypt = true
 EOF

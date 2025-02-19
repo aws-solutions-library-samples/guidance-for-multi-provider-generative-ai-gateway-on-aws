@@ -57,11 +57,11 @@ output "EksAlbControllerPrivateEcrRepositoryName" {
 
 output "private_subnet_ids" {
   description = "List of IDs of private subnets"
-  value = jsonencode(length(trimspace(var.vpc_id)) > 0 ? (length(data.aws_subnets.existing_all) > 0 ? data.aws_subnets.existing_all[0].ids : []) : local.new_private_subnet_ids)
+  value = jsonencode(length(trimspace(var.vpc_id)) > 0 ? local.existing_private_subnet_ids : local.new_private_subnet_ids)
 }
 
 output "public_subnet_ids" {
   description = "List of IDs of public subnets"
-  value = jsonencode(length(trimspace(var.vpc_id)) > 0 ? (length(data.aws_subnets.existing_all) > 0 ? data.aws_subnets.existing_all[0].ids : []) : local.new_public_subnet_ids)
+  value = jsonencode(length(trimspace(var.vpc_id)) > 0 ? local.existing_public_subnet_ids : local.new_public_subnet_ids)
 }
 

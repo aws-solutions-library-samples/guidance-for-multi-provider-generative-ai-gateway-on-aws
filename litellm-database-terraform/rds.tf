@@ -14,7 +14,8 @@ resource "random_password" "db_password_middleware" {
 }
 
 resource "aws_secretsmanager_secret" "db_secret_main" {
-  name = "${var.stack_name}-DBSecret"
+  name_prefix = "${var.stack_name}-DBSecret-"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "db_secret_main_version" {
@@ -26,7 +27,8 @@ resource "aws_secretsmanager_secret_version" "db_secret_main_version" {
 }
 
 resource "aws_secretsmanager_secret" "db_secret_middleware" {
-  name = "${var.stack_name}-DBMiddlewareSecret"
+  name_prefix = "${var.stack_name}-DBMiddlewareSecret"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "db_secret_middleware_version" {

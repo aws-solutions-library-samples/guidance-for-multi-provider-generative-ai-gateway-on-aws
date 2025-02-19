@@ -1,5 +1,6 @@
 resource "aws_secretsmanager_secret" "litellm_other_secrets" {
   name_prefix = "LiteLLMApiKeySecret-"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "litellm_other_secrets_ver" {

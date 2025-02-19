@@ -15,6 +15,7 @@ resource "random_password" "litellm_salt" {
 # Create a secret (the "shell" or "container" for the key)
 resource "aws_secretsmanager_secret" "litellm_master_salt" {
   name_prefix = "LiteLLMMasterSalt-"
+  recovery_window_in_days = 0
 }
 
 # Store the generated values
@@ -40,6 +41,7 @@ locals {
 
 resource "aws_secretsmanager_secret" "db_url_secret" {
   name_prefix = "DBUrlSecret-"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "db_url_secret_ver" {
@@ -50,6 +52,7 @@ resource "aws_secretsmanager_secret_version" "db_url_secret_ver" {
 
 resource "aws_secretsmanager_secret" "db_middleware_url_secret" {
   name_prefix = "DBMiddlewareUrlSecret-"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "db_middleware_url_secret_ver" {
