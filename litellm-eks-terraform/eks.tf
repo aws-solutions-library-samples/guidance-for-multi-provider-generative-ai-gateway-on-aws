@@ -125,6 +125,10 @@ resource "aws_iam_role" "eks_cluster" {
 resource "aws_eks_cluster" "this" {
   count = var.create_cluster ? 1 : 0
 
+  access_config {
+    authentication_mode = "API"
+  }
+
   name     = "${var.name}-cluster"
   version  = var.cluster_version
   role_arn = aws_iam_role.eks_cluster[0].arn
@@ -217,13 +221,23 @@ resource "aws_eks_addon" "vpc_cni" {
   depends_on = [aws_eks_cluster.this]
 }
 
+resource "aws_eks_addon" "pod_identity_agent" {
+  count = var.create_cluster || var.install_add_ons_in_existing_eks_cluster ? 1 : 0
+
+  cluster_name = local.cluster_name
+  addon_name   = "eks-pod-identity-agent"
+
+  depends_on = [aws_eks_cluster.this]
+}
+
+
 ###############################################################################
 # EKS Managed Node Group (replacing eks_managed_node_groups in the module)    #
 ###############################################################################
 resource "aws_eks_node_group" "core_nodegroup" {
   cluster_name    = local.cluster_name
   node_group_name_prefix = "core_nodegroup"
-  node_role_arn   = var.nodegroup_role_arn
+  node_role_arn   = aws_iam_role.eks_nodegroup.arn
   subnet_ids      = concat(data.aws_subnets.private.ids)
 
   scaling_config {
@@ -238,48 +252,57 @@ resource "aws_eks_node_group" "core_nodegroup" {
   ]
   ami_type = var.architecture == "x86" ? var.x86_ami_type : var.arm_ami_type
 
-  # Use depends_on to ensure the VPC CNI add-on is installed before node creation
-  # If we're creating the cluster, ensure the cluster resource is built first.
-  # If we're using an existing cluster, the depends_on is effectively empty.
-  depends_on = [aws_eks_cluster.this, kubernetes_config_map.aws_auth]#, aws_iam_role_policy_attachment.eks_cluster_policy_2]
+  depends_on = [
+    aws_eks_access_entry.developers, 
+    aws_eks_access_entry.operators,
+    aws_eks_cluster.this,
+    aws_eks_access_entry.admin,
+    aws_eks_access_policy_association.admin_policy
+  ]
 
   # Example tags
   tags = local.tags
 }
 
-resource "kubernetes_config_map" "aws_auth" {
-  count = var.create_cluster || var.create_aws_auth_in_existing_eks_cluster ? 1 : 0
-  metadata {
-    name      = "aws-auth"
-    namespace = "kube-system"
-    labels    = local.common_labels
-  }
+resource "aws_eks_access_entry" "developers" {
+  cluster_name      = local.cluster_name
+  principal_arn     = aws_iam_role.eks_developers.arn
+  type              = "STANDARD"
+  user_name         = "eks-developers"
+  kubernetes_groups = ["eks-developers"]
+}
 
-  # Wait until the cluster and its endpoint are actually ready
-  depends_on = [
-    aws_eks_cluster.this
-  ]
+resource "aws_eks_access_entry" "operators" {
+  cluster_name      = local.cluster_name
+  principal_arn     = aws_iam_role.eks_operators.arn
+  type              = "STANDARD"
+  user_name         = "eks-operators"
+  kubernetes_groups = ["eks-operators"]
+}
 
-  # The 'data' block is YAML that instructs EKS how to map IAM roles to Kubernetes RBAC
-  data = {
-    # Map IAM roles for the Node Group
-    mapRoles = <<-YAML
-      - rolearn: ${var.nodegroup_role_arn}
-        username: system:node:{{EC2PrivateDNSName}}
-        groups:
-          - system:bootstrappers
-          - system:nodes
-      - rolearn: ${var.developers_role_arn}
-        username: eks-developers
-        groups:
-          - eks-developers
-      - rolearn: ${var.operators_role_arn}
-        username: eks-operators
-        groups:
-          - eks-operators
-    YAML
-  }
+locals {
+  role_name = split("/", data.aws_caller_identity.current.arn)[1]
+  role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.role_name}"
 }
 
 
+resource "aws_eks_access_entry" "admin" {
+  count = var.create_cluster ? 1 : 0
+  cluster_name      = local.cluster_name
+  principal_arn = local.role_arn
+  //principal_arn     = "arn:aws:iam::235614385815:role/Admin"
+  type              = "STANDARD"
+  user_name         = "admin-user"
+}
 
+# 2) Associate the AmazonEKSClusterAdminPolicy to that entry
+resource "aws_eks_access_policy_association" "admin_policy" {
+  count = var.create_cluster ? 1 : 0
+  cluster_name  = local.cluster_name
+  principal_arn = aws_eks_access_entry.admin[0].principal_arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+  access_scope {
+    type = "cluster"
+  }
+}

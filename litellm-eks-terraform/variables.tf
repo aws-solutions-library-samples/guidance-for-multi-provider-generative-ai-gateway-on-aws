@@ -298,27 +298,6 @@ variable "install_add_ons_in_existing_eks_cluster" {
   default = false
 }
 
-variable "developers_role_arn" {
-  description = "ARN of the EKS developers IAM role"
-  type        = string
-}
-
-variable "operators_role_arn" {
-  description = "ARN of the EKS operators IAM role"
-  type        = string
-}
-
-variable "nodegroup_role_arn" {
-  description = "ARN of the EKS node group IAM role"
-  type        = string
-}
-
-variable "create_aws_auth_in_existing_eks_cluster" {
-  description = "Whether to create a new aws-auth in an existing EKS Cluster. Will only work if aws-auth does not exist on the cluster yet"
-  type = bool
-  default = false
-}
-
 variable "desired_capacity" {
   description = "Desired Capacity on the node group and deployment"
   type = number

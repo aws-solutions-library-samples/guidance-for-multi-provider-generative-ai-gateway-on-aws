@@ -90,6 +90,13 @@ resource "kubernetes_secret" "litellm_api_keys" {
     AI21_API_KEY          = var.ai21_api_key
     LANGSMITH_API_KEY     = var.langsmith_api_key
   }
+
+  depends_on = [
+    aws_eks_access_entry.admin,
+    aws_eks_access_policy_association.admin_policy,
+    aws_eks_access_entry.developers,
+    aws_eks_access_entry.operators
+  ]
 }
 
 resource "kubernetes_secret" "middleware_secrets" {
@@ -102,6 +109,13 @@ resource "kubernetes_secret" "middleware_secrets" {
     DATABASE_MIDDLEWARE_URL = var.database_middleware_url
     MASTER_KEY             = var.litellm_master_key
   }
+
+  depends_on = [
+    aws_eks_access_entry.admin,
+    aws_eks_access_policy_association.admin_policy,
+    aws_eks_access_entry.developers,
+    aws_eks_access_entry.operators
+  ]
 }
 
 # Deployment
@@ -421,7 +435,7 @@ resource "kubernetes_ingress_v1" "litellm" {
       }
     }
   }
-  depends_on = [helm_release.aws_load_balancer_controller, module.aws_load_balancer_controller_irsa_role, aws_eks_addon.coredns, aws_eks_node_group.core_nodegroup]
+  depends_on = [helm_release.aws_load_balancer_controller, module.aws_load_balancer_controller_irsa_role, aws_eks_addon.coredns, aws_eks_node_group.core_nodegroup, aws_eks_access_entry.admin, aws_eks_access_policy_association.admin_policy]
 }
 
 # Service
@@ -450,6 +464,14 @@ resource "kubernetes_service" "litellm" {
 
     type = "ClusterIP"
   }
+
+  depends_on = [
+    aws_eks_access_entry.admin,
+    aws_eks_access_policy_association.admin_policy,
+    aws_eks_access_entry.developers,
+    aws_eks_access_entry.operators,
+    aws_eks_node_group.core_nodegroup
+  ]
 }
 
 # Add AWS Load Balancer Controller
@@ -515,7 +537,9 @@ resource "helm_release" "aws_load_balancer_controller" {
 
   depends_on = [
     aws_eks_node_group.core_nodegroup,
-    module.aws_load_balancer_controller_irsa_role
+    module.aws_load_balancer_controller_irsa_role,
+    aws_eks_access_entry.admin,
+    aws_eks_access_policy_association.admin_policy
   ]
 }
 

@@ -72,7 +72,6 @@ echo "EXISTING_VPC_ID: $EXISTING_VPC_ID"
 echo "DISABLE_OUTBOUND_NETWORK_ACCESS: $DISABLE_OUTBOUND_NETWORK_ACCESS"
 echo "CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC: $CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC"
 echo "INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER: $INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER"
-echo "CREATE_AWS_AUTH_IN_EXISTING_EKS_CLUSTER: $CREATE_AWS_AUTH_IN_EXISTING_EKS_CLUSTER"
 echo "DESIRED_CAPACITY: $DESIRED_CAPACITY"
 echo "MIN_CAPACITY: $MIN_CAPACITY"
 echo "MAX_CAPACITY: $MAX_CAPACITY"
@@ -219,6 +218,7 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     export TF_VAR_certificate_arn=$CERTIFICATE_ARN
     export TF_VAR_wafv2_acl_arn=$(jq -r ".\"${STACK_NAME}\".WafAclArn" ./outputs.json)
     export TF_VAR_domain_name=$DOMAIN_NAME
+    export TF_VAR_hosted_zone_name=$HOSTED_ZONE_NAME
 
     # Get the secret ARN from CloudFormation output
     LITELLM_MASTER_AND_SALT_KEY_SECRET_ARN=$(jq -r ".\"${STACK_NAME}\".LitellmMasterAndSaltKeySecretArn" ./outputs.json)
@@ -273,7 +273,6 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     fi
 
     export TF_VAR_install_add_ons_in_existing_eks_cluster=$INSTALL_ADD_ONS_IN_EXISTING_EKS_CLUSTER
-    export TF_VAR_create_aws_auth_in_existing_eks_cluster=$CREATE_AWS_AUTH_IN_EXISTING_EKS_CLUSTER
 
     export TF_VAR_desired_capacity=$DESIRED_CAPACITY
     export TF_VAR_min_capacity=$MIN_CAPACITY
@@ -284,23 +283,13 @@ if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
     export TF_VAR_arm_ami_type=$EKS_ARM_AMI_TYPE
     export TF_VAR_x86_ami_type=$EKS_X86_AMI_TYPE
 
-    cd ../litellm-eks-terraform-roles
-    DEVELOPERS_ROLE_ARN=$(terraform output -raw developers_role_arn)
-    OPERATORS_ROLE_ARN=$(terraform output -raw operators_role_arn)
-    NODEGROUP_ROLE_ARN=$(terraform output -raw nodegroup_role_arn)
-    export TF_VAR_developers_role_arn=$DEVELOPERS_ROLE_ARN
-    export TF_VAR_operators_role_arn=$OPERATORS_ROLE_ARN
-    export TF_VAR_nodegroup_role_arn=$NODEGROUP_ROLE_ARN
+    export TF_VAR_public_load_balancer=$PUBLIC_LOAD_BALANCER
 
     echo "Undeploying the litellm-eks-terraform"
     cd ../litellm-eks-terraform
     terraform init
     terraform destroy -auto-approve
     
-    echo "Undeploying the litellm-eks-terraform-roles"
-    cd ../litellm-eks-terraform-roles
-    terraform init
-    terraform destroy -auto-approve
 
     cd ..
 fi
