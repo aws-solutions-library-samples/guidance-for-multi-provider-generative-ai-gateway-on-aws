@@ -467,53 +467,36 @@ export TF_VAR_arm_ami_type=$EKS_ARM_AMI_TYPE
 export TF_VAR_x86_ami_type=$EKS_X86_AMI_TYPE
 
 export TF_VAR_public_load_balancer=$PUBLIC_LOAD_BALANCER
-if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
-    
-    # Set create_cluster to false if EXISTING_EKS_CLUSTER_NAME is not empty, true otherwise
-    if [ -n "$EXISTING_EKS_CLUSTER_NAME" ]; then
-        export TF_VAR_create_cluster="false"
-    else
-        export TF_VAR_create_cluster="true"
-    fi
 
-    # Cluster information
-    export TF_VAR_existing_cluster_name=$EXISTING_EKS_CLUSTER_NAME
-
-    cd ..
-    cd litellm-eks-terraform
-
-    cat > backend.hcl << EOF
-bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
-key     = "terraform-eks.tfstate"
-region  = "${aws_region}"
-encrypt = true
-EOF
-
-    terraform init -backend-config=backend.hcl
-    #terraform destroy -auto-approve
-    terraform apply -auto-approve
+# Set create_cluster to false if EXISTING_EKS_CLUSTER_NAME is not empty, true otherwise
+if [ -n "$EXISTING_EKS_CLUSTER_NAME" ]; then
+    export TF_VAR_create_cluster="false"
 else
-    export TF_VAR_vcpus=$ECS_VCPUS
-    export TF_VAR_cpu_target_utilization_percent=$ECS_CPU_TARGET_UTILIZATION_PERCENTAGE
-    export TF_VAR_memory_target_utilization_percent=$ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE
-    export TF_VAR_private_subnets=$PRIVATE_SUBNETS
-    export TF_VAR_public_subnets=$PUBLIC_SUBNETS
-    
-    echo "Deploying litellm-ecs-terraform stack"
-    cd ..
-    cd litellm-ecs-terraform
+    export TF_VAR_create_cluster="true"
+fi
 
-    cat > backend.hcl << EOF
+# Cluster information
+export TF_VAR_existing_cluster_name=$EXISTING_EKS_CLUSTER_NAME
+export TF_VAR_vcpus=$ECS_VCPUS
+export TF_VAR_cpu_target_utilization_percent=$ECS_CPU_TARGET_UTILIZATION_PERCENTAGE
+export TF_VAR_memory_target_utilization_percent=$ECS_MEMORY_TARGET_UTILIZATION_PERCENTAGE
+export TF_VAR_private_subnets=$PRIVATE_SUBNETS
+export TF_VAR_public_subnets=$PUBLIC_SUBNETS
+
+echo "Deploying litellm-terraform-stack"
+cd ..
+cd litellm-terraform-stack
+
+cat > backend.hcl << EOF
 bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
-key     = "terraform-ecs.tfstate"
+key     = "terraform-unified.tfstate"
 region  = "${aws_region}"
 encrypt = true
 EOF
 
-    echo "Generated backend.hcl configuration"
-    terraform init -backend-config=backend.hcl
-    terraform apply -auto-approve
-fi
+terraform init -backend-config=backend.hcl
+#terraform destroy -auto-approve
+terraform apply -auto-approve
 
 if [ $? -eq 0 ]; then
     echo "Deployment successful. Extracting outputs..."
