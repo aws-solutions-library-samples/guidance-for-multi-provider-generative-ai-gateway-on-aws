@@ -20,9 +20,10 @@ variable "name" {
   default     = "genai-gateway"
 }
 
-variable "config_bucket_arn" {
-  description = "ARN of the configuration bucket"
-  type        = string
+variable "vpc_id" {
+  type      = string
+  default   = ""
+  description = "If set, use this VPC instead of creating a new one. Leave empty to create a new VPC."
 }
 
 variable "log_bucket_arn" {
@@ -30,51 +31,9 @@ variable "log_bucket_arn" {
   type        = string
 }
 
-variable "ecr_litellm_repository_url" {
-  description = "URL of the ECR repository for LiteLLM"
-  type        = string
-}
-
-variable "ecr_middleware_repository_url" {
-  description = "URL of the ECR repository for middleware"
-  type        = string
-}
-
 variable "litellm_version" {
   description = "Version tag for LiteLLM image"
   type        = string
-}
-
-variable "config_bucket_name" {
-  description = "Name of the S3 bucket containing config"
-  type        = string
-}
-
-variable "redis_url" {
-  description = "Redis connection URL"
-  type        = string
-}
-
-variable "database_url" {
-  description = "Database connection URL"
-  type        = string
-}
-
-variable "database_middleware_url" {
-  description = "Middleware database connection URL"
-  type        = string
-}
-
-variable "litellm_master_key" {
-  description = "LiteLLM master key"
-  type        = string
-  sensitive   = true
-}
-
-variable "litellm_salt_key" {
-  description = "LiteLLM salt key"
-  type        = string
-  sensitive   = true
 }
 
 variable "openai_api_key" {
@@ -228,11 +187,6 @@ variable "certificate_arn" {
   type        = string
 }
 
-variable "wafv2_acl_arn" {
-  description = "ARN of the WAFv2 ACL"
-  type        = string
-}
-
 variable "domain_name" {
   description = "Domain name for the ingress"
   type        = string
@@ -240,21 +194,6 @@ variable "domain_name" {
 
 variable "hosted_zone_name" {
   description = "Hosted zone name for the ingress"
-  type        = string
-}
-
-variable "vpc_id" {
-  description = "VPC ID where the cluster and nodes will be deployed"
-  type        = string
-}
-
-variable "db_security_group_id" {
-  description = "RDS db security group id"
-  type        = string
-}
-
-variable "redis_security_group_id" {
-  description = "redis security group id"
   type        = string
 }
 
@@ -271,7 +210,6 @@ variable "architecture" {
 variable "disable_outbound_network_access" {
     description = "Whether to disable outbound network access for the EKS Cluster"
     type = bool
-    default = false
 }
 
 variable "desired_capacity" {
@@ -305,34 +243,9 @@ variable "memory_target_utilization_percent" {
   type = number
 }
 
-variable "private_subnets" {
-  description = "List of private subnet IDs"
-  type        = list(string)
-}
-
-variable "public_subnets" {
-  description = "List of public subnet IDs"
-  type        = list(string)
-}
-
 variable "vcpus" {
   description = "Number of ECS vcpus"
   type = number
-}
-
-variable "middleware_db_secret_arn" {
-  description = "ARN of secret for middleware rds db"
-  type = string
-}
-
-variable "main_db_secret_arn" {
-  description = "ARN of secret for main rds db"
-  type = string
-}
-
-variable "master_and_salt_key_secret_arn" {
-  description = "ARN of secret with master and salt key"
-  type = string
 }
 
 # EKS Only Variables
@@ -351,12 +264,6 @@ variable "cluster_version" {
 variable "create_cluster" {
   description = "Controls if EKS cluster should be created"
   type        = bool
-}
-
-variable "eks_alb_controller_private_ecr_repository_name" {
-  description = "The name of the ECR repo that is used to store the EKS ALB Controller Container Image in EKS deployments with outbound network access disabled"
-  type        = string
-  default = ""
 }
 
 variable "install_add_ons_in_existing_eks_cluster" {
@@ -382,4 +289,19 @@ variable "arm_ami_type" {
 variable "x86_ami_type" {
   description = "AMI type for x86 deployment"
   type = string
+}
+
+variable "create_vpc_endpoints_in_existing_vpc" {
+  type    = bool
+  description = "If using an existing VPC, set this to true to also create interface/gateway endpoints within it."
+}
+
+variable "ecrLitellmRepository" {
+  type        = string
+  description = "Name of the LiteLLM ECR repository"
+}
+
+variable "ecrMiddlewareRepository" {
+  type        = string
+  description = "Name of the Middleware ECR repository"
 }

@@ -48,11 +48,6 @@ resource "aws_route53_zone" "private_zone" {
   }
 }
 
-# Import existing certificate from ARN
-# data "aws_acm_certificate" "this" {
-#   arn = var.certificateArn
-# }
-
 # ECR Repositories
 data "aws_ecr_repository" "litellm" {
   name = var.ecrLitellmRepository

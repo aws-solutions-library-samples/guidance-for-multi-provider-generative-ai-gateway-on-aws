@@ -1,18 +1,27 @@
+module "base" {
+  source = "./modules/base"
+  name = var.name
+  vpc_id = var.vpc_id
+  deployment_platform = local.platform
+  create_vpc_endpoints_in_existing_vpc = var.create_vpc_endpoints_in_existing_vpc
+  disable_outbound_network_access = var.disable_outbound_network_access
+  ecrLitellmRepository = var.ecrLitellmRepository
+  ecrMiddlewareRepository = var.ecrMiddlewareRepository
+  hostedZoneName = var.hosted_zone_name
+  publicLoadBalancer = var.public_load_balancer
+}
+
 module "ecs_cluster" {
   source = "./modules/ecs"
   count  = local.platform == "ECS" ? 1 : 0
   name = var.name
-  config_bucket_arn = var.config_bucket_arn
-  redis_url = var.redis_url
+  config_bucket_arn = module.base.ConfigBucketArn
+  redis_url = module.base.RedisUrl
   log_bucket_arn = var.log_bucket_arn
-  ecr_litellm_repository_url = var.ecr_litellm_repository_url
-  ecr_middleware_repository_url = var.ecr_middleware_repository_url
+  ecr_litellm_repository_url = module.base.LiteLLMRepositoryUrl
+  ecr_middleware_repository_url = module.base.MiddlewareRepositoryUrl
   litellm_version = var.litellm_version
-  config_bucket_name = var.config_bucket_name
-  database_url = var.database_url
-  database_middleware_url = var.database_middleware_url
-  litellm_master_key = var.litellm_master_key
-  litellm_salt_key = var.litellm_salt_key
+  config_bucket_name = module.base.ConfigBucketName
   openai_api_key = var.openai_api_key
   azure_openai_api_key = var.azure_openai_api_key
   azure_api_key = var.azure_api_key
@@ -39,45 +48,71 @@ module "ecs_cluster" {
   okta_audience = var.okta_audience
   okta_issuer = var.okta_issuer
   certificate_arn = var.certificate_arn
-  wafv2_acl_arn = var.wafv2_acl_arn
+  wafv2_acl_arn = module.base.WafAclArn
   domain_name = var.domain_name
   hosted_zone_name = var.hosted_zone_name
-  vpc_id = var.vpc_id
-  db_security_group_id = var.db_security_group_id
-  redis_security_group_id = var.redis_security_group_id
+  vpc_id = module.base.VpcId
+  db_security_group_id = module.base.DbSecurityGroupId
+  redis_security_group_id = module.base.RedisSecurityGroupId
   architecture = var.architecture
   disable_outbound_network_access = var.disable_outbound_network_access
   desired_capacity = var.desired_capacity
   min_capacity = var.min_capacity
   max_capacity = var.max_capacity
   public_load_balancer = var.public_load_balancer
-  master_and_salt_key_secret_arn = var.master_and_salt_key_secret_arn
-  main_db_secret_arn = var.main_db_secret_arn
-  middleware_db_secret_arn = var.middleware_db_secret_arn
+  master_and_salt_key_secret_arn = module.base.LitellmMasterAndSaltKeySecretArn
+  main_db_secret_arn = module.base.DatabaseUrlSecretArn
+  middleware_db_secret_arn = module.base.DatabaseMiddlewareUrlSecretArn
   vcpus = var.vcpus
   cpu_target_utilization_percent = var.cpu_target_utilization_percent
   memory_target_utilization_percent = var.memory_target_utilization_percent
-  private_subnets = var.private_subnets
-  public_subnets = var.public_subnets
+  private_subnets = module.base.private_subnet_ids
+  public_subnets = module.base.public_subnet_ids
+
+  depends_on = [ module.base ]
+}
+
+data "aws_subnets" "private" {
+  filter {
+    name   = "vpc-id"
+    values = [module.base.VpcId]
+  }
+  filter {
+    name   = "map-public-ip-on-launch"
+    values = ["false"]
+  }
+}
+
+data "aws_subnets" "public" {
+  filter {
+    name   = "vpc-id"
+    values = [module.base.VpcId]
+  }
+  filter {
+    name   = "map-public-ip-on-launch"
+    values = ["true"]
+  }
 }
 
 module "eks_cluster" {
   source = "./modules/eks"
   count  = local.platform == "EKS" ? 1 : 0
   name = var.name
-  config_bucket_arn = var.config_bucket_arn
+  private_subnet_ids = data.aws_subnets.private.ids
+  public_subnet_ids  = data.aws_subnets.public.ids
+  config_bucket_arn = module.base.ConfigBucketArn
   existing_cluster_name = var.existing_cluster_name
   cluster_version = var.cluster_version
-  redis_url = var.redis_url
+  redis_url = module.base.RedisUrl
   log_bucket_arn = var.log_bucket_arn
-  ecr_litellm_repository_url = var.ecr_litellm_repository_url
-  ecr_middleware_repository_url = var.ecr_middleware_repository_url
+  ecr_litellm_repository_url = module.base.LiteLLMRepositoryUrl
+  ecr_middleware_repository_url = module.base.MiddlewareRepositoryUrl
   litellm_version = var.litellm_version
-  config_bucket_name = var.config_bucket_name
-  database_url = var.database_url
-  database_middleware_url = var.database_middleware_url
-  litellm_master_key = var.litellm_master_key
-  litellm_salt_key = var.litellm_salt_key
+  config_bucket_name = module.base.ConfigBucketName
+  database_url = module.base.database_url
+  database_middleware_url = module.base.database_middleware_url
+  litellm_master_key = module.base.litellm_master_key
+  litellm_salt_key = module.base.litellm_salt_key
   openai_api_key = var.openai_api_key
   azure_openai_api_key = var.azure_openai_api_key
   azure_api_key = var.azure_api_key
@@ -104,16 +139,16 @@ module "eks_cluster" {
   okta_audience = var.okta_audience
   okta_issuer = var.okta_issuer
   certificate_arn = var.certificate_arn
-  wafv2_acl_arn = var.wafv2_acl_arn
+  wafv2_acl_arn = module.base.WafAclArn
   domain_name = var.domain_name
   hosted_zone_name = var.hosted_zone_name
   create_cluster = var.create_cluster
-  vpc_id = var.vpc_id
-  db_security_group_id = var.db_security_group_id
-  redis_security_group_id = var.redis_security_group_id
+  vpc_id = module.base.VpcId
+  db_security_group_id = module.base.DbSecurityGroupId
+  redis_security_group_id = module.base.RedisSecurityGroupId
   architecture = var.architecture
   disable_outbound_network_access = var.disable_outbound_network_access
-  eks_alb_controller_private_ecr_repository_name = var.eks_alb_controller_private_ecr_repository_name
+  eks_alb_controller_private_ecr_repository_name = module.base.EksAlbControllerPrivateEcrRepositoryName
   install_add_ons_in_existing_eks_cluster = var.install_add_ons_in_existing_eks_cluster
   desired_capacity = var.desired_capacity
   min_capacity = var.min_capacity
@@ -123,4 +158,6 @@ module "eks_cluster" {
   arm_ami_type = var.arm_ami_type
   x86_ami_type = var.x86_ami_type
   public_load_balancer = var.public_load_balancer
+
+  depends_on = [ module.base ]
 }

@@ -29,39 +29,69 @@ data "aws_subnets" "public" {
   }
 }
 
-# Tag public subnets for internet-facing ALB
 resource "aws_ec2_tag" "public_subnet_elb" {
-  # Use for_each to tag all public subnets
-  for_each    = var.public_load_balancer ? toset(data.aws_subnets.public.ids) : toset([])
+  for_each    = var.public_load_balancer ? toset(var.public_subnet_ids) : toset([])
   resource_id = each.value
   key         = "kubernetes.io/role/elb"
   value       = "1"
 }
 
-# Tag private subnets for internal ALB (optional but recommended)
 resource "aws_ec2_tag" "private_subnet_internal_elb" {
-  # Use for_each to tag all private subnets
-  for_each    = toset(data.aws_subnets.private.ids)
+  for_each    = toset(var.private_subnet_ids)
   resource_id = each.value
   key         = "kubernetes.io/role/internal-elb"
   value       = "1"
 }
 
 resource "aws_ec2_tag" "private_subnets_cluster" {
-  for_each    = toset(data.aws_subnets.private.ids)
+  for_each    = toset(var.private_subnet_ids)
   resource_id = each.value
-
-  key   = "kubernetes.io/cluster/${local.cluster_name}"
-  value = "shared"  # or "owned"
+  key         = "kubernetes.io/cluster/${local.cluster_name}"
+  value       = "shared"
 }
 
 resource "aws_ec2_tag" "public_subnets_cluster" {
-  for_each    = toset(data.aws_subnets.public.ids)
+  for_each    = toset(var.public_subnet_ids)
   resource_id = each.value
-
-  key   = "kubernetes.io/cluster/${local.cluster_name}"
-  value = "shared"  # or "owned"
+  key         = "kubernetes.io/cluster/${local.cluster_name}"
+  value       = "shared"
 }
+
+
+
+# # Tag public subnets for internet-facing ALB
+# resource "aws_ec2_tag" "public_subnet_elb" {
+#   # Use for_each to tag all public subnets
+#   for_each    = var.public_load_balancer ? toset(data.aws_subnets.public.ids) : toset([])
+#   resource_id = each.value
+#   key         = "kubernetes.io/role/elb"
+#   value       = "1"
+# }
+
+# # Tag private subnets for internal ALB (optional but recommended)
+# resource "aws_ec2_tag" "private_subnet_internal_elb" {
+#   # Use for_each to tag all private subnets
+#   for_each    = toset(data.aws_subnets.private.ids)
+#   resource_id = each.value
+#   key         = "kubernetes.io/role/internal-elb"
+#   value       = "1"
+# }
+
+# resource "aws_ec2_tag" "private_subnets_cluster" {
+#   for_each    = toset(data.aws_subnets.private.ids)
+#   resource_id = each.value
+
+#   key   = "kubernetes.io/cluster/${local.cluster_name}"
+#   value = "shared"  # or "owned"
+# }
+
+# resource "aws_ec2_tag" "public_subnets_cluster" {
+#   for_each    = toset(data.aws_subnets.public.ids)
+#   resource_id = each.value
+
+#   key   = "kubernetes.io/cluster/${local.cluster_name}"
+#   value = "shared"  # or "owned"
+# }
 
 
 # First, import the existing security groups

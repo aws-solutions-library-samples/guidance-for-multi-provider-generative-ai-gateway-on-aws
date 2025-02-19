@@ -40,28 +40,6 @@ variable "redis_url" {
   type        = string
 }
 
-variable "database_url" {
-  description = "Database connection URL"
-  type        = string
-}
-
-variable "database_middleware_url" {
-  description = "Middleware database connection URL"
-  type        = string
-}
-
-variable "litellm_master_key" {
-  description = "LiteLLM master key"
-  type        = string
-  sensitive   = true
-}
-
-variable "litellm_salt_key" {
-  description = "LiteLLM salt key"
-  type        = string
-  sensitive   = true
-}
-
 variable "openai_api_key" {
   description = "OpenAI API key"
   type        = string

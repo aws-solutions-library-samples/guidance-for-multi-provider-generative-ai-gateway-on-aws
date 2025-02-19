@@ -3,6 +3,16 @@ variable "name" {
   type        = string
 }
 
+variable "private_subnet_ids" {
+  description = "List of private subnet IDs"
+  type        = list(string)
+}
+
+variable "public_subnet_ids" {
+  description = "List of public subnet IDs"
+  type        = list(string)
+}
+
 variable "existing_cluster_name" {
   description = "Name of the existing EKS Cluster."
   type        = string
