@@ -281,6 +281,10 @@ EOF
 echo "Generated backend.hcl configuration"
 
 terraform init -backend-config=backend.hcl
+if [ -z "$EXISTING_VPC_ID" ] && [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
+    echo "Deploying base of terraform first for case of new vpc and eks"
+    terraform apply -target=module.base -auto-approve
+fi
 terraform apply -auto-approve
 
 if [ $? -eq 0 ]; then
