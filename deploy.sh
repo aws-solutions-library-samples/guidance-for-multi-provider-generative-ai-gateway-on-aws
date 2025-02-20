@@ -139,13 +139,13 @@ echo $ARCH
 
 if [ "$SKIP_BUILD" = false ]; then
     echo "Building and pushing docker image..."
-    #./docker-build-and-deploy.sh $APP_NAME $BUILD_FROM_SOURCE $ARCH
+    ./docker-build-and-deploy.sh $APP_NAME $BUILD_FROM_SOURCE $ARCH
 else
     echo "Skipping docker build and deploy step..."
 fi
 
 cd middleware
-#./docker-build-and-deploy.sh $MIDDLEWARE_APP_NAME $ARCH
+./docker-build-and-deploy.sh $MIDDLEWARE_APP_NAME $ARCH
 cd ..
 
 echo "Deploying the log bucket terraform stack..."
