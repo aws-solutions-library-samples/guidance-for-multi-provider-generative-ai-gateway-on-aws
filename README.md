@@ -103,7 +103,7 @@ If it's easier for you, you can deploy from an AWS Cloud9 environment using the 
 5. In `.env`, set the `HOSTED_ZONE_NAME` to the hosted zone you created in the `Creating your certificate` section of this README.
 6. In `.env`, Fill out any API Keys you need for any third party providers. If you only want to use Amazon Bedrock, you can just leave the `.env` file as-is
 7. By default, this solution is deployed with redis caching enabled, and with most popular model providers enabled. If you want to remove support for certain models, or add more models, you can create and edit your own `config/config.yaml` file. If not, the deployment will automatically use the `config/default-config.yaml`. Make sure you [enable model access](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access-modify.html) on Amazon Bedrock.
-8. Make sure you have valid AWS credentials configured in your environment before running the next step
+8. Make sure you have valid AWS credentials configured in your environment before running the next step. The credentials must last at least an hour to ensure the deployment can complete successfully
 9. Run `./deploy.sh`
 10. After the deployment is done, you can visit the UI by going to the url at the stack output `ServiceURL`, which is the `DOMAIN_NAME` you configured earlier.
 11. The master api key is stored in AWS Secrets Manager in the `LiteLLMMasterSalt` secret. This api key can be used to call the LiteLLM API, and is also the default password for the LiteLLM UI.
