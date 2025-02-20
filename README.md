@@ -134,6 +134,8 @@ If it's easier for you, you can deploy from an AWS Cloud9 environment using the 
 
 #### Deployment Steps
 
+*Note:* This will deploy to your "current region", defined as the region your aws cli is currently pointed to. You can check this by running `aws ec2 describe-availability-zones --output text --query 'AvailabilityZones[0].[RegionName]'`
+
 1. Run `cp .env.template .env`
 2. In `.env`, set the `TERRAFORM_S3_BUCKET_NAME` to a globally unique bucket name. This will store your `.tfstate` files for your terraform deployment.
 3. In `.env`, set the `CERTIFICATE_ARN` to the ARN of the certificate you created in the `Creating your certificate` section of this README.
