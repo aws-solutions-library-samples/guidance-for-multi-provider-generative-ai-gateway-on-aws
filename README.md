@@ -378,9 +378,12 @@ If you set `default_on` to `true`, the guardrail will be enforced at all times. 
 In the case that `default_on` is `false`, in order to make use of the Guardrail, you must specifiy it's name in the client call. Example:
 
 ```
-curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
+export GATEWAY_URL=<Your-Proxy-Endpoint>
+export GATEWAY_API_KEY=<Your-Master-Key-Or-Admin-Key>
+
+curl -X POST "$GATEWAY_URL/v1/chat/completions" \
 -H "Content-Type: application/json" \
--H "Authorization: Bearer <Your-Master-Key-Or-Admin-Key>" \
+-H "Authorization: Bearer $GATEWAY_API_KEY" \
 -d '{
     "model": "anthropic.claude-3-5-sonnet-20240620-v1:0",
     "messages": [
@@ -409,9 +412,9 @@ If you don't specify a budget, the values in `litellm_settings.max_internal_user
 
 ##### Create User with default budget defined in your config.yaml:
 ```
-curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
+curl -X POST "$GATEWAY_URL/user/new" \
 -H "Content-Type: application/json" \
--H "Authorization: Bearer <Your-Master-Key-Or-Admin-Key>" \
+-H "Authorization: Bearer $GATEWAY_API_KEY" \
 -d '{
      "user_email": "new_user@example.com",
      "user_role": "internal_user"
@@ -421,9 +424,9 @@ curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
 ##### Create User with budget that overrides default (in this example we give a budget of 1000 dollars of spend a month)
 
 ```
-curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
+curl -X POST "$GATEWAY_URL/user/new" \
 -H "Content-Type: application/json" \
--H "Authorization: Bearer <Your-Master-Key-Or-Admin-Key>" \
+-H "Authorization: Bearer $GATEWAY_API_KEY" \
 -d '{
      "user_email": "new_user@example.com",
      "user_role": "internal_user"
@@ -436,9 +439,9 @@ curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
 Note: There is currently a bug where `max_parallel_requests` is not returned in the create user response. However, it is still taking effect, and you can confirm that by doing a GET on the user
 
 ```
-curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
+curl -X POST "$GATEWAY_URL/user/new" \
 -H "Content-Type: application/json" \
--H "Authorization: Bearer <Your-Master-Key-Or-Admin-Key>" \
+-H "Authorization: Bearer $GATEWAY_API_KEY" \
 -d '{
      "user_email": "new_user@example.com",
      "user_role": "internal_user"
@@ -450,9 +453,9 @@ curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
 
 ##### Create a user that can only access Bedrock Claude 3.5 sonnet and Claude 3 Haiku
 ```
-curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
+curl -X POST "$GATEWAY_URL/user/new" \
 -H "Content-Type: application/json" \
--H "Authorization: Bearer <Your-Master-Key-Or-Admin-Key>" \
+-H "Authorization: Bearer $GATEWAY_API_KEY" \
 -d '{
      "user_email": "new_user@example.com",
      "user_role": "internal_user"
@@ -470,9 +473,9 @@ for Claude 3 haiku: 20000 tokens per minute, and 10 requests per minute
 Note: There is currently a bug where `model_rpm_limit` and `model_tpm_limit` are not returned in the create user response. However, they are still taking effect, and you can confirm that by doing a GET on the user
 
 ```
-curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
+curl -X POST "$GATEWAY_URL/user/new" \
 -H "Content-Type: application/json" \
--H "Authorization: Bearer <Your-Master-Key-Or-Admin-Key>" \
+-H "Authorization: Bearer $GATEWAY_API_KEY" \
 -d '{
      "user_email": "new_user@example.com",
      "user_role": "internal_user"
@@ -496,9 +499,9 @@ curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
 To set the priority of a request on the client side, you can do the following:
 
 ```
-curl -X POST 'https://<Your-Proxy-Endpoint>/v1/chat/completions' \
+curl -X POST '$GATEWAY_URL/v1/chat/completions' \
 -H 'Content-Type: application/json' \
--H 'Authorization: Bearer <Your-Master-Key-Or-Admin-Key>' \
+-H 'Authorization: Bearer $GATEWAY_API_KEY' \
 -D '{
     "model": "gpt-3.5-turbo-fake-model",
     "messages": [
@@ -785,9 +788,11 @@ Once you have configured your Okta settings, you can create a user like this:
 
 Request
 ```
-curl -X POST "https://<Your-Proxy-Endpoint>/user/new" \
+export OKTA_JWT=<Your-Okta-Oauth-2.0-JWT> 
+
+curl -X POST "$GATEWAY_URL/user/new" \
 -H "Content-Type: application/json" \
--H "Authorization: Bearer <Okta Oauth 2.0 JWT>" \
+-H "Authorization: Bearer $OKTA_JWT" \
 -d '{
  }'
  ```
@@ -802,9 +807,11 @@ With the returned API key, you use LiteLLM as you normally would.
 You can also create additional api keys tied to your user:
 
 ```
-curl -X POST "https://<Your-Proxy-Endpoint>/key/generate" \
+export GATEWAY_API_KEY=<New_Api_Key_Tied_To_Okta_User>
+
+curl -X POST "$GATEWAY_URL/key/generate" \
 -H "Content-Type: application/json" \
--H "Authorization: Bearer <New_Api_Key_Tied_To_Okta_User>" \
+-H "Authorization: Bearer $GATEWAY_API_KEY" \
 -d '{"user_id": "testuser@mycompany.com" }'
 ```
 
