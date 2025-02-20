@@ -57,16 +57,23 @@ resource "aws_route_table" "public" {
   }
 }
 
-resource "aws_route_table" "private" {
-  count = (length(trimspace(var.vpc_id)) == 0) ? 1 : 0
+resource "aws_route_table" "private_with_nat" {
+  count  = (length(trimspace(var.vpc_id)) == 0) && (local.nat_gateway_count == 1) ? 1 : 0
   vpc_id = aws_vpc.new[0].id
-  # If nat_gateway_count = 1, route to NAT. If 0, no routes => isolated.
+
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = local.nat_gateway_count == 1 ? aws_nat_gateway.this[0].id : null
+    nat_gateway_id = aws_nat_gateway.this[0].id
   }
-  # If nat_gateway_count = 0, no route block is effectively created => Isolated subnets
-  # (One can conditionally omit the route block with a dynamic block.)
+  lifecycle {
+    ignore_changes = [route]
+  }
+}
+
+# Route table for isolated private subnets (no routes)
+resource "aws_route_table" "private_isolated" {
+  count  = (length(trimspace(var.vpc_id)) == 0) && (local.nat_gateway_count == 0) ? 1 : 0
+  vpc_id = aws_vpc.new[0].id
   lifecycle {
     ignore_changes = [route]
   }
@@ -82,7 +89,7 @@ resource "aws_route_table_association" "public" {
 resource "aws_route_table_association" "private" {
   count = (length(trimspace(var.vpc_id)) == 0) ? length(aws_subnet.private) : 0
   subnet_id      = aws_subnet.private[count.index].id
-  route_table_id = aws_route_table.private[0].id
+  route_table_id = local.nat_gateway_count == 1 ? aws_route_table.private_with_nat[0].id : aws_route_table.private_isolated[0].id
 }
 
 # Data source for availability_zones

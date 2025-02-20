@@ -125,7 +125,8 @@ data "aws_route_tables" "existing_vpc_all" {
 locals {
   # If we’re using an existing VPC, fetch ALL route table IDs.
   # Otherwise, just pick the new route tables from our resources.
-  s3_gateway_route_table_ids = length(var.vpc_id) > 0 ? data.aws_route_tables.existing_vpc_all[0].ids : [aws_route_table.public[0].id, aws_route_table.private[0].id]
+  private_route_table = local.nat_gateway_count == 1 ? aws_route_table.private_with_nat[0] : aws_route_table.private_isolated[0]
+  s3_gateway_route_table_ids = length(var.vpc_id) > 0 ? data.aws_route_tables.existing_vpc_all[0].ids : [aws_route_table.public[0].id, local.private_route_table.id]
 }
 
 data "aws_vpc_endpoint_service" "bedrock_agent" {
