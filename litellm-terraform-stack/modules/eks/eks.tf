@@ -311,16 +311,22 @@ resource "aws_eks_access_entry" "operators" {
 }
 
 locals {
+  # Split the ARN into components
+  arn_parts = split(":", data.aws_caller_identity.current.arn)
+  
+  # Determine if this is a user or assumed role
+  is_assumed_role = length(regexall("assumed-role", local.arn_parts[5])) > 0
+  
   role_name = split("/", data.aws_caller_identity.current.arn)[1]
-  role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.role_name}"
+  # Construct the appropriate ARN
+  principal_arn = local.is_assumed_role ? "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.role_name}" : data.aws_caller_identity.current.arn
 }
 
 
 resource "aws_eks_access_entry" "admin" {
   count = var.create_cluster ? 1 : 0
   cluster_name      = local.cluster_name
-  principal_arn = local.role_arn
-  //principal_arn     = "arn:aws:iam::235614385815:role/Admin"
+  principal_arn = local.principal_arn
   type              = "STANDARD"
   user_name         = "admin-user"
 }
