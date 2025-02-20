@@ -67,7 +67,7 @@ kubectl Client Version: v1.32.1
 kubectl Kustomize Version: v5.5.0
 ```
 
-### Deploying from AWS Cloud9 (Optional) (Not tested with EKS)
+### Deploying from AWS Cloud9 (Optional)
 
 If it's easier for you, you can deploy from an AWS Cloud9 environment using the following steps:
 
@@ -78,7 +78,7 @@ If it's easier for you, you can deploy from an AWS Cloud9 environment using the 
 5. Once, the environment is deployed, click `Open` under `Cloud9 IDE`
 6. In the terminal, run the following commands:
 7. `git clone https://github.com/aws-samples/genai-gateway.git`
-8. run `sudo ./install-cloud9-prerequisites.sh` (This will install `jq` for you and update you to the latest version of `cdk`. All other dependencies are pre-installed on Cloud9)
+8. run `sudo ./install-cloud9-prerequisites.sh` (This will install `jq`, `terraform`, and `kubectl` for you. All other dependencies are pre-installed on Cloud9)
 9. Run the `Deployment Steps` described below
 
 ### Creating your certificate
