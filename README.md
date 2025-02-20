@@ -4,7 +4,7 @@ Project ACTIVE as of Feb 15, 2025
 
 ## Project Overview
 
-This project provides a simple Terraform deployment of LiteLLM into ECS on AWS. It aims to be pre-configured with defaults that will allow most users to quickly get started with LiteLLM.
+This project provides a simple Terraform deployment of LiteLLM into ECS or EKS on AWS. It aims to be pre-configured with defaults that will allow most users to quickly get started with LiteLLM.
 
 It also provides additional features on top of LiteLLM such as an AWS Bedrock Interface (instead of the default OpenAI interface), support for AWS Bedrock Managed Prompts, Chat History, and support for Okta Oauth 2.0 JWT Token Auth.
 
