@@ -2,6 +2,40 @@
 
 Project ACTIVE as of Feb 15, 2025
 
+## Table of contents
+
+- [Project Overview](#project-overview)
+- [Architecture](#architecture)
+- [How to deploy](#how-to-deploy)
+  - [Prerequisites](#prerequisites)
+  - [Installing kubectl](#installing-kubectl)
+  - [Installing yq](#installing-yq)
+  - [Environment tested and confirmed](#environment-tested-and-confirmed)
+  - [Deploying from AWS Cloud9 (Optional)](#deploying-from-aws-cloud9-optional)
+  - [Creating your certificate](#creating-your-certificate)
+    - [Domain and Certifcate, AWS Internal](#domain-and-certifcate-aws-internal)
+    - [Domain and Certificate, AWS Customer](#domain-and-certificate-aws-customer)
+  - [Deployment Steps](#deployment-steps)
+  - [Optional Deployment Configurations](#optional-deployment-configurations)
+  - [Usage Instructions](#usage-instructions)
+    - [Compare Models](#compare-models)
+    - [Config.yaml (all values pre-populated in Config.yaml, what they do, and what the default values are.)](#configyaml-all-values-pre-populated-in-configyaml-what-they-do-and-what-the-default-values-are)
+      - [Routing](#routing)
+        - [A/B testing and Load Balancing](#ab-testing-and-load-balancing)
+        - [Routing Strategies](#routing-strategies)
+        - [Fallbacks](#fallbacks)
+      - [Guardrails](#guardrails)
+    - [Common Operations](#common-operations)
+      - [Create new user](#create-new-user)
+        - [Create User Return value](#create-user-return-value)
+        - [Set Priority of request (currently broken)](#set-priority-of-request-currently-broken)
+    - [Bedrock interface](#bedrock-interface)
+    - [Bedrock Managed Prompts](#bedrock-managed-prompts)
+    - [Chat History](#chat-history)
+    - [Okta Oauth 2.0 JWT Token Auth Support](#okta-oauth-20-jwt-token-auth-support)
+    - [Langsmith support](#langsmith-support)
+- [Open Source Library](#open-source-library)
+
 ## Project Overview
 
 This project provides a simple Terraform deployment of LiteLLM into ECS or EKS on AWS. It aims to be pre-configured with defaults that will allow most users to quickly get started with LiteLLM.
