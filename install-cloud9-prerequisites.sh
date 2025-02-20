@@ -34,17 +34,3 @@ else
         exit 1
     fi
 fi
-
-# Update CDK to latest version
-echo "Updating AWS CDK to latest version..."
-if command_exists npm; then
-    # Update globally installed CDK
-    npm update -g aws-cdk
-
-    # Verify the update
-    echo "CDK updated to version:"
-    cdk --version
-else
-    echo "npm is not installed. Cannot update CDK."
-    exit 1
-fi
