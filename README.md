@@ -158,7 +158,7 @@ If it's easier for you, you can deploy from an AWS Cloud9 environment using the 
 * 2 Public Subnets (Auto assigned public ips enabled, route table pointing to Internet Gateway)
 * 2 Private Subnets (Route table pointed to NAT Gateway)
 
-* If you'd like to use EKS instead of ECS, switch `DEPLOYMENT_PLATFORM="ECS"` to `DEPLOYMENT_PLATFORM="EKS"`
+* If you'd like to use EKS instead of ECS, switch `DEPLOYMENT_PLATFORM="ECS"` to `DEPLOYMENT_PLATFORM="EKS"` (Note: Because of limitations with Terraform providers and dependencies, you cannot swtich from EKS to ECS in an active deployment. You must do a `undeploy.sh` first. However, switching from ECS to EKS works fine. Open to Pull Requests or suggestions if anyone can figure out a good way to fix this)
 
 * If you'd like to bring your own EKS cluster, set `EXISTING_EKS_CLUSTER_NAME` to your EKS Cluster name. You must also set `EXISTING_VPC_ID`, and the VPC must be the vpc your EKS Cluster exists in. This has been tested with an new EKS cluster created with EKS Auto Mode disabled, and EKS API Auth enabled (see below image). It also has the following add-ons pre-installed:
   * Amazon EKS Pod Identity Agent

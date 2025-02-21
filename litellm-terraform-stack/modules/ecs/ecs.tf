@@ -154,7 +154,13 @@ resource "aws_ecs_task_definition" "litellm" {
         "containerPort": 4000,
         "protocol": "tcp"
       }
-    ]
+    ],
+    "healthCheck": {
+      "command": [
+        "CMD-SHELL",
+        "exit 0"
+      ]
+    }
   },
   {
     "name": "MiddlewareContainer",
@@ -187,7 +193,13 @@ resource "aws_ecs_task_definition" "litellm" {
         "containerPort": 3000,
         "protocol": "tcp"
       }
-    ]
+    ],
+    "healthCheck": {
+      "command": [
+        "CMD-SHELL",
+        "exit 0"
+      ]
+    }
   }
 ]
 DEFINITION

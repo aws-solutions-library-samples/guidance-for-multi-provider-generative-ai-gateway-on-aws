@@ -39,3 +39,4 @@ sessionmanager-bundle.zip
 sessionmanager-bundle
 backend.hcl
 resources.txt
+errored.tfstate
