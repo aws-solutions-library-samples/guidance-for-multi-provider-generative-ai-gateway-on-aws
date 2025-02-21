@@ -11,16 +11,6 @@ output "RdsLitellmSecretArn" {
   value       = aws_secretsmanager_secret.db_secret_main.arn
 }
 
-output "RdsMiddlewareHostname" {
-  description = "The hostname of the Middleware RDS instance"
-  value       = aws_db_instance.database_middleware.endpoint
-}
-
-output "RdsMiddlewareSecretArn" {
-  description = "The ARN of the Middleware RDS secret"
-  value       = aws_secretsmanager_secret.db_secret_middleware.arn
-}
-
 output "RedisHostName" {
   description = "The hostname of the Redis cluster"
   value       = aws_elasticache_replication_group.redis.primary_endpoint_address
@@ -104,11 +94,6 @@ output "DatabaseUrlSecretArn" {
   value       = aws_secretsmanager_secret.db_url_secret.arn
 }
 
-output "DatabaseMiddlewareUrlSecretArn" {
-  description = "The endpoint of the middleware database"
-  value       = aws_secretsmanager_secret.db_middleware_url_secret.arn
-}
-
 output "RedisUrl" {
   description = "The Redis connection URL"
   value       = "redis://${aws_elasticache_replication_group.redis.primary_endpoint_address}:6379"
@@ -126,10 +111,6 @@ output "DbSecurityGroupId" {
 
 output "database_url" {
   value = "postgresql://llmproxy:${local.litellm_db_password}@${aws_db_instance.database.endpoint}/litellm"
-}
-
-output "database_middleware_url" {
-  value = "postgresql://middleware:${local.middleware_db_password}@${aws_db_instance.database_middleware.endpoint}/middleware"
 }
 
 output "litellm_master_key" {

@@ -58,7 +58,7 @@ data "aws_iam_policy_document" "execution_role_policy_doc" {
 
   statement {
     actions   = ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"]
-    resources = [var.master_and_salt_key_secret_arn, var.main_db_secret_arn, var.middleware_db_secret_arn, aws_secretsmanager_secret.litellm_other_secrets.arn]
+    resources = [var.master_and_salt_key_secret_arn, var.main_db_secret_arn, aws_secretsmanager_secret.litellm_other_secrets.arn]
   }
 }
 

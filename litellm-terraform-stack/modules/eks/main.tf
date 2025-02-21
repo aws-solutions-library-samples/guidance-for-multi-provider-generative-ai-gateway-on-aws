@@ -81,7 +81,7 @@ resource "kubernetes_secret" "middleware_secrets" {
   }
 
   data = {
-    DATABASE_MIDDLEWARE_URL = var.database_middleware_url
+    DATABASE_MIDDLEWARE_URL = var.database_url
     MASTER_KEY             = var.litellm_master_key
   }
 

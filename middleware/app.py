@@ -30,16 +30,7 @@ import aiohttp
 from contextlib import asynccontextmanager
 from anyio import to_thread
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    to_thread.current_default_thread_limiter().total_tokens = 1000
-    yield
-
-
-config = {"lifespan": lifespan}
-
-app = FastAPI(**config)
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -78,72 +69,102 @@ else:
 
 
 def setup_database():
+    to_thread.current_default_thread_limiter().total_tokens = 1000
+    print("Thread limiter configured")
+    print(f"setting up database")
     try:
         database_url = os.environ.get("DATABASE_MIDDLEWARE_URL")
         if not database_url:
+            print(f"DATABASE_MIDDLEWARE_URL environment variable not set")
             raise ValueError("DATABASE_MIDDLEWARE_URL environment variable not set")
 
-        engine = create_engine(database_url)
+        # Parse the URL to get base connection to postgres database
+        url_parts = database_url.rsplit("/", 1)
+        base_url = f"{url_parts[0]}/postgres"
+        temp_engine = create_engine(base_url)
+
+        # Check if middleware database exists
+        with temp_engine.connect() as conn:
+            conn.execute(text("COMMIT"))  # Close any open transaction
+            result = conn.execute(
+                text("SELECT 1 FROM pg_database WHERE datname = 'middleware'")
+            )
+            if not result.scalar():
+                # Database doesn't exist, create it
+                conn.execute(text("COMMIT"))  # Ensure we're not in a transaction
+                conn.execute(text("CREATE DATABASE middleware"))
+                print("Created middleware database")
+
+        # Now connect to the middleware database using modified URL
+        engine = create_engine(f"{url_parts[0]}/middleware")
         metadata_obj = MetaData()
 
-        inspector = inspect(engine)
-        if "chat_sessions" not in inspector.get_table_names():
-            chat_sessions_table = Table(
-                "chat_sessions",
-                metadata_obj,
-                Column("session_id", String, primary_key=True),
-                Column("chat_history", Text),
-                Column("api_key_hash", String),  # new column to store hashed API key
-            )
-            metadata_obj.create_all(engine)
-            print("Created chat_sessions table")
-        else:
-            # If the table exists, ensure it has the api_key_hash column
-            chat_sessions_table = Table(
-                "chat_sessions", metadata_obj, autoload_with=engine
-            )
-            columns = [c.name for c in chat_sessions_table.columns]
-            if "api_key_hash" not in columns:
-                with engine.connect() as conn:
+        # Rest of your existing code remains the same
+        with engine.begin() as conn:
+            inspector = inspect(engine)
+            if "chat_sessions" not in inspector.get_table_names():
+                chat_sessions_table = Table(
+                    "chat_sessions",
+                    metadata_obj,
+                    Column("session_id", String, primary_key=True),
+                    Column("chat_history", Text),
+                    Column("api_key_hash", String),
+                )
+                metadata_obj.create_all(engine)
+                print("Created chat_sessions table")
+            else:
+                chat_sessions_table = Table(
+                    "chat_sessions", metadata_obj, autoload_with=engine
+                )
+                columns = [c.name for c in chat_sessions_table.columns]
+                if "api_key_hash" not in columns:
                     conn.execute(
                         text(
                             "ALTER TABLE chat_sessions ADD COLUMN api_key_hash VARCHAR;"
                         )
                     )
-                    conn.commit()
-                # Reload table definition
-                chat_sessions_table = Table(
-                    "chat_sessions", metadata_obj, autoload_with=engine
-                )
-            else:
-                print("chat_sessions table already exists with api_key_hash column")
+                else:
+                    print("chat_sessions table already exists with api_key_hash column")
 
-        # Check if the index already exists
-        indexes = inspector.get_indexes("chat_sessions")
-        index_names = [idx["name"] for idx in indexes]
+            # Check and create index within the same transaction
+            indexes = inspector.get_indexes("chat_sessions")
+            index_names = [idx["name"] for idx in indexes]
 
-        if "idx_chat_sessions_api_key_hash" not in index_names:
-            print(
-                "Creating index idx_chat_sessions_api_key_hash on api_key_hash column."
-            )
-            with engine.connect() as conn:
+            if "idx_chat_sessions_api_key_hash" not in index_names:
+                print("Creating index idx_chat_sessions_api_key_hash")
                 conn.execute(
                     text(
                         "CREATE INDEX idx_chat_sessions_api_key_hash ON chat_sessions (api_key_hash)"
                     )
                 )
-                conn.commit()
-        else:
-            print("Index idx_chat_sessions_api_key_hash already exists.")
+                print("Index created successfully")
+
+        # Verify table exists after transaction commits
+        with engine.connect() as conn:
+            result = conn.execute(
+                text(
+                    "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'chat_sessions')"
+                )
+            )
+            if not result.scalar():
+                raise Exception(
+                    "Table creation failed - table does not exist after create_all()"
+                )
+            print("Table verification successful")
 
         return engine, chat_sessions_table
+
     except SQLAlchemyError as e:
+        print(f"Database setup error: {str(e)}")
+        raise
+    except Exception as e:
         print(f"Database setup error: {str(e)}")
         raise
 
 
 @app.on_event("startup")
 async def startup_event():
+    print(f"doing startup_event")
     global db_engine, chat_sessions
     db_engine, chat_sessions = setup_database()
 

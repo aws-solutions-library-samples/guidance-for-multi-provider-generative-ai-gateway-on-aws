@@ -181,7 +181,7 @@ resource "aws_ecs_task_definition" "litellm" {
     "secrets": [
       {
         "name": "DATABASE_MIDDLEWARE_URL",
-        "valueFrom": "${var.middleware_db_secret_arn}"
+        "valueFrom": "${var.main_db_secret_arn}"
       },
       {
         "name": "MASTER_KEY",

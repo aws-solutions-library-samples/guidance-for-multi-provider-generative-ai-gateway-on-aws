@@ -42,3 +42,23 @@ variable "hostedZoneName" {
   type        = string
   description = "Hosted Zone Name (e.g., 'example.com')"
 }
+
+variable "rds_instance_class" {
+  type        = string
+  description = "The instance class for the RDS database"
+}
+
+variable "rds_allocated_storage" {
+  type        = number
+  description = "The allocated storage in GB for the RDS database"
+}
+
+variable "redis_node_type" {
+  type        = string
+  description = "The node type for Redis clusters"
+}
+
+variable "redis_num_cache_clusters" {
+  type        = number
+  description = "The number of cache clusters for Redis"
+}

@@ -65,11 +65,6 @@ variable "database_url" {
   type        = string
 }
 
-variable "database_middleware_url" {
-  description = "Middleware database connection URL"
-  type        = string
-}
-
 variable "litellm_master_key" {
   description = "LiteLLM master key"
   type        = string

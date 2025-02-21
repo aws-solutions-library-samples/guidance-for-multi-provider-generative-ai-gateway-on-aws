@@ -9,6 +9,10 @@ module "base" {
   ecrMiddlewareRepository = var.ecrMiddlewareRepository
   hostedZoneName = var.hosted_zone_name
   publicLoadBalancer = var.public_load_balancer
+  rds_instance_class = var.rds_instance_class
+  rds_allocated_storage = var.rds_allocated_storage
+  redis_node_type = var.redis_node_type
+  redis_num_cache_clusters = var.redis_num_cache_clusters
 }
 
 module "ecs_cluster" {
@@ -62,7 +66,6 @@ module "ecs_cluster" {
   public_load_balancer = var.public_load_balancer
   master_and_salt_key_secret_arn = module.base.LitellmMasterAndSaltKeySecretArn
   main_db_secret_arn = module.base.DatabaseUrlSecretArn
-  middleware_db_secret_arn = module.base.DatabaseMiddlewareUrlSecretArn
   vcpus = var.vcpus
   cpu_target_utilization_percent = var.cpu_target_utilization_percent
   memory_target_utilization_percent = var.memory_target_utilization_percent
@@ -110,7 +113,6 @@ module "eks_cluster" {
   litellm_version = var.litellm_version
   config_bucket_name = module.base.ConfigBucketName
   database_url = module.base.database_url
-  database_middleware_url = module.base.database_middleware_url
   litellm_master_key = module.base.litellm_master_key
   litellm_salt_key = module.base.litellm_salt_key
   openai_api_key = var.openai_api_key

@@ -265,11 +265,6 @@ variable "main_db_secret_arn" {
   type = string
 }
 
-variable "middleware_db_secret_arn" {
-  description = "ARN of secret for middleware rds db"
-  type = string
-}
-
 variable "vcpus" {
   description = "Number of ECS vcpus"
   type = number
