@@ -43,6 +43,7 @@ resource "aws_ecs_task_definition" "litellm" {
       { "name": "LITELLM_CONFIG_BUCKET_OBJECT_KEY", "value": "config.yaml" },
       { "name": "UI_USERNAME", "value": "admin" },
       { "name": "REDIS_URL", "value": "${var.redis_url}" },
+      { "name": "REDIS_SSL", "value": "True" },
       { "name": "LANGSMITH_PROJECT", "value": "${var.langsmith_project}" },
       { "name": "LANGSMITH_DEFAULT_RUN_NAME", "value": "${var.langsmith_default_run_name}" },
       { "name": "LITELLM_LOCAL_MODEL_COST_MAP", "value": "${var.disable_outbound_network_access ? "True" : "False"}" }

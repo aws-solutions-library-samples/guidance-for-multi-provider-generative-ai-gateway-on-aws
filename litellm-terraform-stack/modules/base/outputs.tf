@@ -96,7 +96,7 @@ output "DatabaseUrlSecretArn" {
 
 output "RedisUrl" {
   description = "The Redis connection URL"
-  value       = "redis://${aws_elasticache_replication_group.redis.primary_endpoint_address}:6379"
+  value       = "rediss://${aws_elasticache_replication_group.redis.primary_endpoint_address}:6379"
 }
 
 output "LitellmMasterAndSaltKeySecretArn" {

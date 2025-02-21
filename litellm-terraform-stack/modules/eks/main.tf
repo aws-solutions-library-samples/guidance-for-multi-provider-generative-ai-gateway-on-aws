@@ -148,6 +148,11 @@ resource "kubernetes_deployment" "litellm" {
           }
 
           env {
+            name  = "REDIS_SSL"
+            value = "True"
+          }
+
+          env {
             name  = "LANGSMITH_PROJECT"
             value = var.langsmith_project
           }
