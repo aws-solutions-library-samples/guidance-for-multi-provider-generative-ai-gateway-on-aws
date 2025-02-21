@@ -43,6 +43,11 @@ variable "hostedZoneName" {
   description = "Hosted Zone Name (e.g., 'example.com')"
 }
 
+variable "create_private_hosted_zone_in_existing_vpc" {
+  description = "In the case public_load_balancer=false (meaning we need a private hosted zone), and an vpc_id is provided, decides whether we create a private hosted zone, or assume one already exists and import it"
+  type        = bool
+}
+
 variable "rds_instance_class" {
   type        = string
   description = "The instance class for the RDS database"

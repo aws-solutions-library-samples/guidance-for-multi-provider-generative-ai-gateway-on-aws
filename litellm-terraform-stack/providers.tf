@@ -5,9 +5,10 @@ terraform {
 locals {
   common_labels = {
     project     = "llmgateway"
+    AWSSolution = "ToDo"
+    GithubRepo  = "https://github.com/aws-solutions-library-samples/"
   }
 }
-
 
 provider "aws" {
   default_tags {

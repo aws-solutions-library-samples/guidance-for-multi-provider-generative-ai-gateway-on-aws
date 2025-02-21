@@ -60,6 +60,7 @@ fi
 echo "Certificate Arn: " $CERTIFICATE_ARN
 echo "Domain Name: " $DOMAIN_NAME
 echo "HOSTED_ZONE_NAME: $HOSTED_ZONE_NAME"
+echo "CREATE_PRIVATE_HOSTED_ZONE_IN_EXISTING_VPC: $CREATE_PRIVATE_HOSTED_ZONE_IN_EXISTING_VPC"
 echo "OKTA_ISSUER: $OKTA_ISSUER"
 echo "OKTA_AUDIENCE: $OKTA_AUDIENCE"
 echo "LiteLLM Version: " $LITELLM_VERSION
@@ -252,6 +253,7 @@ export TF_VAR_okta_audience=$OKTA_AUDIENCE
 export TF_VAR_okta_issuer=$OKTA_ISSUER
 export TF_VAR_domain_name=$DOMAIN_NAME
 export TF_VAR_hosted_zone_name=$HOSTED_ZONE_NAME
+export TF_VAR_create_private_hosted_zone_in_existing_vpc=$CREATE_PRIVATE_HOSTED_ZONE_IN_EXISTING_VPC
 export TF_VAR_certificate_arn=$CERTIFICATE_ARN
 export TF_VAR_architecture=$ARCH
 export TF_VAR_disable_outbound_network_access=$DISABLE_OUTBOUND_NETWORK_ACCESS

@@ -197,6 +197,11 @@ variable "hosted_zone_name" {
   type        = string
 }
 
+variable "create_private_hosted_zone_in_existing_vpc" {
+  description = "In the case public_load_balancer=false (meaning we need a private hosted zone), and an vpc_id is provided, decides whether we create a private hosted zone, or assume one already exists and import it"
+  type        = bool
+}
+
 variable "architecture" {
   description = "The architecture for the node group instances (x86 or arm64)"
   type        = string
