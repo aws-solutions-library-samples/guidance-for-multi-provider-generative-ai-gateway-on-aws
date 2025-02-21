@@ -36,7 +36,7 @@ if [ "$BUILD_FROM_SOURCE" = "true" ]; then
     cd litellm-source
 fi
 
-AWS_REGION=$(aws configure get region)
+AWS_REGION=$(aws ec2 describe-availability-zones --output text --query 'AvailabilityZones[0].[RegionName]')
 export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
 
 # Check if the repository already exists

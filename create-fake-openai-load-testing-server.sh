@@ -2,7 +2,7 @@
 #!/bin/bash
 set -aeuo pipefail
 
-aws_region=$(aws configure get region)
+aws_region=$(aws ec2 describe-availability-zones --output text --query 'AvailabilityZones[0].[RegionName]')
 echo $aws_region
 
 APP_NAME=fakeserver
