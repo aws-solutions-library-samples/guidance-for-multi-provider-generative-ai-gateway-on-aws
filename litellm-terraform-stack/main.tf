@@ -20,7 +20,9 @@ module "ecs_cluster" {
   count  = local.platform == "ECS" ? 1 : 0
   name = var.name
   config_bucket_arn = module.base.ConfigBucketArn
-  redis_url = module.base.RedisUrl
+  redis_host = module.base.RedisHost
+  redis_port = module.base.RedisPort
+  redis_password = module.base.RedisPassword
   log_bucket_arn = var.log_bucket_arn
   ecr_litellm_repository_url = module.base.LiteLLMRepositoryUrl
   ecr_middleware_repository_url = module.base.MiddlewareRepositoryUrl
@@ -106,7 +108,9 @@ module "eks_cluster" {
   config_bucket_arn = module.base.ConfigBucketArn
   existing_cluster_name = var.existing_cluster_name
   cluster_version = var.cluster_version
-  redis_url = module.base.RedisUrl
+  redis_host = module.base.RedisHost
+  redis_port = module.base.RedisPort
+  redis_password = module.base.RedisPassword
   log_bucket_arn = var.log_bucket_arn
   ecr_litellm_repository_url = module.base.LiteLLMRepositoryUrl
   ecr_middleware_repository_url = module.base.MiddlewareRepositoryUrl

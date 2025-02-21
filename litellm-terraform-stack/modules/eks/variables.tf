@@ -55,8 +55,18 @@ variable "config_bucket_name" {
   type        = string
 }
 
-variable "redis_url" {
-  description = "Redis connection URL"
+variable "redis_host" {
+  description = "The Redis host name"
+  type        = string
+}
+
+variable "redis_port" {
+  description = "The Redis port"
+  type        = string
+}
+
+variable "redis_password" {
+  description = "The Redis password"
   type        = string
 }
 

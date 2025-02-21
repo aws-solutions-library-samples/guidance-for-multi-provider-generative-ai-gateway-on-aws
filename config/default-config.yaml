@@ -697,6 +697,9 @@ model_list:
 
 router_settings:
   routing_strategy: usage-based-routing-v2
+  redis_host: os.environ/REDIS_HOST
+  redis_port: os.environ/REDIS_PORT
+  redis_password: os.environ/REDIS_PASSWORD
   enable_pre_call_check: true
   # context_window_fallbacks: [{"gpt-4": ["anthropic.claude-3-5-sonnet-20240620-v1:0"]}] #Configure fallbacks for context window exeeded errors (In this example, we will fall back to Claude Sonnet if over 8000 tokens, which is gpt-4's limit)
   # fallbacks: [{"gpt-4o": ["anthropic.claude-3-5-sonnet-20240620-v1:0"]}] #Configure fallbacks for any other error
@@ -712,7 +715,11 @@ litellm_settings:
   detailed_debug: True
   cache_params:
     type: redis
-
+    type: redis
+    host: os.environ/REDIS_HOST # Redis server hostname or IP address
+    port: os.environ/REDIS_PORT # Redis server port (as a string)
+    password: os.environ/REDIS_PASSWORD # Redis server password
+    
   max_budget: 1000000000.0 # (float) sets max budget in dollars across the entire proxy across all API keys. Note, the budget does not apply to the master key. That is the only exception.
   budget_duration: 1mo # (str) frequency of budget reset - You can set duration as seconds ("30s"), minutes ("30m"), hours ("30h"), days ("30d"), months ("1mo").
 

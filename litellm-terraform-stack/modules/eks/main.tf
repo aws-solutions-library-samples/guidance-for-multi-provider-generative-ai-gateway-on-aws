@@ -143,8 +143,18 @@ resource "kubernetes_deployment" "litellm" {
           }
 
           env {
-            name  = "REDIS_URL"
-            value = var.redis_url
+            name  = "REDIS_HOST"
+            value = var.redis_host
+          }
+
+          env {
+            name  = "REDIS_PORT"
+            value = var.redis_port
+          }
+
+          env {
+            name  = "REDIS_PASSWORD"
+            value = var.redis_password
           }
 
           env {

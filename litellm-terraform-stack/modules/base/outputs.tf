@@ -16,11 +16,6 @@ output "RedisHostName" {
   value       = aws_elasticache_replication_group.redis.primary_endpoint_address
 }
 
-output "RedisPort" {
-  description = "The port of the Redis cluster"
-  value       = 6379
-}
-
 output "RdsSecurityGroupId" {
   description = "The ID of the RDS security group"
   value       = aws_security_group.db_sg.id
@@ -97,6 +92,21 @@ output "DatabaseUrlSecretArn" {
 output "RedisUrl" {
   description = "The Redis connection URL"
   value       = "rediss://${aws_elasticache_replication_group.redis.primary_endpoint_address}:6379"
+}
+
+output "RedisHost" {
+  description = "The Redis host name"
+  value       = aws_elasticache_replication_group.redis.primary_endpoint_address
+}
+
+output "RedisPort" {
+  description = "The Redis port"
+  value       = "6379"
+}
+
+output "RedisPassword" {
+  description = "The Redis password"
+  value = random_password.redis_password_main.result
 }
 
 output "LitellmMasterAndSaltKeySecretArn" {

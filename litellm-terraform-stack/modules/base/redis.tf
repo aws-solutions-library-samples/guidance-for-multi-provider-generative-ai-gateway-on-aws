@@ -44,6 +44,12 @@ resource "aws_elasticache_parameter_group" "redis_parameter_group" {
 # REDIS REPLICATION GROUP
 #############################################
 
+# Random passwords
+resource "random_password" "redis_password_main" {
+  length  = 18
+  special = false
+}
+
 resource "aws_elasticache_replication_group" "redis" {
   replication_group_id          = "${var.name}-redis"
   description = "redis"
@@ -60,6 +66,9 @@ resource "aws_elasticache_replication_group" "redis" {
   at_rest_encryption_enabled    = true
   transit_encryption_enabled    = true
   transit_encryption_mode      = "required"
+  auth_token = random_password.redis_password_main.result
+  auth_token_update_strategy = "SET"
+
   depends_on = [
     aws_elasticache_subnet_group.redis_subnet_group,
     aws_elasticache_parameter_group.redis_parameter_group
