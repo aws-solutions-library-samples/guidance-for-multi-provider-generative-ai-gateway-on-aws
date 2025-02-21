@@ -863,7 +863,7 @@ To use langsmith, provide your LANGSMITH_API_KEY, LANGSMITH_PROJECT, and LANGSMI
 6. Open a terminal and run the following AWS SSM command to create a port forwarding session. Replace YOUR_INSTANCE_ID with the instance ID from your stack outputs:
 aws ssm start-session --target YOUR_INSTANCE_ID --document-name AWS-StartPortForwardingSession --parameters "portNumber=3389,localPortNumber=13389"
 
-Return to Microsoft Remote Desktop and double-click your newly added PC. When prompted, enter Username: Administrator, Password: [the password you retrieved in step 5]
+7. Return to Microsoft Remote Desktop and double-click your newly added PC. When prompted, enter Username: Administrator, Password: [the password you retrieved in step 5]
 
 
 ## Open Source Library
