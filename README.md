@@ -177,7 +177,10 @@ Other configurations are not guaranteed to work. You may have to tweak the terra
 
 * If you'd like to run LiteLLM in subnets without outbound internet access, set `DISABLE_OUTBOUND_NETWORK_ACCESS="true"`. Due to lack of internet access, this configuration will only work with AWS Bedrock or SageMaker models. Because of this, you must remove all non-Bedrock/non-SageMaker models from your `config/config.yaml` file. If you do not do this, LiteLLM will fail to start as it will attempt to call third party models over the internet.
 
-* If you'd like the Application Load Balancer to be private to your vpc, set `PUBLIC_LOAD_BALANCER="false"`
+* If you'd like the Application Load Balancer to be private to your vpc, set `PUBLIC_LOAD_BALANCER="false"`. To make it more convinient to get access to this private load balancer, we have provided a script to deploy a windows EC2 instance in the same VPC, described in more detail in [Setting up EC2 in your VPC and remote desktop access to it to get access to litellm in the case you set `PUBLIC_LOAD_BALANCER="false"` 
+](#Setting-up-EC2-in-your-VPC-and-remote-desktop-access-to-it-to-get-access-to-litellm-in-the-case-you-set-`PUBLIC_LOAD_BALANCER="false"`)
+
+
 
 #### Usage Instructions
 
@@ -825,6 +828,43 @@ Reponse
 #### Langsmith support
 
 To use langsmith, provide your LANGSMITH_API_KEY, LANGSMITH_PROJECT, and LANGSMITH_DEFAULT_RUN_NAME in your .env file
+
+#### Setting up EC2 in your VPC and remote desktop access to it to get access to litellm in the case you set `PUBLIC_LOAD_BALANCER="false"` 
+
+**Prerequisites:**
+
+* CDK (will migrate to terraform later)
+
+**Deploying the ec2**
+
+1. `cd` to the `litellm-private-load-balancer-ec2` folder
+2. cp `.ec2.env.template` `.ec2.env`
+3. In `.ec2.env`, set `KEY_PAIR_NAME` to a key pair that you have the private `.pem` file for. If you don't have a key pair, create one
+4. `cd` back to the root directory
+5. Run `./create-ec2-to-access-private-load-balancer.sh`
+
+**Remote Desktop Setup**
+
+1. Download Microsoft Remote Desktop for Mac
+2. Open Microsoft Remote Desktop and click the "+" button in the top menu, then select "Add PC"
+3. In the "PC name" field under the General tab, enter localhost:13389
+
+4. Click "Add" to add your remote desktop configuration
+5. To get the EC2 instance password
+
+* Go to the AWS Console and locate the EC2 instance named "WindowsBrowserInstance"
+* Select the instance and click "Connect"
+* Go to the "RDP client" tab
+* Click "Get password" at the bottom
+* Upload your private .pem file from your keypair (the one specified in `.ec2.env` in the `KEY_PAIR_NAME` value)
+* Copy the decrypted password - you'll need this to connect
+
+
+6. Open a terminal and run the following AWS SSM command to create a port forwarding session. Replace YOUR_INSTANCE_ID with the instance ID from your stack outputs:
+aws ssm start-session --target YOUR_INSTANCE_ID --document-name AWS-StartPortForwardingSession --parameters "portNumber=3389,localPortNumber=13389"
+
+Return to Microsoft Remote Desktop and double-click your newly added PC. When prompted, enter Username: Administrator, Password: [the password you retrieved in step 5]
+
 
 ## Open Source Library
 
