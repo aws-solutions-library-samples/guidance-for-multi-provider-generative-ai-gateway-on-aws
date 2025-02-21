@@ -178,7 +178,7 @@ Other configurations are not guaranteed to work. You may have to tweak the terra
 * If you'd like to run LiteLLM in subnets without outbound internet access, set `DISABLE_OUTBOUND_NETWORK_ACCESS="true"`. Due to lack of internet access, this configuration will only work with AWS Bedrock or SageMaker models. Because of this, you must remove all non-Bedrock/non-SageMaker models from your `config/config.yaml` file. If you do not do this, LiteLLM will fail to start as it will attempt to call third party models over the internet.
 
 * If you'd like the Application Load Balancer to be private to your vpc, set `PUBLIC_LOAD_BALANCER="false"`. To make it more convinient to get access to this private load balancer, we have provided a script to deploy a windows EC2 instance in the same VPC, described in more detail in [Setting up EC2 in your VPC and remote desktop access to it to get access to litellm in the case you set `PUBLIC_LOAD_BALANCER="false"` 
-](#Setting-up-EC2-in-your-VPC-and-remote-desktop-access-to-it-to-get-access-to-litellm-in-the-case-you-set-`PUBLIC_LOAD_BALANCER="false"`)
+](#setting-up-ec2-in-your-vpc-and-remote-desktop-access-to-it-to-get-access-to-litellm-in-the-case-you-set-public_load_balancerfalse)
 
 
 
