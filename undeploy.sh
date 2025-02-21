@@ -81,6 +81,10 @@ echo "EKS_X86_INSTANCE_TYPE: $EKS_X86_INSTANCE_TYPE"
 echo "EKS_ARM_AMI_TYPE: $EKS_ARM_AMI_TYPE"
 echo "EKS_X86_AMI_TYPE: $EKS_X86_AMI_TYPE"
 echo "PUBLIC_LOAD_BALANCER: $PUBLIC_LOAD_BALANCER"
+echo "RDS_INSTANCE_CLASS: $PUBLIC_LOAD_BALANCER"
+echo "RDS_ALLOCATED_STORAGE_GB: $RDS_ALLOCATED_STORAGE_GB"
+echo "REDIS_NODE_TYPE: $REDIS_NODE_TYPE"
+echo "REDIS_NUM_CACHE_CLUSTERS: $REDIS_NUM_CACHE_CLUSTERS"
 
 if [ -n "$CPU_ARCHITECTURE" ]; then
     # Check if CPU_ARCHITECTURE is either "x86" or "arm"
@@ -186,6 +190,10 @@ export TF_VAR_x86_ami_type=$EKS_X86_AMI_TYPE
 export TF_VAR_create_vpc_endpoints_in_existing_vpc=$CREATE_VPC_ENDPOINTS_IN_EXISTING_VPC
 export TF_VAR_ecrLitellmRepository=$APP_NAME
 export TF_VAR_ecrMiddlewareRepository=$MIDDLEWARE_APP_NAME
+export TF_VAR_rds_instance_class=$RDS_INSTANCE_CLASS
+export TF_VAR_rds_allocated_storage=$RDS_ALLOCATED_STORAGE_GB
+export TF_VAR_redis_node_type=$REDIS_NODE_TYPE
+export TF_VAR_redis_num_cache_clusters=$REDIS_NUM_CACHE_CLUSTERS
 
 if [ -n "$EXISTING_EKS_CLUSTER_NAME" ]; then
     export TF_VAR_create_cluster="false"

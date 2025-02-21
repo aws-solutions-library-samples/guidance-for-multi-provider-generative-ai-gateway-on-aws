@@ -230,7 +230,7 @@ resource "aws_eks_addon" "coredns" {
   addon_name   = "coredns"
 
   # If we create the cluster, wait for it & the node group. Otherwise no wait.
-  depends_on = [aws_eks_cluster.this, aws_eks_node_group.core_nodegroup]
+  depends_on = [aws_eks_cluster.this, aws_eks_node_group.core_nodegroup, helm_release.aws_load_balancer_controller]
 }
 
 resource "aws_eks_addon" "kube_proxy" {
