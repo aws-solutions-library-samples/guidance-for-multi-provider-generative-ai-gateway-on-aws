@@ -1,16 +1,15 @@
 #!/bin/bash
 set -aeuo pipefail
 
-aws_region=$(aws configure get region)
+aws_region=$(aws ec2 describe-availability-zones --output text --query 'AvailabilityZones[0].[RegionName]')
 echo $aws_region
 
-LITELLM_STACK_NAME="LitellmCdkStack"
 PRIVATE_LOAD_BALANCER_EC2_STACK_NAME="LitellmPrivateLoadBalancerEc2Stack"
 
 source .env
 
-cd litellm-cdk
-VPC_ID=$(jq -r ".\"${LITELLM_STACK_NAME}\".VpcId" ./outputs.json)
+cd litellm-terraform-stack
+VPC_ID=$(terraform output -raw vpc_id)
 cd ..
 
 cd litellm-private-load-balancer-ec2

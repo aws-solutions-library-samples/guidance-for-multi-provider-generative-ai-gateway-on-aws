@@ -44,5 +44,11 @@ export class LitellmPrivateLoadBalancerEc2Stack extends cdk.Stack {
       keyPair: ec2.KeyPair.fromKeyPairName(this, "ec2litellmkeypair", props.keyPairName),
       role: ec2Role
     });
+
+    new cdk.CfnOutput(this, 'WindowsInstanceId', {
+      value: windowsInstance.instanceId,
+      description: 'Windows EC2 Instance ID',
+      exportName: 'WindowsInstanceId',
+    });
   }
 }

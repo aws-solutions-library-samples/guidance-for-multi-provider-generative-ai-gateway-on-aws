@@ -22,3 +22,8 @@ output "ServiceURL" {
   description = "Equivalent to https://var.domainName"
   value       = "https://${var.domain_name}"
 }
+
+output "vpc_id" {
+  description = "the vpc id we deployed to"
+  value       = module.base.VpcId
+}
