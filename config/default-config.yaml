@@ -715,7 +715,6 @@ litellm_settings:
   detailed_debug: True
   cache_params:
     type: redis
-    type: redis
     host: os.environ/REDIS_HOST # Redis server hostname or IP address
     port: os.environ/REDIS_PORT # Redis server port (as a string)
     password: os.environ/REDIS_PASSWORD # Redis server password
