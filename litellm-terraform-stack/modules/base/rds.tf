@@ -30,6 +30,7 @@ resource "aws_security_group" "db_sg" {
   vpc_id      = local.final_vpc_id
 
   egress {
+    description = "allow all outbound access"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -64,4 +65,8 @@ resource "aws_db_instance" "database" {
   skip_final_snapshot       = true
   deletion_protection       = false
   multi_az = true
+  performance_insights_enabled = true
+  enabled_cloudwatch_logs_exports = ["general", "error", "slowquery"]
+  auto_minor_version_upgrade = true
+  monitoring_interval = 60
 }

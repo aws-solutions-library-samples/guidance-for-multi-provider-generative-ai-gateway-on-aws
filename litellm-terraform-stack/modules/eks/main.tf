@@ -97,6 +97,7 @@ resource "kubernetes_deployment" "litellm" {
         container {
           name  = "litellm-container"
           image = "${var.ecr_litellm_repository_url}:${var.litellm_version}"
+          image_pull_policy = "Always"
 
           port {
             container_port = 4000
@@ -438,6 +439,7 @@ resource "kubernetes_service" "litellm" {
 # Add AWS Load Balancer Controller
 module "aws_load_balancer_controller_irsa_role" {
   source = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "5.52.2"
 
   role_name                              = "${var.name}-aws-load-balancer-controller"
   attach_load_balancer_controller_policy = true

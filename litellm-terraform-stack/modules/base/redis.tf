@@ -8,6 +8,7 @@ resource "aws_security_group" "redis_sg" {
   vpc_id      = local.final_vpc_id
 
   egress {
+    description = "allow all outbound access"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"

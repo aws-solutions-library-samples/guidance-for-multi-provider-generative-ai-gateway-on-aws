@@ -6,12 +6,15 @@ resource "aws_security_group" "vpc_endpoints_sg" {
   description       = "Security group for Interface VPC Endpoints"
   vpc_id            = local.final_vpc_id
   ingress {
+    description = "allow inbound access from within the vpc"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = [cidrsubnet("0.0.0.0/0", 0, 0)] # or limit to local.final_vpc_id's CIDR if you prefer
+    cidr_blocks = [local.creating_new_vpc ? aws_vpc.new[0].cidr_block : data.aws_vpc.existing[0].cidr_block]
+    //cidr_blocks = [cidrsubnet("0.0.0.0/0", 0, 0)] # or limit to local.final_vpc_id's CIDR if you prefer
   }
   egress {
+    description = "allow all outbound access"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
