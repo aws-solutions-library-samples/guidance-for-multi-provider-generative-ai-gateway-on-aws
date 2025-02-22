@@ -12,24 +12,9 @@ locals {
 }
 
 locals {
-  final_vpc_id = (
-    length(trimspace(var.vpc_id)) > 0
-    ? data.aws_vpc.existing[0].id
-    : aws_vpc.new[0].id
-  )
-
-  # If using an existing VPC, you must supply your own subnets or logic to filter them.
-  # In the CDK code:
-  #   subnetIds = props.disableOutboundNetworkAccess ? vpc.isolatedSubnets : vpc.privateSubnets
-  # We'll assume that if user is providing an existing VPC, they'd also supply a list of subnets.
-  # For demonstration, we do a data source that grabs all subnets in that VPC and picks either the "isolated" or "private" set by name/tag.
-  # You must adapt the filter below to your environment. For simplicity, we just pick them all.
+  creating_new_vpc = length(trimspace(var.vpc_id)) == 0
+  final_vpc_id = local.creating_new_vpc ? aws_vpc.new[0].id : data.aws_vpc.existing[0].id
 }
-
-# Now define local arrays of subnets:
-# - If existing: we just take data.aws_subnets.existing_all[*].ids
-# - If new & disable_outbound => we choose the newly created "private" subnets (because they are effectively isolated if NAT=0)
-# - If new & not disable_outbound => we choose the newly created "private" subnets as normal "private"
 
 # First get all subnets in the VPC with auto-assign public IP enabled
 data "aws_subnets" "public_ip_subnets" {
@@ -102,19 +87,19 @@ locals {
   # The final chosen subnets for "private_with_egress" or "private_isolated" usage.
   # If existing VPC => data subnets (you must do your own filtering in real usage).
   # If new VPC => the private subnets we created.
-  chosen_subnet_ids = length(trimspace(var.vpc_id)) > 0 ? local.existing_private_subnet_ids : local.new_private_subnet_ids
+  chosen_subnet_ids = local.creating_new_vpc ? local.new_private_subnet_ids : local.existing_private_subnet_ids
 }
 
 locals {
   create_endpoints = (
-    length(trimspace(var.vpc_id)) == 0
+    local.creating_new_vpc == 0
     || var.create_vpc_endpoints_in_existing_vpc
   )
 }
 
 data "aws_route_tables" "existing_vpc_all" {
   # only do the lookup if var.vpc_id is set
-  count = length(var.vpc_id) > 0 ? 1 : 0
+  count = local.creating_new_vpc ? 0 : 1
 
   filter {
     name   = "vpc-id"
@@ -125,8 +110,9 @@ data "aws_route_tables" "existing_vpc_all" {
 locals {
   # If we’re using an existing VPC, fetch ALL route table IDs.
   # Otherwise, just pick the new route tables from our resources.
-  private_route_table = length(var.vpc_id) > 0 ? null : local.nat_gateway_count == 1 ? aws_route_table.private_with_nat[0] : aws_route_table.private_isolated[0]
-  s3_gateway_route_table_ids = length(var.vpc_id) > 0 ? data.aws_route_tables.existing_vpc_all[0].ids : [aws_route_table.public[0].id, local.private_route_table.id]
+  s3_gateway_route_table_ids = local.creating_new_vpc ? [aws_route_table.public[0].id, local.private_route_table.id] : data.aws_route_tables.existing_vpc_all[0].ids
+  private_route_table = local.creating_new_vpc ? (local.nat_gateway_count == 1 ? aws_route_table.private_with_nat[0] : aws_route_table.private_isolated[0]) : (null)
+
 }
 
 data "aws_vpc_endpoint_service" "bedrock_agent" {

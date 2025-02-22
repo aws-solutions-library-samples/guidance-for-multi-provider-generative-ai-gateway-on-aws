@@ -244,8 +244,8 @@ variable "wafv2_acl_arn" {
   type        = string
 }
 
-variable "domain_name" {
-  description = "Domain name for the ingress"
+variable "record_name" {
+  description = "record name for the ingress"
   type        = string
 }
 

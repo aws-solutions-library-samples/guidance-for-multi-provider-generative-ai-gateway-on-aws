@@ -7,32 +7,7 @@ data "aws_region" "current" {}
 
 locals {
   azs = slice(data.aws_availability_zones.available.names, 0, 3)
-
-  tags = {
-    AWSSolution = "ToDo"
-    GithubRepo  = "https://github.com/aws-solutions-library-samples/"
-  }
 }
-
-#--------------------------------------------------------------
-# Adding guidance solution ID via AWS CloudFormation resource
-#--------------------------------------------------------------
-resource "aws_cloudformation_stack" "guidance_deployment_metrics" {
-    name = "tracking-stack"
-    template_body = <<STACK
-    {
-        "AWSTemplateFormatVersion": "2010-09-09",
-        "Description": "Guidance for GenAI Gateway running on Amazon EKS",
-        "Resources": {
-            "EmptyResource": {
-                "Type": "AWS::CloudFormation::WaitConditionHandle"
-            }
-        }
-    }
-    STACK
-}
-
-
 
 # Kubernetes Secrets
 resource "kubernetes_secret" "litellm_api_keys" {
@@ -288,7 +263,7 @@ resource "kubernetes_ingress_v1" "litellm" {
 
   spec {
     rule {
-      host = var.domain_name
+      host = var.record_name
       http {
         path {
           path      = "/bedrock/model"

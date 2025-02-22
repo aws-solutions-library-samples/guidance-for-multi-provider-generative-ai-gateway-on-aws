@@ -57,43 +57,6 @@ resource "aws_ec2_tag" "public_subnets_cluster" {
   value       = "shared"
 }
 
-
-
-# # Tag public subnets for internet-facing ALB
-# resource "aws_ec2_tag" "public_subnet_elb" {
-#   # Use for_each to tag all public subnets
-#   for_each    = var.public_load_balancer ? toset(data.aws_subnets.public.ids) : toset([])
-#   resource_id = each.value
-#   key         = "kubernetes.io/role/elb"
-#   value       = "1"
-# }
-
-# # Tag private subnets for internal ALB (optional but recommended)
-# resource "aws_ec2_tag" "private_subnet_internal_elb" {
-#   # Use for_each to tag all private subnets
-#   for_each    = toset(data.aws_subnets.private.ids)
-#   resource_id = each.value
-#   key         = "kubernetes.io/role/internal-elb"
-#   value       = "1"
-# }
-
-# resource "aws_ec2_tag" "private_subnets_cluster" {
-#   for_each    = toset(data.aws_subnets.private.ids)
-#   resource_id = each.value
-
-#   key   = "kubernetes.io/cluster/${local.cluster_name}"
-#   value = "shared"  # or "owned"
-# }
-
-# resource "aws_ec2_tag" "public_subnets_cluster" {
-#   for_each    = toset(data.aws_subnets.public.ids)
-#   resource_id = each.value
-
-#   key   = "kubernetes.io/cluster/${local.cluster_name}"
-#   value = "shared"  # or "owned"
-# }
-
-
 # First, import the existing security groups
 data "aws_security_group" "db" {
   id = var.db_security_group_id
@@ -182,9 +145,6 @@ resource "aws_eks_cluster" "this" {
   depends_on = [
     aws_iam_role_policy_attachment.eks_cluster_policy
   ]
-
-  # Example: pass tags to the cluster
-  tags = local.tags
 }
 
 # Look up existing EKS cluster only if create_cluster = false
@@ -289,9 +249,6 @@ resource "aws_eks_node_group" "core_nodegroup" {
     aws_eks_access_entry.admin,
     aws_eks_access_policy_association.admin_policy
   ]
-
-  # Example tags
-  tags = local.tags
 }
 
 resource "aws_eks_access_entry" "developers" {

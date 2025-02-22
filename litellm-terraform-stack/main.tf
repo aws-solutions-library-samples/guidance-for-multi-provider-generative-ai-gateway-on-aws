@@ -1,3 +1,21 @@
+#--------------------------------------------------------------
+# Adding guidance solution ID via AWS CloudFormation resource
+#--------------------------------------------------------------
+resource "aws_cloudformation_stack" "guidance_deployment_metrics" {
+    name = "tracking-stack"
+    template_body = <<STACK
+    {
+        "AWSTemplateFormatVersion": "2010-09-09",
+        "Description": "Guidance for GenAI Gateway running on Amazon ECS",
+        "Resources": {
+            "EmptyResource": {
+                "Type": "AWS::CloudFormation::WaitConditionHandle"
+            }
+        }
+    }
+    STACK
+}
+
 module "base" {
   source = "./modules/base"
   name = var.name
@@ -8,6 +26,7 @@ module "base" {
   ecrLitellmRepository = var.ecrLitellmRepository
   ecrMiddlewareRepository = var.ecrMiddlewareRepository
   hostedZoneName = var.hosted_zone_name
+  create_private_hosted_zone_in_existing_vpc = var.create_private_hosted_zone_in_existing_vpc
   publicLoadBalancer = var.public_load_balancer
   rds_instance_class = var.rds_instance_class
   rds_allocated_storage = var.rds_allocated_storage
@@ -55,7 +74,7 @@ module "ecs_cluster" {
   okta_issuer = var.okta_issuer
   certificate_arn = var.certificate_arn
   wafv2_acl_arn = module.base.WafAclArn
-  domain_name = var.domain_name
+  record_name = var.record_name
   hosted_zone_name = var.hosted_zone_name
   vpc_id = module.base.VpcId
   db_security_group_id = module.base.DbSecurityGroupId
@@ -146,7 +165,7 @@ module "eks_cluster" {
   okta_issuer = var.okta_issuer
   certificate_arn = var.certificate_arn
   wafv2_acl_arn = module.base.WafAclArn
-  domain_name = var.domain_name
+  record_name = var.record_name
   hosted_zone_name = var.hosted_zone_name
   create_cluster = var.create_cluster
   vpc_id = module.base.VpcId

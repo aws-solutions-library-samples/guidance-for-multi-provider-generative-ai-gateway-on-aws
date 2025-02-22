@@ -8,7 +8,7 @@ data "aws_route53_zone" "selected" {
 # Create the A record
 resource "aws_route53_record" "litellm" {
   zone_id = data.aws_route53_zone.selected.zone_id
-  name    = var.domain_name  # e.g., "litellm.mirodrr.people.aws.dev"
+  name    = var.record_name  # e.g., "litellm.mirodrr.people.aws.dev"
   type    = "A"
 
   alias {

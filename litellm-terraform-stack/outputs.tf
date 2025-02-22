@@ -19,8 +19,8 @@ output "eks_deployment_name" {
 }
 
 output "ServiceURL" {
-  description = "Equivalent to https://var.domainName"
-  value       = "https://${var.domain_name}"
+  description = "Equivalent to https://var.record_name"
+  value       = "https://${var.record_name}"
 }
 
 output "vpc_id" {

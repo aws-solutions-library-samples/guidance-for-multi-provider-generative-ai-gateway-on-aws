@@ -187,14 +187,19 @@ variable "certificate_arn" {
   type        = string
 }
 
-variable "domain_name" {
-  description = "Domain name for the ingress"
+variable "record_name" {
+  description = "record name for the ingress"
   type        = string
 }
 
 variable "hosted_zone_name" {
   description = "Hosted zone name for the ingress"
   type        = string
+}
+
+variable "create_private_hosted_zone_in_existing_vpc" {
+  description = "In the case public_load_balancer=false (meaning we need a private hosted zone), and an vpc_id is provided, decides whether we create a private hosted zone, or assume one already exists and import it"
+  type        = bool
 }
 
 variable "architecture" {
