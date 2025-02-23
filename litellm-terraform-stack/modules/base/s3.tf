@@ -6,7 +6,7 @@ resource "aws_s3_bucket" "config_bucket" {
   force_destroy = true
 }
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "example" {
+resource "aws_s3_bucket_server_side_encryption_configuration" "config_bucket" {
   bucket = aws_s3_bucket.config_bucket.id
 
   rule {
@@ -16,7 +16,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "example" {
     }
 }
 
-resource "aws_s3_bucket_policy" "config_ssl_policy" {
+resource "aws_s3_bucket_policy" "config_bucket" {
   bucket = aws_s3_bucket.config_bucket.id
 
   policy = jsonencode({
@@ -39,6 +39,12 @@ resource "aws_s3_bucket_policy" "config_ssl_policy" {
       }
     ]
   })
+}
+
+resource "aws_s3_bucket_public_access_block" "config_bucket" {
+  bucket = aws_s3_bucket.config_bucket.id
+  block_public_acls   = true
+  block_public_policy = true
 }
 
 # Single file upload of `config.yaml`

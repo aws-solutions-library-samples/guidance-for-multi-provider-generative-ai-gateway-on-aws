@@ -3,7 +3,7 @@ resource "aws_s3_bucket" "log_bucket" {
   force_destroy = true
 }
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "bucket_encryption" {
+resource "aws_s3_bucket_server_side_encryption_configuration" "log_bucket" {
   bucket = aws_s3_bucket.log_bucket.id
 
   rule {
@@ -13,7 +13,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "bucket_encryption
   }
 }
 
-resource "aws_s3_bucket_policy" "bucket_ssl_policy" {
+resource "aws_s3_bucket_policy" "log_bucket" {
   bucket = aws_s3_bucket.log_bucket.id
 
   policy = jsonencode({
@@ -36,4 +36,10 @@ resource "aws_s3_bucket_policy" "bucket_ssl_policy" {
       }
     ]
   })
+}
+
+resource "aws_s3_bucket_public_access_block" "log_bucket" {
+  bucket = aws_s3_bucket.log_bucket.id
+  block_public_acls   = true
+  block_public_policy = true
 }

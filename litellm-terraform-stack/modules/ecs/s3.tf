@@ -37,3 +37,9 @@ resource "aws_s3_bucket_policy" "access_log_bucket" {
     ]
   })
 }
+
+resource "aws_s3_bucket_public_access_block" "access_log_bucket" {
+  bucket = aws_s3_bucket.access_log_bucket.id
+  block_public_acls   = true
+  block_public_policy = true
+}

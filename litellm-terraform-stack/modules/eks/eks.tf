@@ -74,6 +74,7 @@ resource "aws_security_group_rule" "db_ingress" {
   protocol          = "tcp"
   cidr_blocks       = [data.aws_vpc.existing.cidr_block]
   security_group_id = data.aws_security_group.db.id
+  description              = "Allow EKS tasks to connect to RDS"
 }
 
 # Add ingress rules to Redis security group
@@ -84,6 +85,7 @@ resource "aws_security_group_rule" "redis_ingress" {
   protocol          = "tcp"
   cidr_blocks       = [data.aws_vpc.existing.cidr_block]
   security_group_id = data.aws_security_group.redis.id
+  description              = "Allow EKS tasks to connect to Redis"
 }
 
 resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
