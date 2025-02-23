@@ -474,6 +474,21 @@ resource "helm_release" "aws_load_balancer_controller" {
     value = module.aws_load_balancer_controller_irsa_role.iam_role_arn
   }
 
+  set {
+    name  = "podSecurityContext.runAsNonRoot"
+    value = "true"
+  }
+
+  set {
+    name  = "podSecurityContext.runAsUser"
+    value = "1000"
+  }
+
+  set {
+    name  = "podSecurityContext.runAsGroup"
+    value = "1000"
+  }
+
   //Only need to set to internal ECR repo when internet access not available
   dynamic "set" {
     for_each = var.disable_outbound_network_access ? [1] : []

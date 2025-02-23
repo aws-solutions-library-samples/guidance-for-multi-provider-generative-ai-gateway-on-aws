@@ -91,10 +91,7 @@ locals {
 }
 
 locals {
-  create_endpoints = (
-    local.creating_new_vpc == 0
-    || var.create_vpc_endpoints_in_existing_vpc
-  )
+  create_endpoints = (local.creating_new_vpc || var.create_vpc_endpoints_in_existing_vpc)
 }
 
 data "aws_route_tables" "existing_vpc_all" {
