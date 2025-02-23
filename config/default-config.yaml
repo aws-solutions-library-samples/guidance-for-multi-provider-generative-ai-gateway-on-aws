@@ -18,49 +18,82 @@ model_list:
     #tpm: 100000 #Set tokens per minute. Will stop sending traffic to this model once exceeded, and will send traffic to fallback models if configured.
     #rpm: 10000 #Set requests per minute. Will stop sending traffic to this model once exceeded, and will send traffic to fallback models if configured.
     litellm_params:
-      model: bedrock/us.anthropic.claude-3-5-sonnet-20240620-v1:0
+      model: bedrock/anthropic.claude-3-5-sonnet-20240620-v1:0
       #temperature: 0.7 # 👈 pass in default provider specific parameters like this
       #top_k: 1 # 👈 pass in default provider specific parameters like this
       #aws_region_name: us-west-2 #Override default of using the region litellm is deployed in
       # weight: 1 #Used to load balance between two different models. Give two different models the same "model_name" and the traffic will be distributed based on the relative weights
+  - model_name: us.anthropic.claude-3-5-sonnet-20240620-v1:0
+    litellm_params:
+      model: bedrock/us.anthropic.claude-3-5-sonnet-20240620-v1:0
 
   - model_name: anthropic.claude-3-5-sonnet-20241022-v2:0
+    litellm_params:
+      model: bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0
+  - model_name: us.anthropic.claude-3-5-sonnet-20241022-v2:0
     litellm_params:
       model: bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0
 
   - model_name: anthropic.claude-3-5-haiku-20241022-v1:0
     litellm_params:
+      model: bedrock/anthropic.claude-3-5-haiku-20241022-v1:0
+  - model_name: us.anthropic.claude-3-5-haiku-20241022-v1:0
+    litellm_params:
       model: bedrock/us.anthropic.claude-3-5-haiku-20241022-v1:0
 
   - model_name: anthropic.claude-3-sonnet-20240229-v1:0
+    litellm_params:
+      model: bedrock/anthropic.claude-3-sonnet-20240229-v1:0
+  - model_name: us.anthropic.claude-3-sonnet-20240229-v1:0
     litellm_params:
       model: bedrock/us.anthropic.claude-3-sonnet-20240229-v1:0
   
   - model_name: anthropic.claude-3-haiku-20240307-v1:0
     litellm_params:
+      model: bedrock/anthropic.claude-3-haiku-20240307-v1:0
+  - model_name: us.anthropic.claude-3-haiku-20240307-v1:0
+    litellm_params:
       model: bedrock/us.anthropic.claude-3-haiku-20240307-v1:0
   
   - model_name: anthropic.claude-3-opus-20240229-v1:0
+    litellm_params:
+      model: bedrock/anthropic.claude-3-opus-20240229-v1:0
+  - model_name: us.anthropic.claude-3-opus-20240229-v1:0
     litellm_params:
       model: bedrock/us.anthropic.claude-3-opus-20240229-v1:0
   
   - model_name: meta.llama3-1-405b-instruct-v1:0
     litellm_params:
+      model: bedrock/meta.llama3-1-405b-instruct-v1:0
+  - model_name: us.meta.llama3-1-405b-instruct-v1:0
+    litellm_params:
       model: bedrock/us.meta.llama3-1-405b-instruct-v1:0
   
   - model_name: meta.llama3-1-70b-instruct-v1:0
+    litellm_params:
+      model: bedrock/meta.llama3-1-70b-instruct-v1:0
+  - model_name: us.meta.llama3-1-70b-instruct-v1:0
     litellm_params:
       model: bedrock/us.meta.llama3-1-70b-instruct-v1:0
 
   - model_name: meta.llama3-1-8b-instruct-v1:0
     litellm_params:
+      model: bedrock/meta.llama3-1-8b-instruct-v1:0
+  - model_name: us.meta.llama3-1-8b-instruct-v1:0
+    litellm_params:
       model: bedrock/us.meta.llama3-1-8b-instruct-v1:0
   
   - model_name: meta.llama3-70b-instruct-v1:0
     litellm_params:
+      model: bedrock/meta.llama3-70b-instruct-v1:0
+  - model_name: us.meta.llama3-70b-instruct-v1:0
+    litellm_params:
       model: bedrock/us.meta.llama3-70b-instruct-v1:0
   
   - model_name: meta.llama3-8b-instruct-v1:0
+    litellm_params:
+      model: bedrock/meta.llama3-8b-instruct-v1:0
+  - model_name: us.meta.llama3-8b-instruct-v1:0
     litellm_params:
       model: bedrock/us.meta.llama3-8b-instruct-v1:0
 
@@ -74,13 +107,22 @@ model_list:
 
   - model_name: amazon.nova-pro-v1
     litellm_params:
+      model: bedrock/amazon.nova-pro-v1:0
+  - model_name: us.amazon.nova-pro-v1
+    litellm_params:
       model: bedrock/us.amazon.nova-pro-v1:0
 
   - model_name: amazon.nova-lite-v1
     litellm_params:
+      model: bedrock/amazon.nova-lite-v1:0
+  - model_name: us.amazon.nova-lite-v1
+    litellm_params:
       model: bedrock/us.amazon.nova-lite-v1:0
 
   - model_name: amazon.nova-micro-v1
+    litellm_params:
+      model: bedrock/amazon.nova-micro-v1:0
+  - model_name: us.amazon.nova-micro-v1
     litellm_params:
       model: bedrock/us.amazon.nova-micro-v1:0
 
