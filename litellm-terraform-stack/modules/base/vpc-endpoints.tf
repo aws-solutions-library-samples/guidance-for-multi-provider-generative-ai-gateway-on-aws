@@ -11,7 +11,6 @@ resource "aws_security_group" "vpc_endpoints_sg" {
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = [local.creating_new_vpc ? aws_vpc.new[0].cidr_block : data.aws_vpc.existing[0].cidr_block]
-    //cidr_blocks = [cidrsubnet("0.0.0.0/0", 0, 0)] # or limit to local.final_vpc_id's CIDR if you prefer
   }
   egress {
     description = "allow all outbound access"

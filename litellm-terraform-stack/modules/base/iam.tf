@@ -21,3 +21,27 @@ resource "aws_iam_role_policy_attachment" "vpc_flow_logs_attach" {
   role       = aws_iam_role.vpc_flow_logs_role[0].name
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
 }
+
+# First, create an IAM role for RDS Enhanced Monitoring
+resource "aws_iam_role" "rds_enhanced_monitoring" {
+  name = "${var.name}-rds-enhanced-monitoring"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "monitoring.rds.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+# Attach the required policy for Enhanced Monitoring
+resource "aws_iam_role_policy_attachment" "rds_enhanced_monitoring" {
+  role       = aws_iam_role.rds_enhanced_monitoring.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
+}

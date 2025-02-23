@@ -84,9 +84,10 @@ resource "aws_db_instance" "database" {
   deletion_protection       = false
   multi_az = true
   performance_insights_enabled = true
-  enabled_cloudwatch_logs_exports = ["general", "error", "slowquery", "postgresql"]
+  enabled_cloudwatch_logs_exports = ["postgresql"]
   auto_minor_version_upgrade = true
   monitoring_interval = 60
+  monitoring_role_arn      = aws_iam_role.rds_enhanced_monitoring.arn
   parameter_group_name = aws_db_parameter_group.example_pg.name
   copy_tags_to_snapshot     = true
 }

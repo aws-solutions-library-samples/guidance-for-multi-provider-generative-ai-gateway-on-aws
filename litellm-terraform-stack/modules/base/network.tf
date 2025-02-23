@@ -100,7 +100,7 @@ data "aws_availability_zones" "available" {
 
 resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
   count             = local.creating_new_vpc ? 1 : 0
-  name              = "/aws/vpc/${var.name}-flow-logs"
+  name_prefix              = "/aws/vpc/${var.name}-flow-logs"
   retention_in_days = 365
 }
 
