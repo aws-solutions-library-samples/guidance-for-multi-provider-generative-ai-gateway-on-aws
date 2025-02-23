@@ -222,6 +222,28 @@ resource "aws_eks_addon" "pod_identity_agent" {
   depends_on = [aws_eks_cluster.this]
 }
 
+resource "aws_eks_addon" "cloudwatch_observability" {
+  count = var.create_cluster || var.install_add_ons_in_existing_eks_cluster ? 1 : 0
+
+  cluster_name = local.cluster_name
+  addon_name   = "amazon-cloudwatch-observability"
+
+  depends_on = [
+    aws_eks_cluster.this,
+    aws_eks_addon.pod_identity_agent,
+    aws_eks_pod_identity_association.cloudwatch_observability,
+    aws_eks_node_group.core_nodegroup,
+    helm_release.aws_load_balancer_controller
+  ]
+}
+
+resource "aws_eks_pod_identity_association" "cloudwatch_observability" {
+  cluster_name    = local.cluster_name
+  namespace       = "amazon-cloudwatch"
+  service_account = "cloudwatch-agent"
+  role_arn        = aws_iam_role.cw_observability_role[0].arn
+}
+
 
 ###############################################################################
 # EKS Managed Node Group (replacing eks_managed_node_groups in the module)    #
