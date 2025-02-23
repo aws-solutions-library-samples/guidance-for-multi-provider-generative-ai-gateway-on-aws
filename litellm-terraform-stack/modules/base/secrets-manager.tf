@@ -19,13 +19,18 @@ resource "aws_secretsmanager_secret" "litellm_master_salt" {
   recovery_window_in_days = 0
 }
 
+locals {
+  litellm_master_key = "sk-${random_password.litellm_master.result}"
+  litellm_salt_key = "sk-${random_password.litellm_salt.result}"
+}
+
 # Store the generated values
 resource "aws_secretsmanager_secret_version" "litellm_master_salt_ver" {
   secret_id = aws_secretsmanager_secret.litellm_master_salt.id
 
   secret_string = jsonencode({
-    LITELLM_MASTER_KEY = "sk-${random_password.litellm_master.result}"
-    LITELLM_SALT_KEY   = "sk-${random_password.litellm_salt.result}"
+    LITELLM_MASTER_KEY = local.litellm_master_key
+    LITELLM_SALT_KEY   = local.litellm_salt_key
   })
 }
 

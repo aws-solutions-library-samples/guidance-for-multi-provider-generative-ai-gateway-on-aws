@@ -124,9 +124,9 @@ output "database_url" {
 }
 
 output "litellm_master_key" {
-  value = random_password.litellm_master.result
+  value = local.litellm_master_key
 }
 
 output "litellm_salt_key" {
-  value = random_password.litellm_salt.result
+  value = local.litellm_salt_key
 }

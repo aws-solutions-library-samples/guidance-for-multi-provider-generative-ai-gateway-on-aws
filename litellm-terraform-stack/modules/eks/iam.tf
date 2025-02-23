@@ -140,8 +140,6 @@ data "aws_iam_policy_document" "pod_identity_assume_role" {
   }
 }
 
-
-
 resource "aws_iam_role" "cw_observability_role" {
   # Make sure this only creates if you're creating the cluster or adding add-ons
   count = var.create_cluster || var.install_add_ons_in_existing_eks_cluster ? 1 : 0
@@ -155,4 +153,30 @@ resource "aws_iam_role_policy_attachment" "cw_agent_policy_attach" {
 
   role       = aws_iam_role.cw_observability_role[0].name
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+data "aws_iam_policy_document" "eks_cluster_kms" {
+  statement {
+    sid     = "AllowKMSUseOfEncryptionKey"
+    effect  = "Allow"
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:DescribeKey",
+      "kms:CreateGrant"
+    ]
+    resources = [
+      aws_kms_key.eks_secrets[0].arn
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "eks_cluster_kms_policy" {
+  count = var.create_cluster ? 1 : 0
+  name = "EKS-Cluster-KMS-Policy"
+  role = aws_iam_role.eks_cluster[0].name
+
+  policy = data.aws_iam_policy_document.eks_cluster_kms.json
 }
