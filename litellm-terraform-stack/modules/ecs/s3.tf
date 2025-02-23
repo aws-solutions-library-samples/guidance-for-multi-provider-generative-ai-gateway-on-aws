@@ -13,6 +13,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "access_log_bucket
     }
 }
 
+data "aws_elb_service_account" "main" {}
+
 resource "aws_s3_bucket_policy" "access_log_bucket" {
   bucket = aws_s3_bucket.access_log_bucket.id
 
@@ -33,6 +35,15 @@ resource "aws_s3_bucket_policy" "access_log_bucket" {
             "aws:SecureTransport" = "false"
           }
         }
+      },
+      {
+        Sid       = "AllowELBLogDelivery"
+        Effect    = "Allow"
+        Principal = {
+          AWS = data.aws_elb_service_account.main.arn
+        }
+        Action    = "s3:PutObject"
+        Resource  = "${aws_s3_bucket.access_log_bucket.arn}/*"
       }
     ]
   })
