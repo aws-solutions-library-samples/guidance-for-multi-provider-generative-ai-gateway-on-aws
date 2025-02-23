@@ -136,8 +136,6 @@ If it's easier for you, you can deploy from an AWS Cloud9 environment using the 
 
 *Note:* This will deploy to your "current region", defined as the region your aws cli is currently pointed to. You can check this by running `aws ec2 describe-availability-zones --output text --query 'AvailabilityZones[0].[RegionName]'` See [this](https://stackoverflow.com/a/63496689) for more details
 
-*Note:* When deploying to EKS, the Terraform has a dependency on the AWS CLI's `Default output format`. Make sure that it is set to `Default output format [None]` or `Default output format [json]`. Setting it to `Default output format [text]` will break the EKS deployment. You can check the current value for this, and change it by using `aws configure`
-
 1. Run `cp .env.template .env`
 2. In `.env`, set the `TERRAFORM_S3_BUCKET_NAME` to a globally unique bucket name. This will store your `.tfstate` files for your terraform deployment.
 3. In `.env`, set the `CERTIFICATE_ARN` to the ARN of the certificate you created in the `Creating your certificate` section of this README.
