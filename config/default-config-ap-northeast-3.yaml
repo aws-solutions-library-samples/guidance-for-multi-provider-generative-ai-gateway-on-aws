@@ -1,0 +1,10 @@
+model_list:
+#Bedrock Models
+  - model_name: anthropic.claude-3-5-sonnet-20241022-v2:0
+    litellm_params:
+      model: bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0
+
+  - model_name: us.anthropic.claude-3-5-sonnet-20241022-v2:0
+    litellm_params:
+      model: bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0
+

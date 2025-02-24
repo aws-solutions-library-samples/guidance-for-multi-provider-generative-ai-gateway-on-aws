@@ -1,0 +1,66 @@
+model_list:
+#Bedrock Models
+  - model_name: amazon.titan-embed-text-v2:0
+    litellm_params:
+      model: bedrock/amazon.titan-embed-text-v2:0
+
+  - model_name: us.amazon.titan-embed-text-v2:0
+    litellm_params:
+      model: bedrock/us.amazon.titan-embed-text-v2:0
+
+  - model_name: anthropic.claude-3-5-sonnet-20240620-v1:0
+    litellm_params:
+      model: bedrock/anthropic.claude-3-5-sonnet-20240620-v1:0
+
+  - model_name: us.anthropic.claude-3-5-sonnet-20240620-v1:0
+    litellm_params:
+      model: bedrock/us.anthropic.claude-3-5-sonnet-20240620-v1:0
+
+  - model_name: anthropic.claude-3-haiku-20240307-v1:0:200k
+    litellm_params:
+      model: bedrock/anthropic.claude-3-haiku-20240307-v1:0:200k
+
+  - model_name: us.anthropic.claude-3-haiku-20240307-v1:0:200k
+    litellm_params:
+      model: bedrock/us.anthropic.claude-3-haiku-20240307-v1:0:200k
+
+  - model_name: anthropic.claude-3-haiku-20240307-v1:0
+    litellm_params:
+      model: bedrock/anthropic.claude-3-haiku-20240307-v1:0
+
+  - model_name: us.anthropic.claude-3-haiku-20240307-v1:0
+    litellm_params:
+      model: bedrock/us.anthropic.claude-3-haiku-20240307-v1:0
+
+  - model_name: anthropic.claude-3-sonnet-20240229-v1:0:28k
+    litellm_params:
+      model: bedrock/anthropic.claude-3-sonnet-20240229-v1:0:28k
+
+  - model_name: us.anthropic.claude-3-sonnet-20240229-v1:0:28k
+    litellm_params:
+      model: bedrock/us.anthropic.claude-3-sonnet-20240229-v1:0:28k
+
+  - model_name: anthropic.claude-3-sonnet-20240229-v1:0:200k
+    litellm_params:
+      model: bedrock/anthropic.claude-3-sonnet-20240229-v1:0:200k
+
+  - model_name: us.anthropic.claude-3-sonnet-20240229-v1:0:200k
+    litellm_params:
+      model: bedrock/us.anthropic.claude-3-sonnet-20240229-v1:0:200k
+
+  - model_name: anthropic.claude-3-sonnet-20240229-v1:0
+    litellm_params:
+      model: bedrock/anthropic.claude-3-sonnet-20240229-v1:0
+
+  - model_name: us.anthropic.claude-3-sonnet-20240229-v1:0
+    litellm_params:
+      model: bedrock/us.anthropic.claude-3-sonnet-20240229-v1:0
+
+  - model_name: anthropic.claude-3-5-sonnet-20241022-v2:0
+    litellm_params:
+      model: bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0
+
+  - model_name: us.anthropic.claude-3-5-sonnet-20241022-v2:0
+    litellm_params:
+      model: bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0
+

@@ -1,10 +1,44 @@
 #!/bin/bash
 set -aeuo pipefail
 
-# Parse command line arguments
+aws_region=$(aws ec2 describe-availability-zones --output text --query 'AvailabilityZones[0].[RegionName]')
+echo $aws_region
+
+# Check if config.yaml exists
 if [ ! -f "config/config.yaml" ]; then
-    echo "config/config.yaml does not exist, creating it from default-config.yaml"
-    cp config/default-config.yaml config/config.yaml
+  echo "config/config.yaml does not exist, creating it by merging base and region-specific configs"
+  
+  # Define the file paths
+  base_config="config/default-config-base.yaml"
+  region_config="config/default-config-${aws_region}.yaml"
+  
+  # Check if the base config exists
+  if [ ! -f "$base_config" ]; then
+    echo "Error: Base config file $base_config not found"
+    exit 1
+  fi
+  
+  # Check if the region-specific config exists
+  if [ ! -f "$region_config" ]; then
+    echo "Error: Region-specific config file $region_config for region $aws_region not found"
+    exit 1
+  fi
+  
+  echo "Merging $base_config with $region_config for region $aws_region"
+  
+  # Extract model lists from both files and combine them
+  yq eval-all '
+    select(fileIndex == 0).model_list + select(fileIndex == 1).model_list
+  ' "$base_config" "$region_config" > "config/combined_models.yaml"
+  
+  # Get the base config without model_list
+  yq eval 'del(.model_list)' "$base_config" > "config/config.yaml.tmp"
+  
+  # Add the combined model_list to the base config
+  yq eval '.model_list = load("config/combined_models.yaml")' "config/config.yaml.tmp" > "config/config.yaml"
+  
+  # Clean up temporary files
+  rm "config/combined_models.yaml" "config/config.yaml.tmp"
 fi
 
 if [ ! -f ".env" ]; then
@@ -12,8 +46,6 @@ if [ ! -f ".env" ]; then
     cp .env.template .env
 fi
 
-aws_region=$(aws ec2 describe-availability-zones --output text --query 'AvailabilityZones[0].[RegionName]')
-echo $aws_region
 
 SKIP_BUILD=false
 while [[ $# -gt 0 ]]; do

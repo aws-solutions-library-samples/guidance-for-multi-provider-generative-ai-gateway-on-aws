@@ -1,0 +1,203 @@
+model_list:
+#Databricks Models (Commented out because the api_base value will vary by user and needs to be manually updated)
+  # - model_name: databricks-meta-llama-3-1-70b-instruct
+  #   litellm_params:
+  #     model: databricks/databricks-meta-llama-3-1-70b-instruct
+  #     api_base: "<Your databricks base url>" # e.g.: https://adb-3064715882934586.6.azuredatabricks.net/serving-endpoints
+
+  # - model_name: databricks-meta-llama-3-1-405b-instruct
+  #   litellm_params:
+  #     model: databricks/databricks-meta-llama-3-1-405b-instruct
+  #     api_base: "<Your databricks base url>" # e.g.: https://adb-3064715882934586.6.azuredatabricks.net/serving-endpoints
+
+  # - model_name: databricks-dbrx-instruct
+  #   litellm_params:
+  #     model: databricks/databricks-dbrx-instruct
+  #     api_base: "<Your databricks base url>" # e.g.: https://adb-3064715882934586.6.azuredatabricks.net/serving-endpoints
+
+  # - model_name: databricks-meta-llama-3-70b-instruct
+  #   litellm_params:
+  #     model: databricks/databricks-meta-llama-3-70b-instruct
+  #     api_base: "<Your databricks base url>" # e.g.: https://adb-3064715882934586.6.azuredatabricks.net/serving-endpoints
+
+  # - model_name: databricks-llama-2-70b-chat
+  #   litellm_params:
+  #     model: databricks/databricks-llama-2-70b-chat
+  #     api_base: "<Your databricks base url>" # e.g.: https://adb-3064715882934586.6.azuredatabricks.net/serving-endpoints
+
+  # - model_name: databricks-mixtral-8x7b-instruct
+  #   litellm_params:
+  #     model: databricks/databricks-mixtral-8x7b-instruct
+  #     api_base: "<Your databricks base url>" # e.g.: https://adb-3064715882934586.6.azuredatabricks.net/serving-endpoints
+
+  # - model_name: databricks-mpt-30b-instruct
+  #   litellm_params:
+  #     model: databricks/databricks-mpt-30b-instruct
+  #     api_base: "<Your databricks base url>" # e.g.: https://adb-3064715882934586.6.azuredatabricks.net/serving-endpoints
+
+  # - model_name: databricks-mpt-7b-instruct
+  #   litellm_params:
+  #     model: databricks/databricks-mpt-7b-instruct
+  #     api_base: "<Your databricks base url>" # e.g.: https://adb-3064715882934586.6.azuredatabricks.net/serving-endpoints
+
+  #Sagemaker Models (Commented out because your config will vary dramatically based on the specific model you are using. Refer to the docs: https://docs.litellm.ai/docs/providers/aws_sagemaker)
+  # - model_name: jumpstart-model
+  #   litellm_params:
+  #     model: sagemaker/jumpstart-dft-hf-textgeneration1-mp-20240815-185614
+
+  #Azure OpenAI Models (Commented out because the api_base and api_version values will vary by user and need to be manually updated)
+  # - model_name: azure/gpt-4o-realtime-preview-2024-10-01
+  #   litellm_params:
+  #     model: azure/gpt-4o-realtime-preview-2024-10-01
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/o1-mini
+  #   litellm_params:
+  #     model: azure/o1-mini
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/o1-preview
+  #   litellm_params:
+  #     model: azure/o1-preview
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-4o-mini
+  #   litellm_params:
+  #     model: azure/gpt-4o-mini
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-4o-mini-2024-07-18
+  #   litellm_params:
+  #     model: azure/gpt-4o-mini-2024-07-18
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-4o
+  #   litellm_params:
+  #     model: azure/gpt-4o
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+      
+  # - model_name: azure/gpt-4o-2024-08-06
+  #   litellm_params:
+  #     model: azure/gpt-4o-2024-08-06
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-4o-2024-05-13
+  #   litellm_params:
+  #     model: azure/gpt-4o-2024-05-13
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-4-turbo
+  #   litellm_params:
+  #     model: azure/gpt-4-turbo
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-4-turbo-preview
+  #   litellm_params:
+  #     model: azure/gpt-4-0125-preview
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-4-0125-preview
+  #   litellm_params:
+  #     model: azure/gpt-4-0125-preview
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-4-1106-preview
+  #   litellm_params:
+  #     model: azure/gpt-4-1106-preview
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-3.5-turbo
+  #   litellm_params:
+  #     model: azure/gpt-3.5-turbo
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-3.5-turbo-1106
+  #   litellm_params:
+  #     model: azure/gpt-3.5-turbo-1106
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-3.5-turbo-0301
+  #   litellm_params:
+  #     model: azure/gpt-3.5-turbo-0301
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-3.5-turbo-0613
+  #   litellm_params:
+  #     model: azure/gpt-3.5-turbo-0613
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-3.5-turbo-16k
+  #   litellm_params:
+  #     model: azure/gpt-3.5-turbo-16k
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-3.5-turbo-16k-0613
+  #   litellm_params:
+  #     model: azure/gpt-3.5-turbo-16k-0613
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-4
+  #   litellm_params:
+  #     model: azure/gpt-4
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-4-0314
+  #   litellm_params:
+  #     model: azure/gpt-4-0314
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-4-0613
+  #   litellm_params:
+  #     model: azure/gpt-4-0613
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-4-32k
+  #   litellm_params:
+  #     model: azure/gpt-4-32k
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-4-32k-0314
+  #   litellm_params:
+  #     model: azure/gpt-4-32k-0314
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  # - model_name: azure/gpt-4-32k-0613
+  #   litellm_params:
+  #     model: azure/gpt-4-32k-0613
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+  
+  # - model_name: azure/gpt-4-vision-preview
+  #   litellm_params:
+  #     model: azure/gpt-4-vision-preview
+  #     api_base: https://<your-resource-name>.openai.azure.com/
+  #     api_version: "<your api version>"
+
+  #Azure AI Studio Models (Commented out because the api_base value will vary by user and need to be manually updated)
+  # - model_name: azure_ai/Llama-3.1-70B-Instruct
+  #   litellm_params:
+  #     model: azure_ai/Llama-3.1-70B-Instruct
+  #     api_base: "<your azure ai base url>"
