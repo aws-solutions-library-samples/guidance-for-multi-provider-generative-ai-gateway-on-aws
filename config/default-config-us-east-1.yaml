@@ -62,11 +62,11 @@ model_list:
 
   - model_name: ai21.jamba-1-5-large-v1:0
     litellm_params:
-      model: bedrock/ai21.jamba-1-5-large-v1:0
+      model: bedrock/converse/ai21.jamba-1-5-large-v1:0
 
   - model_name: ai21.jamba-1-5-mini-v1:0
     litellm_params:
-      model: bedrock/ai21.jamba-1-5-mini-v1:0
+      model: bedrock/converse/ai21.jamba-1-5-mini-v1:0
 
   - model_name: anthropic.claude-3-haiku-20240307-v1:0
     litellm_params:
@@ -188,3 +188,6 @@ model_list:
     litellm_params:
       model: bedrock/us.anthropic.claude-3-5-sonnet-20241022-v2:0
 
+  - model_name: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+    litellm_params:
+      model: bedrock/converse/us.anthropic.claude-3-7-sonnet-20250219-v1:0
