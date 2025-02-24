@@ -529,9 +529,7 @@ There is currently no way to set this priority on the server side. So you must h
 
 #### Bedrock interface
 
-This deployment has a middleware layer that allows you to use the Bedrock interface via boto3 instead of the OpenAi interface. This requires overriding the `endpoint_url`, and injecting your api key into the authorization header in the request. There are example scripts on how to do this, `test-middleware-synchronous.py` (for synchronous requests) and `test-middleware-streaming.py` (for streaming requests)
-
-To use this script:
+This deployment has a middleware layer that allows you to use the Bedrock interface via boto3 instead of the OpenAi interface. This requires overriding the `endpoint_url`, and injecting your api key into the authorization header in the request. Below is an example script on how to do this:
 
 Set the required environment variables:
 
@@ -545,16 +543,17 @@ Install dependencies:
 
 `pip install boto3`
 
-Run the script:
+Run the below script:
 
-`python test-middleware-synchronous.py` (for synchronous requests)
-
-`python test-middleware-streaming.py` (for streaming requests)
-
-
-The key part of this script is the initialization of the boto3 client, like this:
+Here is a basic example of initializing and using the boto3 client for use with the gateway:
 
 ```
+import boto3
+import os
+from botocore.client import Config
+from botocore import UNSIGNED
+from typing import Generator, Dict, Any, Optional
+
 def create_bedrock_client():
     """
     Creates a Bedrock client with custom endpoint and authorization header.
@@ -602,9 +601,14 @@ def create_bedrock_client():
     client.meta.events.register("request-created.*", add_authorization_header)
 
     return client
-```
 
-Once that client is initialized, you can use it exactly as you would use boto3 to call AWS Bedrock directly (currently only supports `converse` and `converse_stream`)
+
+bedrock_client = create_bedrock_client()
+messages = [{"role": "user", "content": [{"text": "Create a list of 3 pop songs."}]}]
+model_id = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+response = bedrock_client.converse(modelId=model_id, messages=messages)
+print(response)
+```
 
 #### Bedrock Managed Prompts
 
