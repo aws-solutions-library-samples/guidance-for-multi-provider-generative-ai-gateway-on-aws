@@ -841,7 +841,7 @@ To use langsmith, provide your LANGSMITH_API_KEY, LANGSMITH_PROJECT, and LANGSMI
 3. Run `./create-ec2-to-access-private-load-balancer.sh`
 4. The public ip address will be output as `bastion_host_public_ip`. Make note of it for later.
 5. Modify the hostnames on your local machine (Instructions for Mac. Windows should be similar, still need to test.)
-    * sudo vim /etc/hosts
+    * `sudo vim /etc/hosts`
     * update the localhost entry
         * Original: `127.0.0.1 localhost`
         * Modified: `127.0.0.1 localhost <RECORD_NAME specified in .env file>` e.g. `127.0.0.1 localhost genai-gateway.liumike.people.aws.dev`
