@@ -34,6 +34,7 @@ Project ACTIVE as of Feb 15, 2025
     - [Chat History](#chat-history)
     - [Okta Oauth 2.0 JWT Token Auth Support](#okta-oauth-20-jwt-token-auth-support)
     - [Langsmith support](#langsmith-support)
+    - [Setting up bastion host in your VPC to allow access to the private load balancer in the case you set PUBLIC_LOAD_BALANCER="false"](#setting-up-bastion-host-in-your-vpc-to-allow-access-to-the-private-load-balancer-in-the-case-you-set-public_load_balancerfalse)
 - [Open Source Library](#open-source-library)
 
 ## Project Overview
