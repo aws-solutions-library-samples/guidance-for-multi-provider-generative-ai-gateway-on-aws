@@ -838,14 +838,15 @@ To use langsmith, provide your LANGSMITH_API_KEY, LANGSMITH_PROJECT, and LANGSMI
 1. Create a EC2 Key Pair ([Documentation](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/create-key-pairs.html))
 2. In `.env`, set `EC2_KEY_PAIR_NAME` to your key pair name
 3. Run `./create-ec2-to-access-private-load-balancer.sh`
-3. Modify the hostnames on your local machine (Instructions for Mac. Windows should be similar, still need to test.)
+4. The public ip address will be output as `bastion_host_public_ip`. Make note of it for later.
+5. Modify the hostnames on your local machine (Instructions for Mac. Windows should be similar, still need to test.)
     * sudo vim /etc/hosts
     * update the localhost entry
         * Original: `127.0.0.1 localhost`
         * Modified: `127.0.0.1 localhost <RECORD_NAME specified in .env file>` e.g. `127.0.0.1 localhost genai-gateway.liumike.people.aws.dev`
-4. Set up an ssh tunnel `ssh -i <your_pem_file.pem> -L 8443:<RECORD_NAME>:443 ec2-user@<bastion_host_public_ip>`
-5. Now open a browser and navigate it to `https://<RECORD_NAME>:8443` 
-6. If all has gone well, you should see the LiteLLM UI
+6. Set up an ssh tunnel `ssh -i <your_pem_file.pem> -L 8443:<RECORD_NAME>:443 ec2-user@<bastion_host_public_ip>`
+7. Now open a browser and navigate it to `https://<RECORD_NAME>:8443` 
+8. If all has gone well, you should see the LiteLLM UI
 
 ## Open Source Library
 
