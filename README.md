@@ -177,8 +177,8 @@ Other configurations are not guaranteed to work. You may have to tweak the terra
 
 * If you'd like to run LiteLLM in subnets without outbound internet access, set `DISABLE_OUTBOUND_NETWORK_ACCESS="true"`. Due to lack of internet access, this configuration will only work with AWS Bedrock or SageMaker models. Because of this, you must remove all non-Bedrock/non-SageMaker models from your `config/config.yaml` file. If you do not do this, LiteLLM will fail to start as it will attempt to call third party models over the internet.
 
-* If you'd like the Application Load Balancer to be private to your vpc, set `PUBLIC_LOAD_BALANCER="false"`. To make it more convinient to get access to this private load balancer, we have provided a script to deploy a windows EC2 instance in the same VPC, described in more detail in [Setting up EC2 in your VPC and remote desktop access to it to get access to litellm in the case you set `PUBLIC_LOAD_BALANCER="false"` 
-](#setting-up-ec2-in-your-vpc-and-remote-desktop-access-to-it-to-get-access-to-litellm-in-the-case-you-set-public_load_balancerfalse)
+* If you'd like the Application Load Balancer to be private to your vpc, set `PUBLIC_LOAD_BALANCER="false"`. To make it more convinient to get access to this private load balancer, we have provided a script to deploy a windows EC2 instance in the same VPC, described in more detail in [Setting up bastion host in your VPC to allow access to the private load balancer in the case you set `PUBLIC_LOAD_BALANCER="false"` 
+](#setting-up-bastion-host-in-your-vpc-to-allow-access-to-the-private-load-balancer-in-the-case-you-set-public_load_balancerfalse)
 
 
 
@@ -833,42 +833,19 @@ Reponse
 
 To use langsmith, provide your LANGSMITH_API_KEY, LANGSMITH_PROJECT, and LANGSMITH_DEFAULT_RUN_NAME in your .env file
 
-#### Setting up EC2 in your VPC and remote desktop access to it to get access to litellm in the case you set `PUBLIC_LOAD_BALANCER="false"` 
+#### Setting up bastion host in your VPC to allow access to the private load balancer in the case you set `PUBLIC_LOAD_BALANCER="false"` 
 
-**Prerequisites:**
-
-* CDK (will migrate to terraform later)
-
-**Deploying the ec2**
-
-1. `cd` to the `litellm-private-load-balancer-ec2` folder
-2. cp `.ec2.env.template` `.ec2.env`
-3. In `.ec2.env`, set `KEY_PAIR_NAME` to a key pair that you have the private `.pem` file for. If you don't have a key pair, create one
-4. `cd` back to the root directory
-5. Run `./create-ec2-to-access-private-load-balancer.sh`
-
-**Remote Desktop Setup**
-
-1. Download Microsoft Remote Desktop for Mac
-2. Open Microsoft Remote Desktop and click the "+" button in the top menu, then select "Add PC"
-3. In the "PC name" field under the General tab, enter localhost:13389
-
-4. Click "Add" to add your remote desktop configuration
-5. To get the EC2 instance password
-
-* Go to the AWS Console and locate the EC2 instance named "WindowsBrowserInstance"
-* Select the instance and click "Connect"
-* Go to the "RDP client" tab
-* Click "Get password" at the bottom
-* Upload your private .pem file from your keypair (the one specified in `.ec2.env` in the `KEY_PAIR_NAME` value)
-* Copy the decrypted password - you'll need this to connect
-
-
-6. Open a terminal and run the following AWS SSM command to create a port forwarding session. Replace YOUR_INSTANCE_ID with the instance ID from your stack outputs:
-aws ssm start-session --target YOUR_INSTANCE_ID --document-name AWS-StartPortForwardingSession --parameters "portNumber=3389,localPortNumber=13389"
-
-7. Return to Microsoft Remote Desktop and double-click your newly added PC. When prompted, enter Username: Administrator, Password: [the password you retrieved in step 5]
-
+1. Create a EC2 Key Pair ([Documentation](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/create-key-pairs.html))
+2. In `.env`, set `EC2_KEY_PAIR_NAME` to your key pair name
+3. Run `./create-ec2-to-access-private-load-balancer.sh`
+3. Modify the hostnames on your local machine (Instructions for Mac. Windows should be similar, still need to test.)
+    * sudo vim /etc/hosts
+    * update the localhost entry
+        * Original: `127.0.0.1 localhost`
+        * Modified: `127.0.0.1 localhost <RECORD_NAME specified in .env file>` e.g. `127.0.0.1 localhost genai-gateway.liumike.people.aws.dev`
+4. Set up an ssh tunnel `ssh -i <your_pem_file.pem> -L 8443:<RECORD_NAME>:443 ec2-user@<bastion_host_public_ip>`
+5. Now open a browser and navigate it to `https://<RECORD_NAME>:8443` 
+6. If all has gone well, you should see the LiteLLM UI
 
 ## Open Source Library
 
