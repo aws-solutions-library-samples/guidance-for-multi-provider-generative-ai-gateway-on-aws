@@ -844,7 +844,7 @@ To use langsmith, provide your LANGSMITH_API_KEY, LANGSMITH_PROJECT, and LANGSMI
     * `sudo vim /etc/hosts`
     * update the localhost entry
         * Original: `127.0.0.1 localhost`
-        * Modified: `127.0.0.1 localhost <RECORD_NAME specified in .env file>` e.g. `127.0.0.1 localhost genai-gateway.liumike.people.aws.dev`
+        * Modified: `127.0.0.1 localhost <RECORD_NAME specified in .env file>` e.g. `127.0.0.1 localhost genai-gateway.robert.people.aws.dev`
 6. Set up an ssh tunnel `ssh -i <your_pem_file.pem> -L 8443:<RECORD_NAME>:443 ec2-user@<bastion_host_public_ip>`
 7. Now open a browser and navigate it to `https://<RECORD_NAME>:8443` 
 8. If all has gone well, you should see the LiteLLM UI
