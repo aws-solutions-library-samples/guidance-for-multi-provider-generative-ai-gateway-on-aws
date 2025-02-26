@@ -299,3 +299,13 @@ variable "public_subnets" {
   description = "List of public subnet IDs"
   type        = list(string)
 }
+
+variable "disable_swagger_page" {
+  type    = bool
+  description = "Whether to disable the swagger page or not"
+}
+
+variable "disable_admin_ui" {
+  type    = bool
+  description = "Whether to disable the admin UI or not"
+}

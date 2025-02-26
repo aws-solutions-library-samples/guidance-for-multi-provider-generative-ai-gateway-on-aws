@@ -86,6 +86,8 @@ echo "RDS_INSTANCE_CLASS: $PUBLIC_LOAD_BALANCER"
 echo "RDS_ALLOCATED_STORAGE_GB: $RDS_ALLOCATED_STORAGE_GB"
 echo "REDIS_NODE_TYPE: $REDIS_NODE_TYPE"
 echo "REDIS_NUM_CACHE_CLUSTERS: $REDIS_NUM_CACHE_CLUSTERS"
+echo "DISABLE_SWAGGER_PAGE: $DISABLE_SWAGGER_PAGE"
+echo "DISABLE_ADMIN_UI: $DISABLE_ADMIN_UI"
 
 if [ -n "$CPU_ARCHITECTURE" ]; then
     # Check if CPU_ARCHITECTURE is either "x86" or "arm"
@@ -196,6 +198,8 @@ export TF_VAR_rds_instance_class=$RDS_INSTANCE_CLASS
 export TF_VAR_rds_allocated_storage=$RDS_ALLOCATED_STORAGE_GB
 export TF_VAR_redis_node_type=$REDIS_NODE_TYPE
 export TF_VAR_redis_num_cache_clusters=$REDIS_NUM_CACHE_CLUSTERS
+export TF_VAR_disable_swagger_page=$DISABLE_SWAGGER_PAGE
+export TF_VAR_disable_admin_ui=$DISABLE_ADMIN_UI
 
 if [ -n "$EXISTING_EKS_CLUSTER_NAME" ]; then
     export TF_VAR_create_cluster="false"

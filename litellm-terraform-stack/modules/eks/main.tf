@@ -163,6 +163,16 @@ resource "kubernetes_deployment" "litellm" {
             value = var.disable_outbound_network_access ? "True" : "False"
           }
 
+          env {
+            name = "NO_DOCS"
+            value = var.disable_swagger_page ? "True" : "False"
+          }
+
+          env {
+            name = "DISABLE_ADMIN_UI"
+            value = var.disable_admin_ui ? "True" : "False"
+          }
+
           env_from {
             secret_ref {
               name = kubernetes_secret.litellm_api_keys.metadata[0].name

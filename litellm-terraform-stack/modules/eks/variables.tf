@@ -338,3 +338,13 @@ variable "public_load_balancer" {
   description = "whether the load balancer is public"
   type = bool
 }
+
+variable "disable_swagger_page" {
+  type    = bool
+  description = "Whether to disable the swagger page or not"
+}
+
+variable "disable_admin_ui" {
+  type    = bool
+  description = "Whether to disable the admin UI or not"
+}

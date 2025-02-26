@@ -92,6 +92,8 @@ module "ecs_cluster" {
   memory_target_utilization_percent = var.memory_target_utilization_percent
   private_subnets = module.base.private_subnet_ids
   public_subnets = module.base.public_subnet_ids
+  disable_swagger_page = var.disable_swagger_page
+  disable_admin_ui = var.disable_admin_ui
 
   depends_on = [ module.base ]
 }
@@ -183,6 +185,8 @@ module "eks_cluster" {
   arm_ami_type = var.arm_ami_type
   x86_ami_type = var.x86_ami_type
   public_load_balancer = var.public_load_balancer
+  disable_swagger_page = var.disable_swagger_page
+  disable_admin_ui = var.disable_admin_ui
 
   depends_on = [ module.base ]
 }

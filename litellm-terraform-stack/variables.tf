@@ -330,3 +330,13 @@ variable "redis_num_cache_clusters" {
   type        = number
   description = "The number of cache clusters for Redis"
 }
+
+variable "disable_swagger_page" {
+  type    = bool
+  description = "Whether to disable the swagger page or not"
+}
+
+variable "disable_admin_ui" {
+  type    = bool
+  description = "Whether to disable the admin UI or not"
+}

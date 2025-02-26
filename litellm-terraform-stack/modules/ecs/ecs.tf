@@ -48,7 +48,9 @@ resource "aws_ecs_task_definition" "litellm" {
       { "name": "REDIS_SSL", "value": "True" },
       { "name": "LANGSMITH_PROJECT", "value": "${var.langsmith_project}" },
       { "name": "LANGSMITH_DEFAULT_RUN_NAME", "value": "${var.langsmith_default_run_name}" },
-      { "name": "LITELLM_LOCAL_MODEL_COST_MAP", "value": "${var.disable_outbound_network_access ? "True" : "False"}" }
+      { "name": "LITELLM_LOCAL_MODEL_COST_MAP", "value": "${var.disable_outbound_network_access ? "True" : "False"}" },
+      { "name": "NO_DOCS", "value": "${var.disable_swagger_page ? "True" : "False"}" },
+      { "name": "DISABLE_ADMIN_UI", "value": "${var.disable_admin_ui ? "True" : "False"}" }
     ],
     "secrets": [
       {
