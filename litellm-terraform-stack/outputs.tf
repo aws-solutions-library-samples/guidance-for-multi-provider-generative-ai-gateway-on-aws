@@ -27,3 +27,8 @@ output "vpc_id" {
   description = "the vpc id we deployed to"
   value       = module.base.VpcId
 }
+
+output "ConfigBucketName" {
+  description = "The Name of the configuration bucket"
+  value       = module.base.ConfigBucketName
+}
