@@ -50,7 +50,9 @@ resource "aws_ecs_task_definition" "litellm" {
       { "name": "LANGSMITH_DEFAULT_RUN_NAME", "value": "${var.langsmith_default_run_name}" },
       { "name": "LITELLM_LOCAL_MODEL_COST_MAP", "value": "${var.disable_outbound_network_access ? "True" : "False"}" },
       { "name": "NO_DOCS", "value": "${var.disable_swagger_page ? "True" : "False"}" },
-      { "name": "DISABLE_ADMIN_UI", "value": "${var.disable_admin_ui ? "True" : "False"}" }
+      { "name": "DISABLE_ADMIN_UI", "value": "${var.disable_admin_ui ? "True" : "False"}" },
+      { "name": "LANGFUSE_PUBLIC_KEY", "value": "${var.langfuse_public_key}" },
+      { "name": "LANGFUSE_HOST", "value": "${var.langfuse_host}" }
     ],
     "secrets": [
       {
@@ -152,6 +154,10 @@ resource "aws_ecs_task_definition" "litellm" {
       {
         "name": "LANGSMITH_API_KEY",
         "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:LANGSMITH_API_KEY::"
+      },
+      {
+        "name": "LANGFUSE_SECRET_KEY",
+        "valueFrom": "${aws_secretsmanager_secret_version.litellm_other_secrets_ver.arn}:LANGFUSE_SECRET_KEY::"
       }
     ],
     "portMappings": [

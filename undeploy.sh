@@ -88,6 +88,9 @@ echo "REDIS_NODE_TYPE: $REDIS_NODE_TYPE"
 echo "REDIS_NUM_CACHE_CLUSTERS: $REDIS_NUM_CACHE_CLUSTERS"
 echo "DISABLE_SWAGGER_PAGE: $DISABLE_SWAGGER_PAGE"
 echo "DISABLE_ADMIN_UI: $DISABLE_ADMIN_UI"
+echo "LANGFUSE_PUBLIC_KEY: $LANGFUSE_PUBLIC_KEY"
+echo "LANGFUSE_SECRET_KEY: $LANGFUSE_SECRET_KEY"
+echo "LANGFUSE_HOST: $LANGFUSE_HOST"
 
 if [ -n "$CPU_ARCHITECTURE" ]; then
     # Check if CPU_ARCHITECTURE is either "x86" or "arm"
@@ -200,6 +203,12 @@ export TF_VAR_redis_node_type=$REDIS_NODE_TYPE
 export TF_VAR_redis_num_cache_clusters=$REDIS_NUM_CACHE_CLUSTERS
 export TF_VAR_disable_swagger_page=$DISABLE_SWAGGER_PAGE
 export TF_VAR_disable_admin_ui=$DISABLE_ADMIN_UI
+export TF_VAR_langfuse_public_key=$LANGFUSE_PUBLIC_KEY
+export TF_VAR_langfuse_secret_key=$LANGFUSE_SECRET_KEY
+
+if [ -n "${LANGFUSE_HOST}" ]; then
+    export TF_VAR_langfuse_host=$LANGFUSE_HOST
+fi
 
 if [ -n "$EXISTING_EKS_CLUSTER_NAME" ]; then
     export TF_VAR_create_cluster="false"

@@ -309,3 +309,18 @@ variable "disable_admin_ui" {
   type    = bool
   description = "Whether to disable the admin UI or not"
 }
+
+variable "langfuse_public_key" {
+  type    = string
+  description = "the public key of your langfuse deployment"
+}
+
+variable "langfuse_secret_key" {
+  type    = string
+  description = "the secret key of your langfuse deployment"
+}
+
+variable "langfuse_host" {
+  type    = string
+  description = "the hostname of your langfuse deployment."
+}

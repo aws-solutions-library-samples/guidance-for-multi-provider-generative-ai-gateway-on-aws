@@ -94,6 +94,9 @@ module "ecs_cluster" {
   public_subnets = module.base.public_subnet_ids
   disable_swagger_page = var.disable_swagger_page
   disable_admin_ui = var.disable_admin_ui
+  langfuse_public_key = var.langfuse_public_key
+  langfuse_secret_key = var.langfuse_secret_key
+  langfuse_host = var.langfuse_host
 
   depends_on = [ module.base ]
 }
@@ -187,6 +190,9 @@ module "eks_cluster" {
   public_load_balancer = var.public_load_balancer
   disable_swagger_page = var.disable_swagger_page
   disable_admin_ui = var.disable_admin_ui
+  langfuse_public_key = var.langfuse_public_key
+  langfuse_secret_key = var.langfuse_secret_key
+  langfuse_host = var.langfuse_host
 
   depends_on = [ module.base ]
 }

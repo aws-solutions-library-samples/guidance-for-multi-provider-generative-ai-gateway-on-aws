@@ -40,6 +40,7 @@ resource "kubernetes_secret" "litellm_api_keys" {
     DEEPSEEK_API_KEY      = var.deepseek_api_key
     AI21_API_KEY          = var.ai21_api_key
     LANGSMITH_API_KEY     = var.langsmith_api_key
+    LANGFUSE_SECRET_KEY = var.langfuse_secret_key
   }
 
   depends_on = [
@@ -171,6 +172,16 @@ resource "kubernetes_deployment" "litellm" {
           env {
             name = "DISABLE_ADMIN_UI"
             value = var.disable_admin_ui ? "True" : "False"
+          }
+
+          env {
+            name = "LANGFUSE_PUBLIC_KEY"
+            value = var.langfuse_public_key
+          }
+
+          env {
+            name = "LANGFUSE_HOST"
+            value = var.langfuse_host
           }
 
           env_from {
