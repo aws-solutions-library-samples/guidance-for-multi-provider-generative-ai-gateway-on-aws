@@ -246,6 +246,7 @@ resource "aws_eks_addon" "cloudwatch_observability" {
 }
 
 resource "aws_eks_pod_identity_association" "cloudwatch_observability" {
+  count = var.create_cluster || var.install_add_ons_in_existing_eks_cluster ? 1 : 0
   cluster_name    = local.cluster_name
   namespace       = "amazon-cloudwatch"
   service_account = "cloudwatch-agent"

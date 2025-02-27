@@ -156,6 +156,7 @@ resource "aws_iam_role_policy_attachment" "cw_agent_policy_attach" {
 }
 
 data "aws_iam_policy_document" "eks_cluster_kms" {
+  count = var.create_cluster ? 1 : 0
   statement {
     sid     = "AllowKMSUseOfEncryptionKey"
     effect  = "Allow"
@@ -178,5 +179,5 @@ resource "aws_iam_role_policy" "eks_cluster_kms_policy" {
   name = "EKS-Cluster-KMS-Policy"
   role = aws_iam_role.eks_cluster[0].name
 
-  policy = data.aws_iam_policy_document.eks_cluster_kms.json
+  policy = data.aws_iam_policy_document.eks_cluster_kms[0].json
 }
