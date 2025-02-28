@@ -16,4 +16,4 @@ COPY . /app
 # Expose the port; ECS will map it
 EXPOSE 8080
 
-CMD ["python", "fake_openai_server.py"]
+CMD ["python", "fake_llm_server.py"]

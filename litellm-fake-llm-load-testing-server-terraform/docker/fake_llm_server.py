@@ -63,6 +63,47 @@ app.add_middleware(
 async def health_check():
     return {"status": "healthy"}
 
+@app.post("/model/{model_id}/converse")
+async def converse(model_id: str, request: Request):
+    """
+    Fake Bedrock 'converse' endpoint. 
+    Returns a single JSON response according to the Bedrock response schema.
+    """
+    body = await request.json()
+
+    # Simulate random processing delay (optional)
+    # await asyncio.sleep(random.uniform(1.0, 3.0))
+
+    # You could inspect 'body' here to see the user's messages or parameters.
+    # For example: messages = body.get("messages", [])
+    # Then craft a response. Here we just hard-code a sample.
+
+    # A minimal valid Bedrock-like response
+    response_data = {
+        "output": {
+            "message": {
+                "role": "assistant",
+                "content": [
+                    {
+                        "text": "Hello there! This is a fake response from the Bedrock model."
+                    }
+                ]
+            }
+        },
+        "stopReason": "end_turn",
+        "usage": {
+            "inputTokens": 30,
+            "outputTokens": 10,
+            "totalTokens": 40
+        },
+        "metrics": {
+            "latencyMs": 1234
+        }
+    }
+
+    # Return a JSON response
+    return JSONResponse(content=response_data)
+
 
 @app.post("/chat/completions")
 @app.post("/v1/chat/completions")
@@ -77,7 +118,7 @@ async def completion(request: Request):
 
     if stream_requested:
         # Simulate a small initial delay before the streaming starts
-        await asyncio.sleep(random.uniform(0.8, 1.5))
+        #await asyncio.sleep(random.uniform(0.8, 1.5))
 
         # Return a streaming response
         async def stream_generator():
@@ -114,7 +155,7 @@ async def completion(request: Request):
                     ],
                 }
                 yield f"data: {json.dumps(chunk_data)}\n\n"
-                await asyncio.sleep(random.uniform(0.2, 0.8))
+                #await asyncio.sleep(random.uniform(0.2, 0.8))
 
             # Final chunk signaling the end
             final_chunk = {
@@ -138,7 +179,7 @@ async def completion(request: Request):
 
     else:
         # Normal non-streaming response with random 1–3 second delay
-        await asyncio.sleep(random.uniform(1.0, 3.0))
+        #await asyncio.sleep(random.uniform(1.0, 3.0))
         return {
             "id": "chatcmpl-123",
             "object": "chat.completion",

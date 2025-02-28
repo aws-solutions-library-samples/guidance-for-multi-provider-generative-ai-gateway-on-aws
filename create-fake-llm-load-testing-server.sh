@@ -6,20 +6,14 @@ aws_region=$(aws ec2 describe-availability-zones --output text --query 'Availabi
 echo $aws_region
 
 APP_NAME=fakeserver
-LITELLM_STACK_NAME="LitellmCdkStack"
-FAKE_OPENAI_SERVER_STACK_NAME="LitellmFakeOpenaiLoadTestingServerCdkStack"
 
 source .env
 
-cd litellm-cdk
-VPC_ID=$(jq -r ".\"${LITELLM_STACK_NAME}\".VpcId" ./outputs.json)
+cd litellm-terraform-stack
+VPC_ID=$(terraform output -raw vpc_id)
 cd ..
 
-cd litellm-fake-openai-load-testing-server-cdk
-npm install
-
-source .env.testing
-
+cd litellm-fake-llm-load-testing-server-terraform
 
 if [ -n "$CPU_ARCHITECTURE" ]; then
     # Check if CPU_ARCHITECTURE is either "x86" or "arm"
@@ -57,22 +51,31 @@ cd docker
 cd ..
 
 echo "about to deploy"
-export JSII_SILENCE_WARNING_UNTESTED_NODE_VERSION=1
 
-cdk deploy "$FAKE_OPENAI_SERVER_STACK_NAME" --require-approval never \
---context vpcId=$VPC_ID \
---context certificateArn=$LOAD_TESTING_ENDPOINT_CERTIFICATE_ARN \
---context hostedZoneName=$LOAD_TESTING_ENDPOINT_HOSTED_ZONE_NAME \
---context domainName=$LOAD_TESTING_ENDPOINT_DOMAIN_NAME \
---context ecrFakeServerRepository=$APP_NAME \
---context architecture=$ARCH \
---outputs-file ./outputs.json
+export TF_VAR_vpc_id=$VPC_ID
+export TF_VAR_ecr_fake_server_repository=$APP_NAME
+export TF_VAR_architecture=$ARCH
+export TF_VAR_fake_llm_load_testing_endpoint_certifiacte_arn=$FAKE_LLM_LOAD_TESTING_ENDPOINT_CERTIFICATE_ARN
+export TF_VAR_fake_llm_load_testing_endpoint_hosted_zone_name=$FAKE_LLM_LOAD_TESTING_ENDPOINT_HOSTED_ZONE_NAME
+export TF_VAR_fake_llm_load_testing_endpoint_record_name=$FAKE_LLM_LOAD_TESTING_ENDPOINT_RECORD_NAME
+
+
+cat > backend.hcl << EOF
+bucket  = "${TERRAFORM_S3_BUCKET_NAME}"
+key     = "terraform-fake-llm-server.tfstate"
+region  = "${aws_region}"
+encrypt = true
+EOF
+echo "Generated backend.hcl configuration"
+
+terraform init -backend-config=backend.hcl -reconfigure
+terraform apply -auto-approve
 
 echo "deployed"
 
 if [ $? -eq 0 ]; then
-    LITELLM_ECS_CLUSTER=$(jq -r ".\"${FAKE_OPENAI_SERVER_STACK_NAME}\".FakeServerEcsCluster" ./outputs.json)
-    LITELLM_ECS_TASK=$(jq -r ".\"${FAKE_OPENAI_SERVER_STACK_NAME}\".FakeServerEcsTask" ./outputs.json)
+    LITELLM_ECS_CLUSTER=$(terraform output -raw fake_server_ecs_cluster)
+    LITELLM_ECS_TASK=$(terraform output -raw fake_server_ecs_task)
     
     aws ecs update-service \
         --cluster $LITELLM_ECS_CLUSTER \

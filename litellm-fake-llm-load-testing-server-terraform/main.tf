@@ -1,8 +1,4 @@
 # Data sources
-data "aws_vpc" "fake_server_vpc" {
-  id = var.vpc_id
-}
-
 data "aws_subnets" "public" {
   filter {
     name   = "vpc-id"
@@ -25,12 +21,8 @@ data "aws_subnets" "private" {
   }
 }
 
-data "aws_acm_certificate" "fake_server_cert" {
-  arn = var.certificate_arn
-}
-
 data "aws_route53_zone" "hosted_zone" {
-  name = var.hosted_zone_name
+  name = var.fake_llm_load_testing_endpoint_hosted_zone_name
 }
 
 data "aws_ecr_repository" "fake_server_repo" {
@@ -38,8 +30,8 @@ data "aws_ecr_repository" "fake_server_repo" {
 }
 
 # ECS Cluster
-resource "aws_ecs_cluster" "fake_openai_cluster" {
-  name = "FakeOpenAICluster"
+resource "aws_ecs_cluster" "fake_llm_cluster" {
+  name = "FakeLlmCluster"
 }
 
 # ECS Task Definition
@@ -67,7 +59,7 @@ resource "aws_ecs_task_definition" "fake_server_task_def" {
         logDriver = "awslogs"
         options = {
           "awslogs-group"         = aws_cloudwatch_log_group.fake_server_logs.name
-          "awslogs-region"        = "us-east-1" # Replace with your region
+          "awslogs-region"        = data.aws_region.current.name
           "awslogs-stream-prefix" = "FakeServer"
         }
       }
@@ -146,7 +138,7 @@ resource "aws_lb_listener" "fake_server_listener" {
   port              = "443"
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-  certificate_arn   = data.aws_acm_certificate.fake_server_cert.arn
+  certificate_arn   = var.fake_llm_load_testing_endpoint_certifiacte_arn
 
   default_action {
     type             = "forward"
@@ -159,7 +151,7 @@ resource "aws_lb_target_group" "fake_server_tg" {
   name        = "FakeServer-TG"
   port        = 8080
   protocol    = "HTTP"
-  vpc_id      = data.aws_vpc.fake_server_vpc.id
+  vpc_id      = var.vpc_id
   target_type = "ip"
 
   health_check {
@@ -179,7 +171,7 @@ resource "aws_lb_target_group" "fake_server_tg" {
 resource "aws_security_group" "alb_sg" {
   name        = "fake-server-alb-sg"
   description = "Allow HTTPS inbound traffic"
-  vpc_id      = data.aws_vpc.fake_server_vpc.id
+  vpc_id      = var.vpc_id
 
   ingress {
     description = "HTTPS from internet"
@@ -200,7 +192,7 @@ resource "aws_security_group" "alb_sg" {
 resource "aws_security_group" "ecs_sg" {
   name        = "fake-server-ecs-sg"
   description = "Allow inbound traffic from ALB"
-  vpc_id      = data.aws_vpc.fake_server_vpc.id
+  vpc_id      = var.vpc_id
 
   ingress {
     description     = "HTTP from ALB"
@@ -221,7 +213,7 @@ resource "aws_security_group" "ecs_sg" {
 # ECS Service
 resource "aws_ecs_service" "fake_server_service" {
   name                               = "FakeServer"
-  cluster                            = aws_ecs_cluster.fake_openai_cluster.id
+  cluster                            = aws_ecs_cluster.fake_llm_cluster.id
   task_definition                    = aws_ecs_task_definition.fake_server_task_def.arn
   desired_count                      = 1
   launch_type                        = "FARGATE"
@@ -243,7 +235,7 @@ resource "aws_ecs_service" "fake_server_service" {
 # Route 53 Record
 resource "aws_route53_record" "fake_server_dns" {
   zone_id = data.aws_route53_zone.hosted_zone.zone_id
-  name    = var.domain_name
+  name    = var.fake_llm_load_testing_endpoint_record_name
   type    = "A"
 
   alias {
@@ -253,18 +245,3 @@ resource "aws_route53_record" "fake_server_dns" {
   }
 }
 
-# Outputs
-output "fake_server_ecs_cluster" {
-  value       = aws_ecs_cluster.fake_openai_cluster.name
-  description = "Name of the ECS Cluster"
-}
-
-output "fake_server_ecs_task" {
-  value       = aws_ecs_service.fake_server_service.name
-  description = "Name of the task service"
-}
-
-output "fake_server_service_url" {
-  value       = "https://${var.domain_name}"
-  description = "URL of the deployed service"
-}

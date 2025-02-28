@@ -4,18 +4,18 @@ variable "vpc_id" {
   type        = string
 }
 
-variable "certificate_arn" {
+variable "fake_llm_load_testing_endpoint_certifiacte_arn" {
   description = "ARN of the SSL certificate"
   type        = string
 }
 
-variable "hosted_zone_name" {
+variable "fake_llm_load_testing_endpoint_hosted_zone_name" {
   description = "Name of the hosted zone"
   type        = string
 }
 
-variable "domain_name" {
-  description = "Domain name for the service"
+variable "fake_llm_load_testing_endpoint_record_name" {
+  description = "Route53 A record name for the service"
   type        = string
 }
 
