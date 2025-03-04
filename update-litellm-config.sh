@@ -40,12 +40,10 @@ if [ "$DEPLOYMENT_PLATFORM" = "ECS" ]; then
 fi
 
 if [ "$DEPLOYMENT_PLATFORM" = "EKS" ]; then
-    echo "Rebooting ECS deployment $EKS_DEPLOYMENT_NAME on EKS cluster $EKS_CLUSTER_NAME"
     EKS_CLUSTER_NAME=$(terraform output -raw eks_cluster_name)
     EKS_DEPLOYMENT_NAME=$(terraform output -raw eks_deployment_name)
+    echo "Rebooting ECS deployment $EKS_DEPLOYMENT_NAME on EKS cluster $EKS_CLUSTER_NAME"
 
-    echo "EKS_DEPLOYMENT_NAME: $EKS_DEPLOYMENT_NAME"
-    echo "EKS_CLUSTER_NAME: $EKS_CLUSTER_NAME"
     aws eks update-kubeconfig --region $aws_region --name $EKS_CLUSTER_NAME
     kubectl rollout restart deployment $EKS_DEPLOYMENT_NAME
 fi
