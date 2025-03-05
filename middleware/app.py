@@ -874,7 +874,6 @@ async def proxy_request(request: Request):
     body = await request.body()
     try:
         data = json.loads(body)
-
         is_streaming = data.get("stream", False)
 
         enable_history = data.pop("enable_history", False)
