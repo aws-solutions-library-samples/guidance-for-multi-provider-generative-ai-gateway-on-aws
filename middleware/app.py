@@ -872,6 +872,7 @@ async def get_chat_stream(
 @app.post("/chat/completions")
 async def proxy_request(request: Request):
     body = await request.body()
+
     try:
         data = json.loads(body)
         is_streaming = data.get("stream", False)
