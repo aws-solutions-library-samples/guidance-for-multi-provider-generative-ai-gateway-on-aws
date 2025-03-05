@@ -890,6 +890,7 @@ async def proxy_request(request: Request):
             )
         provided_hash = hash_api_key(api_key)
 
+        # Prepare or load chat_history
         if history_enabled:
             if session_id is not None:
                 # Retrieve or verify existing session
@@ -902,44 +903,33 @@ async def proxy_request(request: Request):
                                 "error": "Unauthorized: API key does not match session owner"
                             },
                         )
-                    chat_history = (
-                        session_data["chat_history"]
-                        if session_data["chat_history"]
-                        else []
-                    )
+                    chat_history = session_data["chat_history"] or []
                 else:
                     chat_history = []
                     create_chat_history(session_id, chat_history, provided_hash)
             else:
-                # No session_id provided but enable_history = True, so create a new session
+                # No session_id but enable_history = True, so create a new session
                 session_id = str(uuid.uuid4())
                 chat_history = []
                 create_chat_history(session_id, chat_history, provided_hash)
-
-            # Merge incoming user messages into chat history
-            user_messages_this_round = [
-                m for m in data.get("messages", []) if m["role"] == "user"
-            ]
-            if user_messages_this_round:
-                chat_history.append(user_messages_this_round[-1])
-
-            # Overwrite data["messages"] with chat_history for the LLM request
-            data["messages"] = chat_history
         else:
-            # History is disabled and no valid session_id is provided.
-            # Pass messages through as-is.
+            # History not enabled: start with empty
             chat_history = []
 
-        # Merge incoming user messages into chat history
-        user_messages_this_round = [
-            m for m in data.get("messages", []) if m["role"] == "user"
-        ]
-        if user_messages_this_round:
-            chat_history.append(user_messages_this_round[-1])
+        # Merge incoming system/user messages into chat_history in original order
+        # (We generally skip adding "assistant" messages from the request side,
+        #  because those come from the model, not from the user.)
+        new_messages = data.get("messages", [])
+        for msg in new_messages:
+            if msg["role"] in ["system", "user"]:
+                chat_history.append(msg)
 
+        # Now data["messages"] should be the entire conversation the model sees
         data["messages"] = chat_history
 
-        # Check for prompt ARN logic
+        # ---------------------------------------------------------------------
+        # Handle optional "Bedrock Prompt" logic (unchanged from your snippet):
+        # ---------------------------------------------------------------------
         model_id = data.get("model")
         prompt_variables = data.pop("promptVariables", {})
         final_prompt_text = None
@@ -968,15 +958,14 @@ async def proxy_request(request: Request):
         if final_prompt_text:
             data["messages"] = [{"role": "user", "content": final_prompt_text}]
 
-        # client = AsyncOpenAI(api_key=api_key, base_url=LITELLM_ENDPOINT)
-
+        # ---------------------------------------------------------------------
+        # Stream vs. Non-Stream logic
+        # ---------------------------------------------------------------------
         if is_streaming:
-            # print(f"streaming")
             return await get_chat_stream(
                 api_key, data, session_id, chat_history, history_enabled
             )
         else:
-            # print(f"not streaming")
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {api_key}",
@@ -985,14 +974,14 @@ async def proxy_request(request: Request):
                 async with session.post(
                     f"{LITELLM_ENDPOINT}/v1/chat/completions",
                     headers=headers,
-                    json=data,  # Sending the data in the body
+                    json=data,
                 ) as resp:
-                    # Parse the response JSON
                     response_headers = dict(resp.headers)
-                    response_headers.pop("Content-Length")
-                    # print(response_headers)
+                    # Avoid passing through invalid content-length
+                    response_headers.pop("Content-Length", None)
                     response_dict = await resp.json()
 
+            # If there's a response from the assistant, save it to history
             if response_dict.get("choices"):
                 assistant_message = response_dict["choices"][0]["message"]
                 if history_enabled:
@@ -1001,6 +990,7 @@ async def proxy_request(request: Request):
                     )
                     update_chat_history(session_id, chat_history)
 
+            # Return session_id in the response if we have one
             if session_id:
                 response_dict["session_id"] = session_id
 

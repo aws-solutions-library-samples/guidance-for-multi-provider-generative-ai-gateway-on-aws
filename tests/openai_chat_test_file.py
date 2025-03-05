@@ -11,6 +11,7 @@ load_dotenv()
 base_url = os.getenv("API_ENDPOINT")
 api_key = os.getenv("API_KEY")
 model_id = os.getenv("MODEL_ID")
+print(f'base_url: {base_url} api_key: {api_key} model_id: {model_id}')
 client = OpenAI(base_url=base_url, api_key=api_key)
 managed_prompt_arn = os.getenv("MANAGED_PROMPT_ARN")
 managed_prompt_variable_name = os.getenv("MANAGED_PROMPT_VARIABLE_NAME")
@@ -23,7 +24,7 @@ large_prompt = "Hello" * 10000
 
 async def stream_completion(
     prompt: str,
-    model: str = "anthropic.claude-3-5-sonnet-20241022-v2:0",
+    model: str = "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
     extra_body: Dict[str, Any] = None,
 ) -> AsyncGenerator[Tuple[str, str], None]:
     """
@@ -55,8 +56,8 @@ async def stream_completion(
 
 
 def get_completion(
-    prompt: str,
-    model: str = "anthropic.claude-3-5-sonnet-20241022-v2:0",
+    messages: list,
+    model: str = "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
     extra_body: Dict[str, Any] = None,
 ) -> Tuple[str, str]:
     """
@@ -68,7 +69,7 @@ def get_completion(
 
     response = client.chat.completions.create(
         model=model,
-        messages=[{"role": "user", "content": prompt}],
+        messages=messages,
         stream=False,
         extra_body=extra_body,
     )
@@ -79,7 +80,7 @@ def get_completion(
 
 
 def test_openai_chat():
-    content, session_id = get_completion(small_prompt)
+    content, session_id = get_completion([{"role": "user", "content": small_prompt}])
     assert content is not None and content.strip()
     assert session_id is not None and session_id.strip()
     print(f"test_openai_chat response content: {content} session_id: {session_id}")
@@ -106,7 +107,7 @@ async def test_openai_chat_streaming():
 
 def test_openai_chat_history():
     print("First request:", flush=True)
-    response_content_1, session_id_1 = get_completion(small_prompt)
+    response_content_1, session_id_1 = get_completion([{"role": "system", "content": "You are a master storyteller"},{"role": "user", "content": small_prompt}], model_id, extra_body={"enable_history": True})
     assert response_content_1 is not None and response_content_1.strip()
     assert session_id_1 is not None and session_id_1.strip()
     print(f"Content: {response_content_1}")
@@ -114,7 +115,7 @@ def test_openai_chat_history():
 
     print("\nSecond request (with session_id):", flush=True)
     response_content_2, session_id_2 = get_completion(
-        small_prompt_follow_up, extra_body={"session_id": session_id_1}
+        [{"role": "user", "content": small_prompt_follow_up}], model_id, extra_body={"session_id": session_id_1}
     )
     print(f"Content: {response_content_2}")
     print(f"Session ID: {session_id_2}\n")
@@ -171,7 +172,7 @@ def test_bedrock_managed_prompt():
 
     # Test with a managed prompt
     response_content, session_id = get_completion(
-        "",  # Empty prompt as it won't be used
+        [{"role": "user", "content": ""}],  # Empty prompt as it won't be used
         model=managed_prompt_arn,
         extra_body={
             "promptVariables": {
@@ -220,7 +221,7 @@ async def test_bedrock_managed_prompt_streaming():
 
 
 def test_large_prompt():
-    content, session_id = get_completion(large_prompt)
+    content, session_id = get_completion([{"role": "user", "content": large_prompt}])
     assert content is not None and content.strip()
     assert session_id is not None and session_id.strip()
     print(f"test_openai_chat response content: {content} session_id: {session_id}")
@@ -238,7 +239,7 @@ def test_invalid_api_key():
     # Attempt to make a request with the invalid client
     with pytest.raises(OpenAIError) as exc_info:
         response = invalid_client.chat.completions.create(
-            model="anthropic.claude-3-5-sonnet-20241022-v2:0",
+            model="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
             messages=[{"role": "user", "content": small_prompt}],
             stream=False,
         )
