@@ -872,10 +872,8 @@ async def get_chat_stream(
 @app.post("/chat/completions")
 async def proxy_request(request: Request):
     body = await request.body()
-    print(f'initial body: {body}')
     try:
         data = json.loads(body)
-        print(f'initial data: {data}')
 
         is_streaming = data.get("stream", False)
 
@@ -960,7 +958,6 @@ async def proxy_request(request: Request):
         # ---------------------------------------------------------------------
         # Stream vs. Non-Stream logic
         # ---------------------------------------------------------------------
-        print(f'final data sent to litellm: {data}')
         if is_streaming:
             return await get_chat_stream(
                 api_key, data, session_id, chat_history, history_enabled
