@@ -19,14 +19,17 @@ model_list:
   - model_name: amazon.titan-embed-text-v1
     litellm_params:
       model: bedrock/amazon.titan-embed-text-v1
+      drop_params: true #Needed to avoid errors when encoding_format is passed in by openai python client
 
   - model_name: amazon.titan-embed-text-v2:0
     litellm_params:
       model: bedrock/amazon.titan-embed-text-v2:0
+      drop_params: true #Needed to avoid errors when encoding_format is passed in by openai python client
 
   - model_name: amazon.titan-embed-image-v1
     litellm_params:
       model: bedrock/amazon.titan-embed-image-v1
+      drop_params: true #Needed to avoid errors when encoding_format is passed in by openai python client
 
   - model_name: amazon.titan-image-generator-v1
     litellm_params:
@@ -83,6 +86,7 @@ model_list:
   - model_name: cohere.embed-english-v3
     litellm_params:
       model: bedrock/cohere.embed-english-v3
+      drop_params: true #Needed to avoid errors when encoding_format is passed in by openai python client
 
   - model_name: cohere.embed-multilingual-v3
     litellm_params:
