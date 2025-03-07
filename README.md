@@ -113,7 +113,7 @@ If it's easier for you, you can deploy from an AWS Cloud9 environment using the 
 5. Once, the environment is deployed, click `Open` under `Cloud9 IDE`
 6. In the terminal, run the following commands:
 7. `git clone https://github.com/aws-samples/genai-gateway.git`
-8. run `sudo ./install-cloud9-prerequisites.sh` (This will install `jq`, `terraform`, and `kubectl` for you. All other dependencies are pre-installed on Cloud9)
+8. 'cd genai-gateway/' and run `sudo ./install-cloud9-prerequisites.sh` (This will install `jq`, `terraform`, and `kubectl` for you. All other dependencies are pre-installed on Cloud9)
 9. Due to a limitation in Cloud 9, the built-in credentials only last 15 minutes. This will always cause your deployments to fail. To avoid this, you MUST do the following
   * Open up the credentials file via `vi ~/.aws/credentials`
   * Paste in your own credentials that have admin access, and will last at least an hour.
