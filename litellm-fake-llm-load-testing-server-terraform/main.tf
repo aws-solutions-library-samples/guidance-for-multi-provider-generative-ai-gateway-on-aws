@@ -215,7 +215,7 @@ resource "aws_ecs_service" "fake_server_service" {
   name                               = "FakeServer"
   cluster                            = aws_ecs_cluster.fake_llm_cluster.id
   task_definition                    = aws_ecs_task_definition.fake_server_task_def.arn
-  desired_count                      = 1
+  desired_count                      = 3
   launch_type                        = "FARGATE"
   health_check_grace_period_seconds  = 300
   

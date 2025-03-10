@@ -90,4 +90,5 @@ resource "aws_db_instance" "database" {
   monitoring_role_arn      = aws_iam_role.rds_enhanced_monitoring.arn
   parameter_group_name = aws_db_parameter_group.example_pg.name
   copy_tags_to_snapshot     = true
+  apply_immediately = true
 }
