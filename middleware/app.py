@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse, Response
 import httpx
 import json
-from typing import Dict, Any, AsyncGenerator, List, Optional
+from typing import Dict, Any, AsyncGenerator, List, Optional, Tuple
 from openai import AsyncOpenAI
 import struct
 import zlib
@@ -1115,8 +1115,6 @@ async def list_session_ids_for_api_key(request: Request):
 
     return {"session_ids": session_ids}
 
-
-# ToDo: Enforce that a non-admin user can only create keys for themself if this bug isn't fixed in a timely manner https://github.com/BerriAI/litellm/issues/7336
 @app.post("/key/generate")
 async def forward_key_generate(request: Request):
     async with httpx.AsyncClient() as client:
@@ -1197,6 +1195,458 @@ async def forward_user_new(request: Request):
             headers=response.headers,
         )
 
+
+# ---------------
+# The new Invoke Model endpoint
+# ---------------
+@app.post("/bedrock/model/{model_id}/invoke")
+async def handle_bedrock_invoke(model_id: str, request: Request):
+    """
+    Handles requests in the AWS Bedrock Invoke Model format and
+    routes them to your LLM/OpenAI endpoint, then converts the
+    response back into a Bedrock Invoke Model-compatible response.
+    """
+    try:
+        bedrock_invoke_response, session_id = await process_invoke_request(model_id, request)
+        headers = {"X-Session-Id": session_id} if session_id else {}
+        return JSONResponse(content=bedrock_invoke_response, headers=headers)
+    except HTTPException as he:
+        print(f"HTTPException he: {he}")
+        return JSONResponse(
+            status_code=he.status_code,
+            content={
+                "Message": he.detail,
+            },
+        )
+    except Exception as e:
+        print(f"Exception e: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "Message": f"Internal server error: {str(e)}",
+            },
+        )
+
+async def process_invoke_request(model_id: str, request: Request) -> (Dict[str, Any], str):
+    """
+    Orchestrates:
+     - Reading the JSON from the request (Bedrock Invoke Model style)
+     - Converting it to OpenAI format
+     - Calling your OpenAI/LiteLLM endpoint
+     - Converting the response back to Bedrock Invoke Model format
+     - Optionally storing chat history if needed
+    """
+    body = await request.json()
+
+    # If you still want to support session/history, you can store them in additional fields.
+    # E.g. you might embed them inside the body or pass them as custom JSON fields:
+    # "my_session_data": {"session_id": "...", "enable_history": true}
+    # Adjust as needed for your actual payload.
+    my_session_data = body.get("my_session_data", {})
+    session_id = my_session_data.get("session_id", None)
+    enable_history = my_session_data.get("enable_history", False)
+
+    history_enabled = (session_id is not None) or enable_history
+
+    # Authorization / API key
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        api_key = auth_header[len("Bearer ") :]
+    else:
+        print(f"Missing or invalid Authorization header: {auth_header}")
+        raise HTTPException(
+            status_code=401, detail={"error": "Missing or invalid Authorization header"}
+        )
+
+    provided_hash = hash_api_key(api_key)
+
+    # Retrieve or create chat history
+    if history_enabled:
+        if session_id is not None:
+            session_data = get_session_data(session_id)
+            if session_data is not None:
+                if session_data["api_key_hash"] != provided_hash:
+                    print(
+                        "Unauthorized: API key does not match session owner "
+                        f"(stored {session_data['api_key_hash']} vs. provided {provided_hash})"
+                    )
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Unauthorized: API key does not match session owner",
+                    )
+                chat_history = session_data["chat_history"] if session_data["chat_history"] else []
+            else:
+                chat_history = []
+                create_chat_history(session_id, chat_history, provided_hash)
+        else:
+            session_id = str(uuid.uuid4())
+            chat_history = []
+            create_chat_history(session_id, chat_history, provided_hash)
+    else:
+        chat_history = []
+
+    # 1) Convert the Bedrock Invoke Model request into OpenAI format
+    openai_format = await convert_bedrock_invoke_to_openai(model_id, body)
+
+    # 2) Merge chat history if you want to preserve conversation across calls
+    if history_enabled:
+        # The last user message from this body:
+        user_messages_this_round = [
+            m for m in openai_format["messages"] if m["role"] == "user"
+        ]
+        if user_messages_this_round:
+            chat_history.append(user_messages_this_round[-1])
+        # Use full chat history as the new messages
+        openai_format["messages"] = chat_history
+
+    # 3) Call your LLM/OpenAI endpoint
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            LITELLM_CHAT,
+            json=openai_format,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            timeout=30.0,
+        )
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail={"error": f"Error from LiteLLM endpoint: {response.text}"},
+            )
+
+        openai_response = response.json()
+
+    # 4) Convert the OpenAI response back to Bedrock Invoke Model format
+    bedrock_invoke_response = await convert_openai_to_bedrock_invoke(openai_response)
+
+    # 5) Append assistant message to chat history, if applicable
+    if history_enabled and "choices" in openai_response and len(openai_response["choices"]) > 0:
+        assistant_message = openai_response["choices"][0]["message"]
+        chat_history.append({"role": "assistant", "content": assistant_message["content"]})
+        update_chat_history(session_id, chat_history)
+        bedrock_invoke_response["session_id"] = session_id
+
+    return bedrock_invoke_response, session_id
+
+# ---------------
+# Conversions
+# ---------------
+async def convert_bedrock_invoke_to_openai(
+    model_id: str, invoke_request: Dict[str, Any]
+) -> Dict[str, Any]:
+    print(f'model_id: {model_id} invoke_request: {invoke_request}')
+    """
+    Convert a Bedrock Invoke-Model-style request to OpenAI format.
+
+    For example, your request might look like:
+    {
+      "anthropic_version": "bedrock-2023-05-31",
+      "max_tokens": 512,
+      "temperature": 0.5,
+      "messages": [
+         {
+           "role": "user",
+           "content": [
+             {"type": "text", "text": "Describe the purpose of a 'hello world' program in one line."}
+           ]
+         }
+      ],
+      ... possibly other fields ...
+    }
+
+    We'll convert that into something like:
+    {
+       "model": "...",
+       "messages": [
+          {"role": "user", "content": "..."}
+       ],
+       "temperature": 0.5,
+       "max_tokens": 512
+    }
+    """
+    # Basic fields
+    completion_params = {
+        "model": model_id,
+    }
+    print(f'completion_params: {completion_params}')
+
+
+    # Convert from bedrock's "messages" array-of-arrays-of-chunks to a single text for each role
+    # This is similar to your convert_messages_to_openai from the Converse approach.
+    bedrock_messages = invoke_request.get("messages", [])
+    print(f'bedrock_messages: {bedrock_messages}')
+    openai_messages = []
+    for msg in bedrock_messages:
+        role = msg.get("role", "user")
+        content_list = msg.get("content", [])
+        print(f'role: {role} content_list: {content_list}')
+        # Join all textual pieces
+        combined_text = "".join([c["text"] for c in content_list if c["type"] == "text"])
+        print(f'combined_text: {combined_text}')
+        openai_messages.append({"role": role, "content": combined_text})
+
+    completion_params["messages"] = openai_messages
+
+    # Temperature / tokens, etc.
+    if "max_tokens" in invoke_request:
+        completion_params["max_tokens"] = invoke_request["max_tokens"]
+    if "maxTokens" in invoke_request:  # if your incoming JSON uses this casing
+        completion_params["max_tokens"] = invoke_request["maxTokens"]
+    if "temperature" in invoke_request:
+        completion_params["temperature"] = invoke_request["temperature"]
+
+    # If you have any additional fields you want to pass directly through
+    # (like top_p, top_k, presence_penalty, etc.), do so here:
+    # e.g.: 
+    #   if "top_p" in invoke_request:
+    #       completion_params["top_p"] = invoke_request["top_p"]
+
+    return completion_params
+
+async def convert_openai_to_bedrock_invoke(openai_response: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert the OpenAI-style response to a Bedrock Invoke-Model-style response.
+
+    Example OpenAI response:
+    {
+      "id": "...",
+      "object": "chat.completion",
+      "created": ...,
+      "model": "...",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "Hello world!"
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 10,
+        "completion_tokens": 10,
+        "total_tokens": 20
+      }
+    }
+
+    We'll produce something like:
+    {
+      "content": [
+        {
+          "text": "Hello world!"
+        }
+      ],
+      "usage": { ... },
+      "stopReason": "end_turn"
+    }
+    """
+    # The "content" from the assistant
+    if "choices" not in openai_response or len(openai_response["choices"]) == 0:
+        # Fallback
+        return {
+            "content": [{"text": ""}],
+            "usage": {"inputTokens": 0, "outputTokens": 0, "totalTokens": 0},
+            "stopReason": "end_turn",
+        }
+
+    assistant_message = openai_response["choices"][0]["message"]
+    bedrock_response = {
+        "content": [
+            {"text": assistant_message["content"]}
+        ],
+        "usage": {
+            "inputTokens": openai_response.get("usage", {}).get("prompt_tokens", 0),
+            "outputTokens": openai_response.get("usage", {}).get("completion_tokens", 0),
+            "totalTokens": openai_response.get("usage", {}).get("total_tokens", 0),
+        },
+    }
+
+    # Map OpenAI finish_reason to Bedrock's "stopReason" style
+    finish_reason = openai_response["choices"][0].get("finish_reason", "stop")
+    stop_reason_map = {
+        "stop": "end_turn",
+        "length": "max_tokens",
+        "tool_calls": "tool_use",
+        "content_filter": "content_filtered",
+    }
+    bedrock_response["stopReason"] = stop_reason_map.get(finish_reason, "end_turn")
+
+    return bedrock_response
+
+@app.post("/bedrock/model/{model_id}/invoke-stream")
+async def handle_bedrock_invoke_stream(model_id: str, request: Request):
+    """
+    Handles requests in the AWS Bedrock Invoke Model format, but streams the output
+    back using Bedrock's event stream format.
+
+    Similar in spirit to `handle_bedrock_streaming_request`, but uses your 'invoke' style
+    conversion logic (convert_bedrock_invoke_to_openai) instead of the 'converse' style.
+    """
+    try:
+        (
+            stream_wrapper,
+            session_id,
+            chat_history,
+            assistant_content_parts,
+            history_enabled,
+        ) = await process_invoke_stream_request(model_id, request)
+
+        async def finalizing_stream():
+            # Yields tokens until the model is finished
+            async for event in stream_wrapper:
+                yield event
+            # Once done, finalize the chat history if needed
+            if history_enabled:
+                await finalize_streaming_chat_history(session_id, chat_history, assistant_content_parts)
+
+        response = StreamingResponse(
+            finalizing_stream(),
+            media_type="application/vnd.amazon.eventstream",
+        )
+        if history_enabled:
+            response.headers["X-Session-Id"] = session_id
+        return response
+
+    except HTTPException as he:
+        # Return consistent JSON payload with the error message
+        return JSONResponse(
+            status_code=he.status_code,
+            content={"Message": he.detail},
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"Message": f"Internal server error: {str(e)}"},
+        )
+
+
+async def process_invoke_stream_request(
+    model_id: str,
+    request: Request
+) -> Tuple[
+    AsyncGenerator[bytes, None],
+    Optional[str],
+    List[Dict[str, str]],
+    List[str],
+    bool,
+]:
+    """
+    Orchestrates the streaming logic for a Bedrock 'invoke' style request.
+
+    1) Parse the Bedrock request body.
+    2) Manage session and chat history if needed.
+    3) Convert the request to an OpenAI streaming format using convert_bedrock_invoke_to_openai.
+    4) Call the LLM with streaming.
+    5) Wrap the streaming response in a generator that emits event stream chunks.
+    """
+    body = await request.json()
+
+    # Extract session info from a custom field if you’re using the same approach as your
+    # original /invoke endpoint. This is flexible – adapt to your actual usage.
+    my_session_data = body.get("my_session_data", {})
+    session_id = my_session_data.get("session_id", None)
+    enable_history = my_session_data.get("enable_history", False)
+
+    history_enabled = (session_id is not None) or enable_history
+
+    # Auth / API key checks
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        api_key = auth_header[len("Bearer "):]
+    else:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing or invalid Authorization header",
+        )
+
+    provided_hash = hash_api_key(api_key)
+
+    # Retrieve or create chat history (if you support continuing conversation).
+    if history_enabled:
+        if session_id is not None:
+            session_data = get_session_data(session_id)
+            if session_data is not None:
+                if session_data["api_key_hash"] != provided_hash:
+                    raise HTTPException(
+                        status_code=401,
+                        detail="Unauthorized: API key does not match session owner",
+                    )
+                chat_history = session_data["chat_history"] or []
+            else:
+                chat_history = []
+                create_chat_history(session_id, chat_history, provided_hash)
+        else:
+            session_id = str(uuid.uuid4())
+            chat_history = []
+            create_chat_history(session_id, chat_history, provided_hash)
+    else:
+        chat_history = []
+
+    # Convert the Bedrock-style request to OpenAI streaming parameters
+    openai_params = await convert_bedrock_invoke_to_openai(model_id, body)
+    openai_params["stream"] = True  # ensure streaming is enabled
+
+    # If history is enabled, gather the last user message into the chat_history
+    if history_enabled:
+        user_messages_this_round = [
+            m for m in openai_params["messages"] if m["role"] == "user"
+        ]
+        if user_messages_this_round:
+            chat_history.append(user_messages_this_round[-1])
+        # Now the entire conversation so far becomes the messages
+        openai_params["messages"] = chat_history
+
+    # Call your streaming LLM endpoint
+    # If you use the same approach as in `converse-stream`, just replicate it here:
+    client = AsyncOpenAI(api_key=api_key, base_url=LITELLM_ENDPOINT)
+    stream = await client.chat.completions.create(**openai_params)
+
+    assistant_content_parts: List[str] = []
+
+    async def stream_wrapper():
+        """
+        Generator that transforms the OpenAI delta tokens
+        into a series of Bedrock-style event stream chunks.
+        """
+        message_started = False
+        content_block_index = 0
+
+        async for chunk in stream:
+            delta = chunk.choices[0].delta
+            finish_reason = chunk.choices[0].finish_reason
+
+            # The role typically appears once at the start
+            if delta.role and not message_started:
+                event_payload = json.dumps({"role": delta.role}).encode("utf-8")
+                yield create_event_message(event_payload, "messageStart")
+                message_started = True
+
+            # If there's actual content in the delta, yield it
+            if delta.content:
+                assistant_content_parts.append(delta.content)
+                event_payload = json.dumps({
+                    "contentBlockIndex": content_block_index,
+                    "delta": {"text": delta.content},
+                }).encode("utf-8")
+                yield create_event_message(event_payload, "contentBlockDelta")
+                content_block_index += 1
+
+            # If the model signals it’s done
+            if finish_reason == "stop":
+                event_payload = json.dumps({"stopReason": "end_turn"}).encode("utf-8")
+                yield create_event_message(event_payload, "messageStop")
+
+    return (
+        stream_wrapper(),
+        session_id,
+        chat_history,
+        assistant_content_parts,
+        history_enabled,
+    )
 
 if __name__ == "__main__":
     import uvicorn
