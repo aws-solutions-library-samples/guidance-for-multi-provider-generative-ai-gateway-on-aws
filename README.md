@@ -47,7 +47,12 @@ If you are unfamiliar with LiteLLM, it provides a consistent interface to access
 
 ## Architecture
 
-![Architecture Diagram](./media/Genai-Gateway-Architecture.png)
+### Running on ECS
+![Architecture Diagram ECS](./media/Genai-Gateway-Architecture-ECS.png)
+
+### Running on EKS
+
+![Architecture Diagram EKS](./media/Genai-Gateway-Architecture-EKS.png)
 
 ## How to deploy
 
