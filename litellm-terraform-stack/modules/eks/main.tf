@@ -10,6 +10,15 @@ locals {
 }
 
 # Kubernetes Secrets
+# Add a sleep to allow RBAC permissions to propagate
+resource "time_sleep" "wait_for_rbac_propagation_before_creating_secrets" {
+  depends_on = [
+    aws_eks_access_entry.admin,
+    aws_eks_access_policy_association.admin_policy
+  ]
+  create_duration = "5s"
+}
+
 resource "kubernetes_secret" "litellm_api_keys" {
   metadata {
     name = "litellm-api-keys"
@@ -44,8 +53,7 @@ resource "kubernetes_secret" "litellm_api_keys" {
   }
 
   depends_on = [
-    aws_eks_access_entry.admin,
-    aws_eks_access_policy_association.admin_policy,
+    time_sleep.wait_for_rbac_propagation_before_creating_secrets,
     aws_eks_access_entry.developers,
     aws_eks_access_entry.operators
   ]
@@ -62,8 +70,7 @@ resource "kubernetes_secret" "middleware_secrets" {
   }
 
   depends_on = [
-    aws_eks_access_entry.admin,
-    aws_eks_access_policy_association.admin_policy,
+    time_sleep.wait_for_rbac_propagation_before_creating_secrets,
     aws_eks_access_entry.developers,
     aws_eks_access_entry.operators
   ]
