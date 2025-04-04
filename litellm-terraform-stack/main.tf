@@ -6,7 +6,7 @@ resource "aws_cloudformation_stack" "guidance_deployment_metrics" {
     template_body = <<STACK
     {
         "AWSTemplateFormatVersion": "2010-09-09",
-        "Description": "Guidance for GenAI Gateway running on Amazon ECS",
+        "Description": "Guidance for Running Generative AI Gateway Proxy on AWS. The Solution ID is SO9022 and the Solution Version is 1.0.0",
         "Resources": {
             "EmptyResource": {
                 "Type": "AWS::CloudFormation::WaitConditionHandle"

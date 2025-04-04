@@ -11,7 +11,7 @@ locals {
     project     = "llmgateway"
     AWSSolution = "ToDo"
     GithubRepo  = "https://github.com/aws-solutions-library-samples/"
-    SolutionID = "TBD"
+    SolutionID  = "SO9022"
     SolutionNameKey = "Guidance for Running Generative AI Gateway Proxy on AWS"
     SolutionVersionKey = "1.0.0"
   }
