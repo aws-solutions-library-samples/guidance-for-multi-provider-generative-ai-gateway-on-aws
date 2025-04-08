@@ -14,10 +14,11 @@ Project ACTIVE as of Feb 15, 2025
    - [Sample cost tables](#sample-cost-tables)
 - [Security](#security)
 - [How to deploy](#how-to-deploy)
-    - [Okta Oauth 2.0 JWT Token Auth Support](#okta-oauth-20-jwt-token-auth-support)
+  
+  <!--  - [Okta Oauth 2.0 JWT Token Auth Support](#okta-oauth-20-jwt-token-auth-support)
     - [Langsmith support](#langsmith-support)
     - [Setting up bastion host in your VPC to allow access to the private load balancer in the case you set PUBLIC_LOAD_BALANCER="false"](#setting-up-bastion-host-in-your-vpc-to-allow-access-to-the-private-load-balancer-in-the-case-you-set-public_load_balancerfalse)
-    - [Load testing](#load-testing)
+    - [Load testing](#load-testing) -->
 - [Open Source Library](#open-source-library)
 - [Notices](#notices)
 
@@ -71,7 +72,7 @@ If you are unfamiliar with LiteLLM, it provides a consistent interface to access
 
 ### Cost Considerations
 
-When implementing this solution on AWS, it's important to understand the various factors that contribute to the overall cost. This section outlines the primary cost components and key factors that influence pricing.
+When implementing this guidance on AWS, it's important to understand the various factors that contribute to the overall cost. This section outlines the primary cost components and key factors that influence pricing.
 
 ### Cost Components
 
@@ -987,7 +988,6 @@ else:
     print(f"Error: {response.status_code}")
     print(response.text)
 ```
--->
 
 #### Okta Oauth 2.0 JWT Token Auth Support
 
@@ -1083,6 +1083,7 @@ This will deploy a simple HTTP backend that exposes 3 APIs for use via HTTP POST
   - A streaming response with multiple chunks and random 0.2–0.8 second delays
 
 To cleanup the mock LLM backend, run `delete-fake-llm-load-testing-server.sh`.
+-->
 
 ## Open Source Library
 
