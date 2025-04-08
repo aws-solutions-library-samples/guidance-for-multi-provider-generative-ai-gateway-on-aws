@@ -6,6 +6,13 @@ Project ACTIVE as of Feb 15, 2025
 
 - [Project Overview](#project-overview)
 - [Architecture](#architecture)
+- [AWS Services in this Guidance](#aws-services-in-this-Guidance)
+- [Cost](#cost)
+   - [Cost Considerations](#cost-considerations)
+   - [Cost components](#cost-components)
+   - [Key Factors Influencing AWS Infrastructure Costs](#key-factors-influencing-infrastructure-costs)
+   - [Sample cost tables](#sample-cost-tables)
+- [Security](#security)
 - [How to deploy](#how-to-deploy)
     - [Okta Oauth 2.0 JWT Token Auth Support](#okta-oauth-20-jwt-token-auth-support)
     - [Langsmith support](#langsmith-support)
@@ -26,6 +33,16 @@ If you are unfamiliar with LiteLLM, it provides a consistent interface to access
 
 ![Reference Architecture Diagram ECS EKS](./media/Reference_architecture_ECS_EKS_platform_combined.jpg)
 
+### Architecture steps
+
+1. Tenants/Client applications access the LiteLLM gateway proxy API through [Amazon Route 53](https://aws.amazon.com/route53/) URL endpoint which is protected against common web exploits using [AWS Web Application Firewall (WAF)](https://aws.amazon.com/waf/).
+2. AWS WAF forwards requests to an [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) to automatically distribute incoming application traffic to [Amazon Elastic Container Service (ECS)](https://aws.amazon.com/ecs/) tasks or to [Amazon Elastic Kubernetes Service (EKS)](https://aws.amazon.com/eks/) pods (depending on selected container orchestration platform) running LiteLLM Generative AI gateway containers. A AWS TLS/SSL secures traffic to the load balancer using a certificate issued by [AWS Certificate Manager (ACM)](https://aws.amazon.com/certificate-manager/).
+3. Container images for API/middleware and LiteLLM applications are built during guidance deployment and pushed into the the [Amazon Elastic Container registry (ECR)](http://aws.amazon.com/ecr/). They are used for deployment to Amazon ECS Fargate or Amazon EKS clusters that run these applications as containers in ECS tasks or EKS pods, respectively. LiteLLM provides a unified application interface for configuration and interacting with LLM providers. The API/middleware also integrates natively with [Amazon Bedrock](https://aws.amazon.com/bedrock/) to enable features not supported by [LiteLLM OSS project](https://docs.litellm.ai/).
+4. Amazon Bedrock provides model access, guardrails, prompt caching and routing to enhance the Generative AI gateway and additional controls for clients through a unified API. Access to required Bedrock models will need be properly [configured](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access-modify.html).
+5. External model providers providers (OpenAI, Anthropic, Vertex AI etc.) are configured using LiteLLM Admin UI to enable additional LLM model access via unified application interface. Pre-existing configurations of third-party providers are integrated into the Gateway using LiteLLM APIs.
+6. LiteLLM integrates with [Amazon ElastiCache (Redis OSS)](<(https://aws.amazon.com/elasticache/){:target="_blank"}>), [Amazon Relational Database Service (RDS)](https://aws.amazon.com/rds/), and [AWS Secrets Manager](https://aws.amazon.com/secrets-manager/) services. Amazon ElastiCache enables multi-tenant distribution of application settings and prompt caching. Amazon RDS enables persistence of virtual API keys and other configuration settings provided by LiteLLM. AWS Secrets Manager stores external model provider credentials and other sensitive settings securely.
+7. LiteLLM and the API/middleware store application logs in the dedicated [Amazon S3](https://aws.amazon.com/s3) storage bucket for troubleshooting and access analysis.
+   
 ### AWS Services in this Guidance
 
 | **AWS Service**                                                                                         | **Role**           | **Description**                                                                                             |
@@ -49,13 +66,6 @@ If you are unfamiliar with LiteLLM, it provides a consistent interface to access
 | [AWS Key Management Service](https://aws.amazon.com/kms/) (KMS)                      | Security service   | Manages encryption keys for securing data in EKS and other AWS services.                                    |
 
 **NOTE** For any guidance deployment, either Amazon ECS or EKS container orchestration platform can be used, but not both.
-
-## Plan your deployment
-
-<!-- Include all deployment planning topics under this section, such as costs,system requirements, deployment pre-requisites, service quotas,
-Region considerations, and template dependencies.-->
-
-### Prerequisites
 
 ## Cost
 
@@ -116,7 +126,7 @@ We recommend creating a [budget](https://alpha-docs-aws.amazon.com/awsaccountbi
 through [AWS Cost Explorer](http://aws.amazon.com/aws-cost-management/aws-cost-explorer/) to
 help manage costs. Prices are subject to change and also depend on model provider usage patterns/volume of data. For full details, refer to the pricing webpage for each AWS service used in this guidance.
 
-### Sample cost table
+### Sample cost tables
 
 The following tables provide a sample cost breakdown for deploying this guidance on Amazon ECS and EKS orchestration platforms with the default parameters in the `us-east-1` (N. Virginia) region for one month. This estimates are based on the AWS Pricing Calculator outputs for the full deployments as per guidance and are subject to changes in underlying services configuration.
 
