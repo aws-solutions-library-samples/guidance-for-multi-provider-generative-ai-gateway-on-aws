@@ -251,7 +251,7 @@ quotas](https://docs.aws.amazon.com/general/latest/gr/aws-general.pdf#aws-servic
 
 Please see detaild depoyment instructions in the Implementation Guide [here](https://implementationguides.kits.eventoutfitters.aws.dev/rgai-proxy-0130/ai-ml/running-generative-ai-gateway-proxy.html)
 
-**TO DO: UPDATE TO LIVE IG URL ONCE AVAILABLE**
+**TO DO: UPDATE TO LIVE IG URL ONCE AVAILABLE!**
 
 <!--
 ### Prerequisites
