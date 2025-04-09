@@ -10,7 +10,7 @@ Project ACTIVE as of Feb 15, 2025
 - [Cost](#cost)
    - [Cost Considerations](#cost-considerations)
    - [Cost components](#cost-components)
-   - [Key Factors Influencing AWS Infrastructure Costs](#key-factors-influencing-infrastructure-costs)
+   - [Key Factors Influencing AWS Infrastructure Costs](#key-factors-influencing-aws-infrastructure-costs)
    - [Sample cost tables](#sample-cost-tables)
 - [Security](#security)
 - [How to deploy](#how-to-deploy)
