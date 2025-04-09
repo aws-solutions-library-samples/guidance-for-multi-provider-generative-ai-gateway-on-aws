@@ -36,7 +36,7 @@ If you are unfamiliar with LiteLLM, it provides a consistent interface to access
 3. Container images for API/middleware and LiteLLM applications are built during guidance deployment and pushed into the the [Amazon Elastic Container registry (ECR)](http://aws.amazon.com/ecr/). They are used for deployment to Amazon ECS Fargate or Amazon EKS clusters that run these applications as containers in ECS tasks or EKS pods, respectively. LiteLLM provides a unified application interface for configuration and interacting with LLM providers. The API/middleware also integrates natively with [Amazon Bedrock](https://aws.amazon.com/bedrock/) to enable features not supported by [LiteLLM OSS project](https://docs.litellm.ai/).
 4. Amazon Bedrock provides model access, guardrails, prompt caching and routing to enhance the Generative AI gateway and additional controls for clients through a unified API. Access to required Bedrock models will need be properly [configured](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access-modify.html).
 5. External model providers providers (OpenAI, Anthropic, Vertex AI etc.) are configured using LiteLLM Admin UI to enable additional LLM model access via unified application interface. Pre-existing configurations of third-party providers are integrated into the Gateway using LiteLLM APIs.
-6. LiteLLM integrates with [Amazon ElastiCache (Redis OSS)](<(https://aws.amazon.com/elasticache/){:target="_blank"}>), [Amazon Relational Database Service (RDS)](https://aws.amazon.com/rds/), and [AWS Secrets Manager](https://aws.amazon.com/secrets-manager/) services. Amazon ElastiCache enables multi-tenant distribution of application settings and prompt caching. Amazon RDS enables persistence of virtual API keys and other configuration settings provided by LiteLLM. AWS Secrets Manager stores external model provider credentials and other sensitive settings securely.
+6. LiteLLM integrates with [Amazon ElastiCache (Redis OSS)](https://aws.amazon.com/elasticache/), [Amazon Relational Database Service (RDS)](https://aws.amazon.com/rds/), and [AWS Secrets Manager](https://aws.amazon.com/secrets-manager/) services. Amazon ElastiCache enables multi-tenant distribution of application settings and prompt caching. Amazon RDS enables persistence of virtual API keys and other configuration settings provided by LiteLLM. AWS Secrets Manager stores external model provider credentials and other sensitive settings securely.
 7. LiteLLM and the API/middleware store application logs in the dedicated [Amazon S3](https://aws.amazon.com/s3) storage bucket for troubleshooting and access analysis.
    
 ### AWS Services in this Guidance
@@ -51,13 +51,13 @@ If you are unfamiliar with LiteLLM, it provides a consistent interface to access
 | [Amazon Web Applications Firewall](https://aws.amazon.com/waf/) (WAF)                | Core Service       | Protect guidance applications from common exploits                                                          |
 | [Amazon Elastic Container Registry](http://aws.amazon.com/ecr/) (ECR)                | Supporting service | Stores and manages Docker container images for EKS deployments.                                             |
 | [Elastic Load Balancer](https://aws.amazon.com/elasticloadbalancing/) (ALB)          | Supporting service | Distributes incoming traffic across multiple targets in the EKS cluster.                                    |
-| [Amazon Simple Storage Service (S3)](https://aws.amazon.com/s3)                      | Supporting service | Provides persistent object storage for Applications logs and other related data.                            |
+| [Amazon Simple Storage Service ](https://aws.amazon.com/s3) (S3)                     | Supporting service | Provides persistent object storage for Applications logs and other related data.                            |
 | [Amazon Relational Database Service ](https://aws.amazon.com/rds/) (RDS)             | Supporting service | Enables persistence of virtual API keys and other configuration settings provided by LiteLLM.               |
 | [Amazon ElastiCache Service (Redis OSS) ](https://aws.amazon.com/elasticache/) (OSS) | Supporting service | Enables multi-tenant distribution of application settings and prompt caching.                               |
 | [AWS Route 53](https://aws.amazon.com/route53/)                                      | Supporting Service | Routes users to the guidance application via DNS records                                                    |
 | [AWS Identity and Access Management](https://aws.amazon.com/iam/) (IAM)              | Supporting service | Manages access to AWS services and resources securely, including ECS or EKS cluster access.                 |
 | [AWS Certificate Manager](https://aws.amazon.com/certificate-manager/) (ACM)         | Security service   | Manages SSL/TLS certificates for secure communication within the cluster.                                   |
-| [Amazon CloudWatch](https://aws.amazon.com/cloudwatch/)                              | Monitoring service | Collects and tracks metrics, logs, and events from EKS and other AWS resources provisoned in the guidance   |
+| [Amazon CloudWatch](https://aws.amazon.com/cloudwatch/)                              | Monitoring service | Collects and tracks metrics, logs, and events from ECS, EKS and other AWS resources provisoned in the guidance   |
 | [AWS Secrets Manager](https://aws.amazon.com/secrets-manager/)                       | Management service | Manager stores external model provider credentials and other sensitive settings securely.                   |
 | [AWS Key Management Service](https://aws.amazon.com/kms/) (KMS)                      | Security service   | Manages encryption keys for securing data in EKS and other AWS services.                                    |
 
@@ -137,10 +137,10 @@ The following tables provide a sample cost breakdown for deploying this guidance
 | Amazon Simple Storage Service (S3)       | 100 GB/month                                                                                      | 7.37              |
 | Amazon Relational Database Service (RDS) | 2 db.t3.micro nodes, 100% utilzation, multi-AZ, 2 vCPU,1 GiB Memory                               | 98.26             |
 | Amazon ElastiCache Service (Redis OSS)   | 2 cache.t3.micro nodes, 2 vCPU, 0.5 GiB Memory, Upto 5 GB Network performance, 100% utilization   | 24.82             |
-| Amazon Route 53                          | 1 hosted zone, 1 millon standard queries/month                                                    | 26.60             |
+| Amazon Route 53                          | 1 hosted zone, 1 million standard queries/month                                                    | 26.60             |
 | Amazon CloudWatch                        | 25 metrics to preserve                                                                            | 12.60             |
 | AWS Secrets Manager                      | 5 secrets, 30 days, 1 million API calls per month                                                 | 7.00              |
-| AWS Key Management Service (KMS)         | 1 key, 1 millon symmertic requests                                                                | 4.00              |
+| AWS Key Management Service (KMS)         | 1 key, 1 million symmertic requests                                                                | 4.00              |
 | AWS WAF                                  | 1 web ACL, 2 rules                                                                                | 7.00              |
 | AWS Certificate Manager                  | 1 Certificate                                                                                     | free              |
 | **TOTAL**                                |                                                                                                   | **$378.10/month** |
@@ -159,10 +159,10 @@ For detailed cost estimates for ECS platform, it is recommended to create an AWS
 | Amazon Simple Storage Service (S3)       | 100 GB/month                                                                                    | 7.37              |
 | Amazon Relational Database Service (RDS) | 2 db.t3.micro nodes, 100% utilzation, multi-AZ, 2 vCPU,1 GiB Memory                             | 98.26             |
 | Amazon ElastiCache Service (Redis OSS)   | 2 cache.t3.micro nodes, 2 vCPU, 0.5 GiB Memory, Upto 5 GB Network performance, 100% utilization | 24.82             |
-| Amazon Route 53                          | 1 hosted zone, 1 millon standard queries/month                                                  | 26.60             |
+| Amazon Route 53                          | 1 hosted zone, 1 million standard queries/month                                                  | 26.60             |
 | Amazon CloudWatch                        | 25 metrics to preserve                                                                          | 12.60             |
 | AWS Secrets Manager                      | 5 secrets, 30 days, 1 million API calls per month                                               | 7.00              |
-| AWS Key Management Service (KMS)         | 1 key, 1 millon symmertic requests                                                              | 4.00              |
+| AWS Key Management Service (KMS)         | 1 key, 1 million symmertic requests                                                              | 4.00              |
 | AWS WAF                                  | 1 web ACL, 2 rules                                                                              | 7.00              |
 | AWS Certificate Manager                  | 1 Certificate                                                                                   | free              |
 | **TOTAL**                                |                                                                                                 | **$384.83/month** |
@@ -222,13 +222,24 @@ This guidance implements several security best practices and AWS services to enh
 
 As of March, 2025 `Guidance for Multi-Provider Generative AI Gateway on AWS` is supported in the following AWS Regions:
 
-| **Region Name**               |
-| ----------------------------- |
-| US East (Ohio)                |
-| US East (N. Virginia)         |
-| US West (Northern California) |
-| US West (Oregon)              |
-| Europe (Paris)                |
+| **Region Name**               |**Region Code**  |
+| ----------------------------- |--|
+| US East (Ohio)                | us-east-1 |
+| US East (N. Virginia)         | us-east-2 |
+| US West (Northern California) | us-west-1 |
+| US West (Oregon)              | us-west-2 |
+| Europe (Paris)                | eu-west-3 |
+| Canada (Central)              | ca-central-1|
+| South America (São Paulo)     | sa-east-1 |
+| Europe (Frankfurt)            | eu-central-1 |
+| Europe (Ireland)              | eu-west-1 |
+| Europe (London)               | eu-west-2 | 
+| Europe (Paris)                | eu-west-3 |
+| Europe (Stockholm)            | eu-north-1 |
+| Europe (Milan)                | eu-south-1 |
+| Europe (Spain)                | eu-south-2 |
+| Europe (Zurich)               | eu-central-2 | 
+
 
 ### Quotas
 
