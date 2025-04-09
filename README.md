@@ -9,17 +9,17 @@ Project ACTIVE as of Feb 15, 2025
 - [AWS Services in this Guidance](#aws-services-in-this-Guidance)
 - [Cost](#cost)
    - [Cost Considerations](#cost-considerations)
-   - [Cost components](#cost-components)
+   - [Cost Components](#cost-components)
    - [Key Factors Influencing AWS Infrastructure Costs](#key-factors-influencing-aws-infrastructure-costs)
-   - [Sample cost tables](#sample-cost-tables)
+   - [Sample Cost Tables](#sample-cost-tables)
 - [Security](#security)
-- [How to deploy](#how-to-deploy)
+- [How to Deploy](#how-to-deploy)
 - [Open Source Library](#open-source-library)
 - [Notices](#notices)
 
 ## Project Overview
 
-This project provides a simple Terraform deployment of LiteLLM into ECS or EKS on AWS. It aims to be pre-configured with defaults that will allow most users to quickly get started with LiteLLM.
+This project provides a simple Terraform deployment of [LiteLLM](https://github.com/BerriAI/litellm) into Amazon Elastic Container Service (ECS) and Elastic Kubernetes Service (EKS) platforms on AWS. It aims to be pre-configured with defaults that will allow most users to quickly get started with LiteLLM.
 
 It also provides additional features on top of LiteLLM such as an AWS Bedrock Interface (instead of the default OpenAI interface), support for AWS Bedrock Managed Prompts, Chat History, and support for Okta Oauth 2.0 JWT Token Auth.
 
@@ -124,7 +124,7 @@ help manage costs. Prices are subject to change and also depend on model provide
 
 ### Sample cost tables
 
-The following tables provide a sample cost breakdown for deploying this guidance on Amazon ECS and EKS orchestration platforms with the default parameters in the `us-east-1` (N. Virginia) region for one month. This estimates are based on the AWS Pricing Calculator outputs for the full deployments as per guidance and are subject to changes in underlying services configuration.
+The following tables provide a sample cost breakdown for deploying this guidance on ECS and EKS container orchestration platforms with the default parameters in the `us-east-1` (N. Virginia) region for one month. These estimates are based on the AWS Pricing Calculator outputs for the full deployments as per guidance and are subject to changes in underlying services configuration.
 
 **For ECS container orchestration platform**
 
@@ -135,7 +135,7 @@ The following tables provide a sample cost breakdown for deploying this guidance
 | Amazon Elastic Container Registry (ECR)  | 5 GB image storage/month                                                                          | 0.50              |
 | Amazon Elastic Load Balancer (ALB)       | 1 ALB, 1 TB/month                                                                                 | 24.62             |
 | Amazon Simple Storage Service (S3)       | 100 GB/month                                                                                      | 7.37              |
-| Amazon Relational Database Service (RDS) | 2 db.t3.micro nodes, 100% utilzation, multi-AZ, 2 vCPU,1 GiB Memory                               | 98.26             |
+| Amazon Relational Database Service (RDS) | 2 db.t3.micro nodes, 100% utilization, multi-AZ, 2 vCPU,1 GiB Memory                               | 98.26             |
 | Amazon ElastiCache Service (Redis OSS)   | 2 cache.t3.micro nodes, 2 vCPU, 0.5 GiB Memory, Upto 5 GB Network performance, 100% utilization   | 24.82             |
 | Amazon Route 53                          | 1 hosted zone, 1 million standard queries/month                                                    | 26.60             |
 | Amazon CloudWatch                        | 25 metrics to preserve                                                                            | 12.60             |
@@ -145,7 +145,7 @@ The following tables provide a sample cost breakdown for deploying this guidance
 | AWS Certificate Manager                  | 1 Certificate                                                                                     | free              |
 | **TOTAL**                                |                                                                                                   | **$378.10/month** |
 
-For detailed cost estimates for ECS platform, it is recommended to create an AWS Price calculator like [this:](https://calculator.aws/#/estimate?id=8bce7fe949694f4ddbb08c9974ddcda9d13b1398)
+For detailed cost estimates for deployment on ECS platform, it is recommended to create an AWS Price calculator like [this:](https://calculator.aws/#/estimate?id=8bce7fe949694f4ddbb08c9974ddcda9d13b1398)
 
 **For EKS container orchestration platform:**
 
@@ -157,7 +157,7 @@ For detailed cost estimates for ECS platform, it is recommended to create an AWS
 | Amazon Elastic Container Registry (ECR)  | 5 GB image storage/month                                                                        | 0.50              |
 | Amazon Elastic Load Balancer (ALB)       | 1 ALB, 1 TB/month                                                                               | 24.62             |
 | Amazon Simple Storage Service (S3)       | 100 GB/month                                                                                    | 7.37              |
-| Amazon Relational Database Service (RDS) | 2 db.t3.micro nodes, 100% utilzation, multi-AZ, 2 vCPU,1 GiB Memory                             | 98.26             |
+| Amazon Relational Database Service (RDS) | 2 db.t3.micro nodes, 100% utilization, multi-AZ, 2 vCPU,1 GiB Memory                             | 98.26             |
 | Amazon ElastiCache Service (Redis OSS)   | 2 cache.t3.micro nodes, 2 vCPU, 0.5 GiB Memory, Upto 5 GB Network performance, 100% utilization | 24.82             |
 | Amazon Route 53                          | 1 hosted zone, 1 million standard queries/month                                                  | 26.60             |
 | Amazon CloudWatch                        | 25 metrics to preserve                                                                          | 12.60             |
@@ -167,7 +167,7 @@ For detailed cost estimates for ECS platform, it is recommended to create an AWS
 | AWS Certificate Manager                  | 1 Certificate                                                                                   | free              |
 | **TOTAL**                                |                                                                                                 | **$384.83/month** |
 
-For detailed cost estimates for EKS platform, it is recommended to create an AWS Price calculator like [this:](https://calculator.aws/#/estimate?id=2e331688341278d6e3e1a8b38c8ba76756e71f08)
+For detailed cost estimates for deployment on EKS platform, it is recommended to create an AWS Price calculator like [this:](https://calculator.aws/#/estimate?id=2e331688341278d6e3e1a8b38c8ba76756e71f08)
 
 ## Security
 
