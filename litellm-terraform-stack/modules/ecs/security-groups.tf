@@ -63,33 +63,17 @@ resource "aws_security_group_rule" "db_ingress" {
   description              = "Allow ECS tasks to connect to RDS"
 }
 
+# AWS-managed prefix list for CloudFront origin-facing IPs
+# This contains all CloudFront edge IP ranges, maintained by AWS automatically.
+data "aws_ec2_managed_prefix_list" "cloudfront" {
+  count = var.use_cloudfront ? 1 : 0
+  name  = "com.amazonaws.global.cloudfront.origin-facing"
+}
+
 resource "aws_security_group" "alb_sg" {
   name        = "${var.name}-alb-sg"
   description = "Security group for ALB"
   vpc_id      = var.vpc_id
-
-  # Public load balancer: Allow HTTPS traffic with WAF protection
-  # Security is provided by:
-  # 1. When CloudFront is enabled: Custom origin header authentication via ALB listener rules
-  # 2. When CloudFront is disabled: WAF rules on the ALB
-  # 3. When private: Only accessible from private subnets
-  ingress {
-    description = "HTTPS traffic"
-    protocol    = "tcp"
-    from_port   = 443
-    to_port     = 443
-    cidr_blocks = var.public_load_balancer ? ["0.0.0.0/0"] : var.private_subnets_cidr_blocks
-  }
-  
-  # Add HTTP ingress for CloudFront origin connections
-  # Security for HTTP is provided by custom header authentication
-  ingress {
-    description = "HTTP traffic for CloudFront origin"
-    protocol    = "tcp"
-    from_port   = 80
-    to_port     = 80
-    cidr_blocks = var.public_load_balancer ? ["0.0.0.0/0"] : var.private_subnets_cidr_blocks
-  }
 
   tags = {
     Name = "${var.name}-alb-sg"
@@ -104,4 +88,41 @@ resource "aws_security_group" "alb_sg" {
     to_port     = 0
     cidr_blocks = ["0.0.0.0/0"]
   }
+}
+
+# --- ALB Ingress Rules ---
+
+# When CloudFront is enabled: restrict ingress to CloudFront prefix list only
+resource "aws_security_group_rule" "alb_ingress_http_cloudfront" {
+  count             = var.use_cloudfront ? 1 : 0
+  type              = "ingress"
+  from_port         = 80
+  to_port           = 80
+  protocol          = "tcp"
+  security_group_id = aws_security_group.alb_sg.id
+  prefix_list_ids   = [data.aws_ec2_managed_prefix_list.cloudfront[0].id]
+  description       = "HTTP from CloudFront origin-facing IPs only"
+}
+
+# When CloudFront is NOT enabled: use CIDR-based rules (original behavior)
+resource "aws_security_group_rule" "alb_ingress_https_direct" {
+  count             = var.use_cloudfront ? 0 : 1
+  type              = "ingress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  security_group_id = aws_security_group.alb_sg.id
+  cidr_blocks       = var.public_load_balancer ? ["0.0.0.0/0"] : var.private_subnets_cidr_blocks
+  description       = "HTTPS traffic"
+}
+
+resource "aws_security_group_rule" "alb_ingress_http_direct" {
+  count             = var.use_cloudfront ? 0 : 1
+  type              = "ingress"
+  from_port         = 80
+  to_port           = 80
+  protocol          = "tcp"
+  security_group_id = aws_security_group.alb_sg.id
+  cidr_blocks       = var.public_load_balancer ? ["0.0.0.0/0"] : var.private_subnets_cidr_blocks
+  description       = "HTTP traffic for CloudFront origin"
 }
