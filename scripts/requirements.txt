@@ -1,4 +1,4 @@
-litellm==1.82.4
+litellm==1.83.0
 tabulate
 termcolor
 python-dotenv
