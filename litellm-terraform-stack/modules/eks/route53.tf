@@ -1,13 +1,16 @@
 
+# Only lookup the Route53 zone if hosted_zone_name is provided
 data "aws_route53_zone" "selected" {
-  name = var.hosted_zone_name
+  count        = var.hosted_zone_name != "" ? 1 : 0
+  name         = var.hosted_zone_name
   private_zone = var.public_load_balancer ? false : true
 }
 
 
-# Create the A record
+# Only create the A record if hosted_zone_name is provided
 resource "aws_route53_record" "litellm" {
-  zone_id = data.aws_route53_zone.selected.zone_id
+  count   = var.hosted_zone_name != "" ? 1 : 0
+  zone_id = data.aws_route53_zone.selected[0].zone_id
   name    = var.record_name  # e.g., "litellm.mirodrr.people.aws.dev"
   type    = "A"
 
