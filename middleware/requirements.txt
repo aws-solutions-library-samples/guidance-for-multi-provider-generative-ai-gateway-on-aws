@@ -11,3 +11,4 @@ psycopg2-binary
 okta-jwt-verifier
 cryptography
 anyio
+requests
