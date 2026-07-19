@@ -9,6 +9,7 @@ boto3
 sqlalchemy
 psycopg2-binary
 okta-jwt-verifier
+requests
 cryptography
 anyio
 requests

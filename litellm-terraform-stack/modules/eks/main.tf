@@ -279,15 +279,19 @@ resource "kubernetes_ingress_v1" "litellm" {
   wait_for_load_balancer = true
   metadata {
     name = "litellm-ingress"
-    annotations = {
-      "kubernetes.io/ingress.class"                = "alb"
-      "alb.ingress.kubernetes.io/scheme"           = var.public_load_balancer ? "internet-facing" : "internal"
-      "alb.ingress.kubernetes.io/target-type"      = "ip"
-      "alb.ingress.kubernetes.io/listen-ports"     = jsonencode([{"HTTP" = 80}, {"HTTPS" = 443}])
-      "alb.ingress.kubernetes.io/certificate-arn"  = var.certificate_arn
-      "alb.ingress.kubernetes.io/ssl-policy"       = "ELBSecurityPolicy-2016-08"
-      "alb.ingress.kubernetes.io/wafv2-acl-arn"   = var.wafv2_acl_arn
-    }
+    annotations = merge(
+      {
+        "kubernetes.io/ingress.class"            = "alb"
+        "alb.ingress.kubernetes.io/scheme"       = var.public_load_balancer ? "internet-facing" : "internal"
+        "alb.ingress.kubernetes.io/target-type"  = "ip"
+        "alb.ingress.kubernetes.io/listen-ports" = var.certificate_arn != "" ? jsonencode([{"HTTP" = 80}, {"HTTPS" = 443}]) : jsonencode([{"HTTP" = 80}])
+        "alb.ingress.kubernetes.io/wafv2-acl-arn" = var.wafv2_acl_arn
+      },
+      var.certificate_arn != "" ? {
+        "alb.ingress.kubernetes.io/certificate-arn" = var.certificate_arn
+        "alb.ingress.kubernetes.io/ssl-policy"      = "ELBSecurityPolicy-2016-08"
+      } : {}
+    )
   }
 
   spec {
