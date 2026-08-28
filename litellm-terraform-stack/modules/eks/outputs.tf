@@ -51,7 +51,7 @@ output "private_subnet_ids" {
 
 output "litellm_url" {
   description = "The URL for the LiteLLM service"
-  value       = "https://${aws_route53_record.litellm.name}"
+  value       = var.hosted_zone_name != "" ? "https://${aws_route53_record.litellm[0].name}" : "https://${data.aws_lb.ingress_alb.dns_name}"
 }
 
 output "cluster_ca" {
