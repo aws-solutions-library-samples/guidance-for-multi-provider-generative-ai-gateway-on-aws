@@ -1,3 +1,11 @@
+locals {
+  # CloudFront only accepts ACM certificates from us-east-1, while the ALB
+  # listener needs one in the deployment region. Prefer the dedicated
+  # cloudfront_certificate_arn; fall back to certificate_arn so existing
+  # us-east-1 deployments keep working unchanged.
+  cloudfront_viewer_certificate_arn = var.cloudfront_certificate_arn != "" ? var.cloudfront_certificate_arn : var.certificate_arn
+}
+
 # Generate a random secret for CloudFront-to-ALB authentication
 # This secret is used for secure origin authentication between CloudFront and ALB
 resource "random_password" "cloudfront_secret" {
@@ -77,11 +85,15 @@ resource "aws_cloudfront_distribution" "this" {
     compress               = true
   }
   
+  # CloudFront requires a us-east-1 certificate, which is usually different from
+  # the regional certificate attached to the ALB listener. Prefer the dedicated
+  # cloudfront_certificate_arn and fall back to certificate_arn for backwards
+  # compatibility (valid only when deploying in us-east-1).
   # Use the provided certificate if Route53 is enabled with a custom domain
   dynamic "viewer_certificate" {
-    for_each = var.use_route53 && var.certificate_arn != "" ? [1] : []
+    for_each = var.use_route53 && local.cloudfront_viewer_certificate_arn != "" ? [1] : []
     content {
-      acm_certificate_arn = var.certificate_arn
+      acm_certificate_arn = local.cloudfront_viewer_certificate_arn
       ssl_support_method  = "sni-only"
       minimum_protocol_version = "TLSv1.2_2021"
     }
@@ -89,7 +101,7 @@ resource "aws_cloudfront_distribution" "this" {
   
   # Use CloudFront default certificate if no Route53 or certificate is provided
   dynamic "viewer_certificate" {
-    for_each = !var.use_route53 || var.certificate_arn == "" ? [1] : []
+    for_each = !var.use_route53 || local.cloudfront_viewer_certificate_arn == "" ? [1] : []
     content {
       cloudfront_default_certificate = true
     }
