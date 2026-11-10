@@ -1,0 +1,9 @@
+guardrails:
+  - guardrail_name: bedrock-guard
+    litellm_params:
+      guardrail: bedrock
+      mode: pre_call
+      guardrailIdentifier: gr-123
+      guardrailVersion: "1"
+general_settings:
+  master_key_header_name: x-api-key

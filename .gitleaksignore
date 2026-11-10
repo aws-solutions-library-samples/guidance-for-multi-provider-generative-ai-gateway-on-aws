@@ -1,5 +1,11 @@
-0cb0c568dc995ce4a6220278a0cf5d76828e0ae9:README.md:generic-api-key:840
+# Findings in the git history that are not secrets (the current tree has none):
+# - example LiteLLM /key/generate responses in earlier READMEs (placeholder
+#   keys and the keys' hashed token_id)
+# - a variable reference in the earlier CDK stack
+# - a deliberately invalid key in an earlier negative test
 dc45f9723bd40324f1bb95568b71948e685dcb10:litellm-cdk/lib/litellm-cdk-stack.ts:generic-api-key:213
 15bd509e996cd7c79e8dc717d1e19a0c66b070ca:tests/openai_chat_test_file.py:generic-api-key:236
 78062c1f9dcc9b68243bbcaf5302676583b760cb:README.md:generic-api-key:347
-1d4f9615f50affba757f297c13360ebc590d88cb:README.md:generic-api-key:677
+a673227cd1c86af18b4cc3db2f4ee80adab71eef:README.md:generic-api-key:840
+68b7030bcf93f272b578086442f26037c293f607:README.md:generic-api-key:840
+eb987e6838f9ece95ff77ce1061b5f95a00d64a3:README.md:generic-api-key:677

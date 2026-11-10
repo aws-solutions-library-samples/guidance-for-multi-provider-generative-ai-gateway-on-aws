@@ -1,0 +1,12 @@
+#!/bin/bash
+# Locust driver bootstrap: Python, locust in a virtualenv, file-descriptor limits.
+set -euxo pipefail
+dnf install -y -q python3.12 python3.12-pip
+python3.12 -m venv /opt/loadtest/venv
+/opt/loadtest/venv/bin/pip install -q --disable-pip-version-check "locust==${locust_version}"
+cat >/etc/security/limits.d/90-loadtest.conf <<'LIMITS'
+* soft nofile 65536
+* hard nofile 65536
+LIMITS
+sysctl -w net.ipv4.ip_local_port_range="10240 65000"
+touch /opt/loadtest/ready

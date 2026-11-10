@@ -1,419 +1,300 @@
 # Guidance for Multi-Provider Generative AI Gateway on AWS
 
+This Guidance runs the open-source [LiteLLM](https://docs.litellm.ai/) proxy (MIT License; its `enterprise/`
+directory is under a separate licence) as a private gateway, designed for high availability, in your AWS account,
+deployed with Terraform. Applications call one OpenAI-compatible endpoint; LiteLLM routes the calls to Amazon
+Bedrock and other model providers, and handles virtual API keys, teams, budgets, rate limits, spend tracking and
+its admin UI.
+
 ## Table of contents
 
 - [Project Overview](#project-overview)
 - [Architecture](#architecture)
-- [AWS Services in this Guidance](#aws-services-in-this-Guidance)
-- [Distribution Options](#distribution-options)
+- [AWS Services in this Guidance](#aws-services-in-this-guidance)
+- [Deployment Options](#deployment-options)
 - [Cost](#cost)
-   - [Cost Considerations](#cost-considerations)
-   - [Cost Components](#cost-components)
-   - [Key Factors Influencing AWS Infrastructure Costs](#key-factors-influencing-aws-infrastructure-costs)
-   - [Sample Cost Tables](#sample-cost-tables)
+  - [Cost Considerations](#cost-considerations)
+  - [Cost Components](#cost-components)
+  - [Deployed Components](#deployed-components)
+  - [Key Factors Influencing AWS Infrastructure Costs](#key-factors-influencing-aws-infrastructure-costs)
+  - [Customer Responsibility](#customer-responsibility)
 - [Security](#security)
-- [How to Deploy](#how-to-deploy)
-- [Open Source Library](#open-source-library)
+- [Repository structure](#repository-structure)
+- [Open source libraries](#open-source-libraries)
 - [Notices](#notices)
 
 ## Project Overview
 
-This project provides a simple Terraform deployment of [LiteLLM](https://github.com/BerriAI/litellm) into Amazon Elastic Container Service (ECS) and Elastic Kubernetes Service (EKS) platforms on AWS. It aims to be pre-configured with defaults that will allow most users to quickly get started with LiteLLM.
+The Guidance hosts the official, unmodified LiteLLM container image. It adds no code to the request path; it
+provides the AWS infrastructure, security-focused defaults and deployment scripts around it. Everything LiteLLM itself does
+(models, keys, teams, budgets, guardrails, SSO) is described in the [LiteLLM documentation](https://docs.litellm.ai/).
 
-It also provides additional features on top of LiteLLM such as an AWS Bedrock Interface (instead of the default OpenAI interface), support for AWS Bedrock Managed Prompts, Chat History, and support for Okta Oauth 2.0 JWT Token Auth.
-
-If you are unfamiliar with LiteLLM, it provides a consistent interface to access all LLM providers so you do not need to edit your code to try out different models. It allows you to centrally manage and track LLM usage across your company at the user, team, and api key level. You can configure budgets and rate limits, restrict access to specific models, and set up retry/fallback routing logic across multiple providers. It provides cost saving measures like prompt caching. It provides security features like support for AWS Bedrock Guardrails for all LLM providers. Finally, it provides a UI where administrators can configure their users and teams, and users can generate their api keys and test out different LLMs in a chat interface.
+The foundation creates an empty AWS CloudFormation stack (`<deployment_name>-tracking-stack`) whose description
+carries the Guidance's solution ID; AWS uses it to count deployments of this Guidance.
 
 ## Architecture
 
-![Reference Architecture Diagram ECS EKS](./media/Gateway-Architecture-with-CloudFront.png)
+The diagram shows the default private deployment, the recommended configuration. The other
+[deployment options](#deployment-options) are described in [docs/deployment.md](docs/deployment.md).
 
-### Architecture steps
+```mermaid
+flowchart LR
+    clients["Applications and admins"]
+    idp["OIDC identity provider"]
 
-1. Tenants and client applications access the LiteLLM gateway proxy API through the [Amazon Route 53](https://aws.amazon.com/route53/) URL endpoint or [Amazon CloudFront](https://aws.amazon.com/cloudfront/) distribution, which is protected against common web exploits and bots using [AWS Web Application Firewall (WAF)](https://aws.amazon.com/waf/).
-2. AWS WAF forwards requests to [Application Load Balancer (ALB)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/)to automatically distribute incoming application traffic to [Amazon Elastic Container Service (ECS)](https://aws.amazon.com/ecs/) tasks or [Amazon Elastic Kubernetes Service (EKS)](https://aws.amazon.com/eks/) pods running generative AI gateway containers. TLS/SSL encryption secures traffic using a certificate issued by [AWS Certificate Manager (ACM)](https://aws.amazon.com/certificate-manager/).
-3. Container images for API/middleware and LiteLLM applications are built during guidance deployment and pushed to [Amazon Elastic Container registry (ECR)](http://aws.amazon.com/ecr/). They are used for deployment to Amazon ECS on AWS Fargate or Amazon EKS clusters that run these applications as containers in ECS tasks or EKS pods, respectively. LiteLLM provides a unified application interface for configuration and interacting with LLM providers. The API/middleware integrates natively with [Amazon Bedrock](https://aws.amazon.com/bedrock/) to enable features not supported by the [LiteLLM Open source project](https://docs.litellm.ai/).
-4. Models hosted on [Amazon Bedrock](https://aws.amazon.com/bedrock/) and [Amazon Nova](https://aws.amazon.com/ai/generative-ai/nova/) provide model access, guardrails, prompt caching, and routing to enhance the AI gateway and additional controls for clients through a unified API. Model access is also available for models deployed on [Amazon SageMaker AI](https://aws.amazon.com/sagemaker-ai/). [Access to required Amazon Bedrock models](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access-modify.html) must be properly configured. 
-5. External model providers (such as OpenAI, Anthropic, or Vertex AI) are configured using the LiteLLM Admin UI to enable additional model access through LiteLLM’s unified application interface. Integrate pre-existing configurations of third-party providers into the gateway using LiteLLM APIs. 
-6. LiteLLM integrates with [Amazon ElastiCache (Redis OSS)](https://aws.amazon.com/elasticache/), [Amazon Relational Database Service (RDS)](https://aws.amazon.com/rds/), and [AWS Secrets Manager](https://aws.amazon.com/secrets-manager/) services. Amazon ElastiCache enables multi-tenant distribution of application settings and prompt caching. Amazon RDS enables persistence of virtual API keys and other configuration settings provided by LiteLLM. Secrets Manager stores external model provider credentials and other sensitive settings securely.
-7. LiteLLM and the API/middleware store application sends logs to the dedicated [Amazon S3](https://aws.amazon.com/s3) storage bucket for troubleshooting and access analysis. 
+    subgraph account["Your AWS account"]
+        subgraph vpc["VPC (created, or your own) - two Availability Zones"]
+            alb["Internal Application<br/>Load Balancer (HTTPS)"]
+            ecs["ECS Fargate service<br/>LiteLLM, 2-20 tasks"]
+            migrate["One-off migration task"]
+            rds[("RDS PostgreSQL<br/>Multi-AZ")]
+            redis[("ElastiCache Redis<br/>primary + replica")]
+            nat["NAT gateway"]
+        end
+        bedrock["Amazon Bedrock"]
+        secrets["Secrets Manager"]
+        s3["S3: config, request logs,<br/>access logs"]
+        cw["CloudWatch logs, alarms,<br/>dashboard + SNS"]
+    end
 
-## Distribution Options
+    providers["ghcr.io image, other<br/>model providers"]
 
-Starting with version 1.1.0, this solution supports flexible deployment scenarios to meet various security and accessibility requirements. You can customize how your LiteLLM gateway is accessed based on your specific needs.
-
-### Deployment Scenarios
-
-#### Scenario 1: Default - Public with CloudFront (Recommended)
-```bash
-USE_CLOUDFRONT="true"
-USE_ROUTE53="false"
-PUBLIC_LOAD_BALANCER="true"
+    clients -- "VPN, Direct Connect or Transit Gateway" --> alb
+    alb -. "UI sign-in" .-> idp
+    alb --> ecs
+    ecs --> rds
+    ecs --> redis
+    migrate --> rds
+    ecs --> bedrock
+    ecs --> secrets
+    ecs --> s3
+    ecs --> cw
+    ecs --> nat --> providers
 ```
 
-**Why choose this scenario:**
-- Global performance with low-latency access via CloudFront's edge locations
-- Enhanced security with AWS Shield Standard DDoS protection
-- Simplified HTTPS management with CloudFront's default certificate
-- Best option for public-facing AI services with global user base
+1. Clients reach an internal Application Load Balancer, admitted from the VPC and the client ranges or security
+   groups you list.
+2. HTTPS terminates on the load balancer with your AWS Certificate Manager (ACM) certificate. The load balancer
+   requires OIDC sign-in in front of the LiteLLM UI paths; API paths use LiteLLM virtual keys.
+3. LiteLLM runs on Amazon ECS on AWS Fargate (Graviton, two tasks minimum across two Availability Zones, CPU and
+   memory target-tracking scaling up to 20 tasks). When the image or the task configuration changes, the apply first
+   runs the database schema migration as a one-off task; the service only rolls if it succeeds, and the deployment circuit breaker rolls back a failed
+   rollout. The container health check also fails when the task's memory, without reclaimable page cache, stays
+   at 90 % of the task memory for about five minutes; ECS then starts a replacement before it stops and drains
+   the task, because LiteLLM can hold on to memory it no longer uses.
+4. Amazon RDS for PostgreSQL stores keys, teams, budgets, spend and models added through the UI or API. Amazon
+   ElastiCache (Redis OSS) holds shared rate-limit and routing state and the response cache.
+5. Generated credentials (master key, salt key, UI password, database URL, Redis token) live only in AWS Secrets
+   Manager and reach the tasks as secret references; the Guidance is designed to keep them out of Terraform
+   variables and state.
+6. Terraform renders the LiteLLM configuration and stores it in Amazon S3; request metadata (not prompts or
+   responses) is logged to S3; Amazon CloudWatch holds logs, alarms and a dashboard, with alarm notifications
+   through Amazon SNS.
+7. LiteLLM calls Amazon Bedrock with its task role. Pulling the image from ghcr.io, other model providers and the
+   identity provider need outbound internet access through the NAT gateway (or your own egress). Signed LiteLLM
+   licence keys are verified offline.
 
-**Security:**
-- CloudFront IP filtering restricts ALB access to only CloudFront traffic
-- WAF can be applied at the CloudFront level (requires global WAF)
-- Simpler certificate management using CloudFront's default certificate
+## AWS Services in this Guidance
 
-**Access URL:** `https://d1234abcdef.cloudfront.net`
+| AWS service | Use in this Guidance |
+| --- | --- |
+| [Amazon Bedrock](https://aws.amazon.com/bedrock/) | Foundation models that LiteLLM calls with its task role. |
+| [Amazon Elastic Container Service (ECS)](https://aws.amazon.com/ecs/) on [AWS Fargate](https://aws.amazon.com/fargate/) | Runs the LiteLLM containers and the schema migration task. |
+| [Elastic Load Balancing (Application Load Balancer)](https://aws.amazon.com/elasticloadbalancing/application-load-balancer/) | Entry point that terminates HTTPS and enforces UI sign-in. |
+| [Amazon Virtual Private Cloud (VPC)](https://aws.amazon.com/vpc/) | Isolated network with private subnets, NAT gateway, VPC endpoints and flow logs. |
+| [Amazon Relational Database Service (RDS)](https://aws.amazon.com/rds/) | PostgreSQL database for LiteLLM keys, teams, budgets, spend and models. |
+| [Amazon ElastiCache](https://aws.amazon.com/elasticache/) | Redis OSS for shared rate-limit, routing and cache state. |
+| [AWS Secrets Manager](https://aws.amazon.com/secrets-manager/) | Stores generated credentials and the secrets you provide. |
+| [Amazon Simple Storage Service (S3)](https://aws.amazon.com/s3/) | Holds the rendered LiteLLM configuration, request logs and load balancer access logs. |
+| [Amazon CloudWatch](https://aws.amazon.com/cloudwatch/) | Logs, metrics, alarms and the gateway dashboard. |
+| [Amazon Simple Notification Service (SNS)](https://aws.amazon.com/sns/) | Delivers alarm notifications. |
+| [AWS Identity and Access Management (IAM)](https://aws.amazon.com/iam/) | Least-privilege roles for the tasks, monitoring and flow logs. |
+| [AWS Key Management Service (KMS)](https://aws.amazon.com/kms/) | Encryption keys for the data stores, logs and alarm topic. |
+| [AWS Certificate Manager (ACM)](https://aws.amazon.com/certificate-manager/) | TLS certificate for the load balancer. |
+| [Amazon Route 53](https://aws.amazon.com/route53/) | Optional DNS alias record for the gateway. |
+| [AWS WAF](https://aws.amazon.com/waf/) | Helps protect the load balancer in public mode. |
+| [AWS Client VPN](https://aws.amazon.com/vpn/client-vpn/) | Optional demo access path for trial deployments. |
+| [Amazon Elastic Container Registry (ECR)](https://aws.amazon.com/ecr/) | Optional private copy of the LiteLLM image for deployments without internet access. |
+| [AWS CloudFormation](https://aws.amazon.com/cloudformation/) | Empty stack that counts deployments of this Guidance. |
 
-#### Scenario 2: Custom Domain with CloudFront
-```bash
-USE_CLOUDFRONT="true"
-USE_ROUTE53="true"
-PUBLIC_LOAD_BALANCER="true"
-HOSTED_ZONE_NAME="example.com"
-RECORD_NAME="genai"
-CERTIFICATE_ARN="arn:aws:acm:region:account:certificate/certificate-id"
-```
+## Deployment Options
 
-**Why choose this scenario:**
-- Brand consistency with your custom domain
-- Professional appearance and SEO benefits
-- Same global performance and security as Scenario 1
-
-**Additional requirements:**
-- Route53 hosted zone for your domain
-- ACM certificate for your domain (must be in us-east-1 for CloudFront)
-
-**Access URL:** `https://genai.example.com`
-
-#### Scenario 3: Direct ALB Access (No CloudFront)
-```bash
-USE_CLOUDFRONT="false"
-USE_ROUTE53="true"
-PUBLIC_LOAD_BALANCER="true"
-HOSTED_ZONE_NAME="example.com"
-RECORD_NAME="genai"
-CERTIFICATE_ARN="arn:aws:acm:region:account:certificate/certificate-id"
-```
-
-**Why choose this scenario:**
-- Lower latency for single-region deployments
-- Simplified architecture without CloudFront 
-- Regional WAF can be directly applied to the ALB
-- Cost savings by eliminating CloudFront distribution
-
-**Security considerations:**
-- No CloudFront layer means direct internet exposure of ALB
-- WAF protection becomes particularly important
-- ALB security group allows traffic from all IPs (0.0.0.0/0)
-
-**Access URL:** `https://genai.example.com` (points directly to ALB)
-
-#### Scenario 4: Private VPC Only
-```bash
-USE_CLOUDFRONT="false"
-USE_ROUTE53="true"
-PUBLIC_LOAD_BALANCER="false"
-HOSTED_ZONE_NAME="example.internal"  # Often a private .internal domain
-RECORD_NAME="genai"
-CERTIFICATE_ARN="arn:aws:acm:region:account:certificate/certificate-id"
-```
-
-**Why choose this scenario:**
-- Maximum security for internal enterprise applications
-- Complete isolation from public internet
-- Suitable for processing sensitive or proprietary data
-
-**Access methods:**
-- VPN connection to the VPC
-- AWS Direct Connect
-- VPC peering with corporate network
-- Transit Gateway
-
-**Security considerations:**
-- No public internet access possible
-- ALB security group only allows traffic from private subnet CIDRs
-- Requires network connectivity to the VPC for access
-
-**Access URL:** `https://genai.example.internal` (resolves only within VPC or connected networks)
-
-### Configuration Quick Reference
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `USE_CLOUDFRONT` | `true` | Enables CloudFront distribution for global delivery |
-| `USE_ROUTE53` | `false` | Enables Route53 for custom domain support |
-| `PUBLIC_LOAD_BALANCER` | `true` | Deploys ALB in public subnets |
-| `CLOUDFRONT_PRICE_CLASS` | `PriceClass_100` | CloudFront price class (100/200/All) |
-| `HOSTED_ZONE_NAME` | `""` | Route53 hosted zone name for custom domain |
-| `RECORD_NAME` | `""` | Record to create in Route53 (subdomain) |
-| `CERTIFICATE_ARN` | `""` | ARN of ACM certificate for custom domain |
-
-### Security Considerations
-
-Each deployment scenario offers different security characteristics:
-
-1. **CloudFront with public ALB (Default)**: 
-   - ALB is in public subnets but protected by custom header authentication
-   - Only traffic with the proper CloudFront secret header is allowed (except health check paths)
-   - CloudFront provides an additional security layer with AWS Shield Standard DDoS protection
-   - Best balance of accessibility and security for public services
-
-2. **Direct ALB access (No CloudFront)**:
-   - ALB directly accessible from internet
-   - WAF protection is crucial for this deployment
-   - Consider IP-based restrictions if possible
-
-3. **Private VPC deployment**:
-   - Highest security, no direct internet exposure
-   - Requires VPN or Direct Connect for access
-   - Consider for sensitive workloads or internal services
-
-All scenarios maintain security best practices including:
-- HTTPS for all communications with TLS 1.2+ 
-- Security groups with principle of least privilege
-- WAF protection against common attacks
-- IAM roles with appropriate permissions
-
-### CloudFront Authentication
-
-When using CloudFront, a custom security mechanism is implemented:
-
-1. CloudFront adds a secret header (`X-CloudFront-Secret`) to all requests sent to the ALB
-2. The ALB has listener rules that verify this header before allowing access
-3. Health check paths are specifically exempted to allow CloudFront origin health checks
-4. The secret is stable across deployments (won't change unless explicitly changed)
-
-This provides a robust defense against direct ALB access even if someone discovers your ALB's domain name. The secret is only displayed once after creation in the Terraform outputs and is marked as sensitive.
-
-### AWS Services in this Guidance
-
-| **AWS Service**                                                                                         | **Role**           | **Description**                                                                                             |
-| ------------------------------------------------------------------------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------- |
-| [Amazon Bedrock](https://aws.amazon.com/bedrock/)                                    | Core service       | Manages Single API access to multiple Foundational Models                                                   |
-| [Amazon SageMaker AI](https://aws.amazon.com/sagemaker-ai/)                          | Core service       | Manages access to any Foundational Model deployed on Amazon SageMaker AI                                    |
-| [Amazon Elastic Container Service](https://aws.amazon.com/ecs/) ( ECS)               | Core service       | Manages application platform and on-demand infrastructure for LiteLLM container orchestration.              |
-| [Amazon Elastic Kubernetes Service](https://aws.amazon.com/eks/) ( EKS)              | Core service       | Manages Kubernetes control plane and compute nodes for LiteLLM container orchestration.                     |
-| [Amazon Elastic Compute Cloud](https://aws.amazon.com/ec2/) (EC2)                    | Core service       | Provides compute instances for EKS compute nodes and runs containerized applications.                       |
-| [Amazon Virtual Private Cloud](https://aws.amazon.com/vpc/) (VPC)                    | Core Service       | Creates an isolated network environment with public and private subnets across multiple Availability Zones. |
-| [Amazon Web Applications Firewall](https://aws.amazon.com/waf/) (WAF)                | Core Service       | Protect guidance applications from common exploits                                                          |
-| [Amazon Elastic Container Registry](http://aws.amazon.com/ecr/) (ECR)                | Supporting service | Stores and manages Docker container images for EKS deployments.                                             |
-| [Elastic Load Balancer](https://aws.amazon.com/elasticloadbalancing/) (ALB)          | Supporting service | Distributes incoming traffic across multiple targets in the EKS cluster.                                    |
-| [Amazon CloudFront](https://aws.amazon.com/cloudfront/)                              | Supporting service | Global content delivery network for improved performance and security.                                      |
-| [Amazon Simple Storage Service ](https://aws.amazon.com/s3) (S3)                     | Supporting service | Provides persistent object storage for Applications logs and other related data.                            |
-| [Amazon Relational Database Service ](https://aws.amazon.com/rds/) (RDS)             | Supporting service | Enables persistence of virtual API keys and other configuration settings provided by LiteLLM.               |
-| [Amazon ElastiCache Service (Redis OSS) ](https://aws.amazon.com/elasticache/) (OSS) | Supporting service | Enables multi-tenant distribution of application settings and prompt caching.                               |
-| [AWS Route 53](https://aws.amazon.com/route53/)                                      | Supporting Service | Optional DNS service for custom domain management                                                           |
-| [AWS Identity and Access Management](https://aws.amazon.com/iam/) (IAM)              | Supporting service | Manages access to AWS services and resources securely, including ECS or EKS cluster access.                 |
-| [AWS Certificate Manager](https://aws.amazon.com/certificate-manager/) (ACM)         | Security service   | Manages SSL/TLS certificates for secure communication within the cluster.                                   |
-| [Amazon CloudWatch](https://aws.amazon.com/cloudwatch/)                              | Monitoring service | Collects and tracks metrics, logs, and events from ECS, EKS and other AWS resources provisoned in the guidance   |
-| [AWS Secrets Manager](https://aws.amazon.com/secrets-manager/)                       | Management service | Manager stores external model provider credentials and other sensitive settings securely.                   |
-| [AWS Key Management Service](https://aws.amazon.com/kms/) (KMS)                      | Security service   | Manages encryption keys for securing data in EKS and other AWS services.                                    |
-
-**NOTE** For any guidance deployment, either Amazon ECS or EKS container orchestration platform can be used, but not both.
+The gateway deploys as a trial (private, plain HTTP, demo VPN; for testing only), as the recommended
+private deployment with HTTPS, DNS, an identity provider and a LiteLLM licence, or in public mode behind AWS
+WAF. Follow [docs/deployment.md](docs/deployment.md); every input and output is listed in
+[docs/configuration.md](docs/configuration.md).
 
 ## Cost
 
 ### Cost Considerations
 
-When implementing this guidance on AWS, it's important to understand the various factors that contribute to the overall cost. This section outlines the primary cost components and key factors that influence pricing.
+When implementing this Guidance on AWS, it is important to understand the factors that contribute to the overall
+cost. This section outlines the main cost components and the factors that influence them. Estimate the cost of
+your configuration in your Region with the [AWS Pricing Calculator](https://calculator.aws/).
 
 ### Cost Components
 
-The total cost of running this solution can be broadly categorized into two main components:
+The total cost of running this Guidance falls into two components:
 
-1. **LLM Provider Costs**: These are the charges incurred for using services from LLM providers such as Amazon Bedrock, Amazon SageMaker AI, Anthropic, and others. Each provider has its own pricing model, typically based on factors like the number of tokens processed, model complexity, and usage volume.
+1. **Model provider costs**: charges for Amazon Bedrock and any other model provider the gateway calls, typically
+   based on the number of tokens processed, the model, and usage volume. The LiteLLM Enterprise licence, if you
+   use one, is billed by its vendor.
+2. **AWS infrastructure costs**: the AWS resources that host and operate the gateway, listed below.
 
-2. **AWS Infrastructure Costs**: These are the costs associated with running the Gen AI Gateway proxy server on AWS infrastructure. This includes various AWS services and resources used to host and operate the solution.
+### Deployed Components
+
+A default deployment runs these resources around the clock:
+
+| AWS service | Resources |
+| --- | --- |
+| Amazon VPC | 1 NAT gateway with 1 public IPv4 address; the S3 gateway endpoint (no charge) |
+| Elastic Load Balancing | 1 Application Load Balancer |
+| Amazon ECS on AWS Fargate | 2 or more tasks (Linux/ARM, 2 vCPU, 4 GiB memory each) |
+| Amazon RDS for PostgreSQL | 1 `db.t4g.large` instance, Multi-AZ, gp3 storage from 20 GB, 30 days of backups |
+| Amazon ElastiCache (Redis OSS) | 2 `cache.t3.micro` nodes |
+| AWS Secrets Manager | 5 generated secrets, plus each secret you add (identity provider, licence, provider API keys) |
+| Amazon CloudWatch | Log groups with ten-year retention, alarms, 1 dashboard, Container Insights |
+| Amazon S3 | Config, request-log and access-log buckets |
+| AWS KMS | 1 key for the alarm topic (replaced by your key when `kms_key_arn` is set) |
+| AWS Certificate Manager | Your certificate (public certificates have no charge) |
+
+Optional components add to this:
+
+| AWS service | When |
+| --- | --- |
+| Interface VPC endpoints | `create_interface_endpoints` or `disable_outbound_network_access`: 6 endpoints, each billed per Availability Zone |
+| AWS WAF and public IPv4 addresses | Public mode: 1 web ACL with 4 rules, and public addresses for the internet-facing load balancer |
+| AWS Client VPN | Trial deployments with `create_vpn`: 1 subnet association, plus each connected client |
+| Amazon Route 53 | A hosted zone for `record_name`, if you do not have one |
+| Amazon ECR | A mirrored copy of the LiteLLM image |
+| AWS Private Certificate Authority | A private CA, if your certificate is for a private name |
 
 ### Key Factors Influencing AWS Infrastructure Costs
 
-While the default configuration provides a starting point, the actual cost of running the LiteLLM-based proxy server on AWS can vary significantly based on your specific implementation and usage patterns. Some of the major factors that can impact scaling and cost include:
+The actual cost depends on your configuration and usage patterns. The main factors are:
 
-1. **Compute Instances**: The type and number of EC2 instances used to host the LiteLLM container as a proxy. Instance type selection affects both performance and cost.
+1. **Compute**: the number of Fargate tasks. The service scales out under load (see
+   [Architecture](#architecture)), so sustained traffic adds tasks.
+2. **Database storage**: grows with keys, teams, users, budgets and per-request spend records.
+3. **Traffic patterns**: request and response sizes, requests and tokens per minute, concurrency, and the latency
+   of the model providers, which keeps connections and tasks busy.
+4. **Logging**: CloudWatch log ingestion and storage; with ten-year retention, storage grows every month. DEBUG
+   logging multiplies the volume.
+5. **Networking**: NAT gateway data processing for calls to non-Bedrock providers, data transfer, and interface
+   endpoint data processing.
+6. **Load balancer and WAF requests**: capacity units and, in public mode, WAF requests.
 
-2. **EBS Storage**: The type and size of EBS volumes attached to the EC2 instances can influence both performance and cost.
-
-3. **Autoscaling Configuration**: The autoscaling policies configured for EKS/ECS clusters will affect how the solution scales in response to demand, impacting both performance and cost.
-
-4. **Traffic Patterns**: The shape and distribution of LLM requests, including factors such as:
-
-   - Request/response payload sizes
-   - Tokens per minute (TPM)
-   - Requests per minute (RPM)
-   - Concurrency levels
-   - Model latency (from downstream LLM providers)
-   - Network latency between AWS and LLM providers
-
-5. **Caching Configuration**: Effective caching can reduce the number of requests to LLM providers, potentially lowering costs but requiring additional resources.
-
-6. **Database Storage**: The amount of storage required for managing virtual keys, organizations, teams, users, budgets, and per-request usage tracking.
-
-7. **High Availability and Resiliency**: Configurations for load balancing, routing, and retries can impact both reliability and cost.
-
-8. **Logging Level**: The configured logging level affects storage and potentially network egress costs.
-
-9. **Networking Costs**: This includes data transfer charges and the cost of running NAT gateways for outgoing calls to LLM providers.
-
-It's important to note that this is not an exhaustive list of cost factors, but rather highlights some of the major contributors to the overall cost of the solution.
+This is not an exhaustive list, but it covers the main contributors.
 
 ### Customer Responsibility
 
-While this implementation guide provides default configurations, customers are responsible for:
+While this Guidance provides default configurations, customers are responsible for:
 
-1. Configuring the solution to their optimal settings based on their specific use case and requirements.
-2. Monitoring and managing the costs incurred from running the proxy server on AWS infrastructure.
-3. Managing and optimizing the costs associated with their chosen LLM providers.
+1. Configuring the Guidance for their use case and requirements.
+2. Monitoring and managing the costs of the AWS infrastructure.
+3. Managing and optimising the costs of their chosen model providers.
 
-Customers should regularly review their AWS service usage patterns, adjust configurations as needed, and leverage AWS cost management tools to optimize their spending.
-
-We recommend creating a [budget](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-create.html) 
-through [AWS Cost Explorer](http://aws.amazon.com/aws-cost-management/aws-cost-explorer/) to
-help manage costs. Prices are subject to change and also depend on model provider usage patterns/volume of data. For full details, please refer to the pricing webpage for each AWS service used in this guidance.
-
-### Sample Cost tables
-
-The following tables provide a sample cost breakdown for deploying this guidance on ECS and EKS container orchestration platforms with the default parameters in the `us-east-1` (N. Virginia) region for one month. These estimates are based on the AWS Pricing Calculator outputs for the full deployments as per guidance and are subject to changes in underlying services configuration.
-
-**For ECS container orchestration platform**
-
-| **AWS service**                          | Dimensions                                                                                        | Cost, month [USD] |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------- | ----------------- |
-| Amazon Elastic Container Service (ECS)   | OS: Linux, CPU Architecture: ARM, 24 hours, 2 tasks per day, 4 GB Memory, 20 GB ephemeral storage | 115.33            |
-| Amazon Virtual Private Cloud (VPC)       | 1 VPC, 4 subnets, 1 NAT Gateway, 1 public IPv4, 100 GB outbound data per month                    | 50.00             |
-| Amazon Elastic Container Registry (ECR)  | 5 GB image storage/month                                                                          | 0.50              |
-| Amazon Elastic Load Balancer (ALB)       | 1 ALB, 1 TB/month                                                                                 | 24.62             |
-| Amazon Simple Storage Service (S3)       | 100 GB/month                                                                                      | 7.37              |
-| Amazon Relational Database Service (RDS) | 2 db.t3.micro nodes, 100% utilization, multi-AZ, 2 vCPU,1 GiB Memory                               | 98.26             |
-| Amazon ElastiCache Service (Redis OSS)   | 2 cache.t3.micro nodes, 2 vCPU, 0.5 GiB Memory, Upto 5 GB Network performance, 100% utilization   | 24.82             |
-| Amazon Route 53                          | 1 hosted zone, 1 million standard queries/month                                                    | 26.60             |
-| Amazon CloudWatch                        | 25 metrics to preserve                                                                            | 12.60             |
-| AWS Secrets Manager                      | 5 secrets, 30 days, 1 million API calls per month                                                 | 7.00              |
-| AWS Key Management Service (KMS)         | 1 key, 1 million symmertic requests                                                                | 4.00              |
-| AWS WAF                                  | 1 web ACL, 2 rules                                                                                | 7.00              |
-| AWS Certificate Manager                  | 1 Certificate                                                                                     | free              |
-| **TOTAL**                                |                                                                                                   | **$378.10/month** |
-
-For detailed cost estimates for deployment on ECS platform, it is recommended to create an AWS Price calculator like [this:](https://calculator.aws/#/estimate?id=8bce7fe949694f4ddbb08c9974ddcda9d13b1398)
-
-**For EKS container orchestration platform:**
-
-| **AWS service**                          | Dimensions                                                                                      | Cost, month [USD] |
-| ---------------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------- |
-| Amazon Elastic Kubernetes Service (EKS)  | 1 control plane                                                                                 | 73.00             |
-| Amazon Elastic Compute Cloud (EC2)       | EKS Compute Nodes, 2 nodes t4g.medium                                                           | 49.06             |
-| Amazon Virtual Private Cloud (VPC)       | 1 VPC, 4 subnets, 1 NAT Gateway, 1 public IPv4, 100 GB outbound data per month                  | 50.00             |
-| Amazon Elastic Container Registry (ECR)  | 5 GB image storage/month                                                                        | 0.50              |
-| Amazon Elastic Load Balancer (ALB)       | 1 ALB, 1 TB/month                                                                               | 24.62             |
-| Amazon Simple Storage Service (S3)       | 100 GB/month                                                                                    | 7.37              |
-| Amazon Relational Database Service (RDS) | 2 db.t3.micro nodes, 100% utilization, multi-AZ, 2 vCPU,1 GiB Memory                             | 98.26             |
-| Amazon ElastiCache Service (Redis OSS)   | 2 cache.t3.micro nodes, 2 vCPU, 0.5 GiB Memory, Upto 5 GB Network performance, 100% utilization | 24.82             |
-| Amazon Route 53                          | 1 hosted zone, 1 million standard queries/month                                                  | 26.60             |
-| Amazon CloudWatch                        | 25 metrics to preserve                                                                          | 12.60             |
-| AWS Secrets Manager                      | 5 secrets, 30 days, 1 million API calls per month                                               | 7.00              |
-| AWS Key Management Service (KMS)         | 1 key, 1 million symmertic requests                                                              | 4.00              |
-| AWS WAF                                  | 1 web ACL, 2 rules                                                                              | 7.00              |
-| AWS Certificate Manager                  | 1 Certificate                                                                                   | free              |
-| **TOTAL**                                |                                                                                                 | **$384.83/month** |
-
-For detailed cost estimates for deployment on EKS platform, it is recommended to create an AWS Price calculator like [this:](https://calculator.aws/#/estimate?id=2e331688341278d6e3e1a8b38c8ba76756e71f08)
+We recommend creating a [budget](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-create.html)
+in [AWS Cost Explorer](https://aws.amazon.com/aws-cost-management/aws-cost-explorer/) to help manage costs. Prices
+are subject to change; see the pricing page of each AWS service for full details.
 
 ## Security
 
-When you build systems on AWS infrastructure, security responsibilities are shared between you and AWS. This [shared responsibility model](https://aws.amazon.com/compliance/shared-responsibility-model/) reduces your operational burden because AWS operates, manages, and controls the components including the host operating system, the virtualization layer, and the physical security of the facilities in which the services operate. For more information about AWS security, visit [AWS Cloud Security](http://aws.amazon.com/security/).
+When you build systems on AWS infrastructure, security responsibilities are shared between you and AWS. This
+[shared responsibility model](https://aws.amazon.com/compliance/shared-responsibility-model/) reduces your
+operational burden because AWS operates, manages, and controls the components including the host operating
+system, the virtualization layer, and the physical security of the facilities in which the services operate. For
+more information about AWS security, visit [AWS Cloud Security](https://aws.amazon.com/security/).
 
-This guidance implements several security best practices and AWS services to enhance the security posture of your ECS and EKS Clusters. Here are the key security components and considerations:
+Weakening a default (public mode, plain HTTP, DEBUG logging) takes an explicit input; public mode without an
+identity provider and DEBUG logging also print a warning on every plan.
 
 ### Identity and Access Management (IAM)
 
-- **IAM Roles**: The architecture deploys dedicated IAM roles (`litellm-stack-developers`, `litellm-stack-operators`) to manage access to ECS or EKS cluster resources. This follows the principle of least privilege, ensuring users and services have only the permissions necessary to perform their tasks.
-- **EKS Managed Node Groups**: These groups use created IAM roles (`litellm-stack-eks-nodegroup-role`) with specific permissions required for nodes to join the cluster and for pods to access AWS services.
+- **Task role**: may invoke Amazon Bedrock models and guardrails, read the LiteLLM configuration and write request
+  logs. Inputs narrow the allowed models and Regions, and other accounts' roles can only be assumed when listed
+  explicitly.
+- **Execution role**: reads only the secrets the tasks use and writes their logs; it gets image pull rights only
+  for a private ECR repository given as `image_uri`.
+- **Service roles**: RDS Enhanced Monitoring and VPC flow logs each have their own role. No policy grants `*`
+  actions.
 
 ### Network Security
 
-- **Amazon VPC**: ECS or EKS clusters are deployed within a VPC (newly created or custom specified in guidance deployment configuration) with public and private subnets across multiple Availability Zones, providing network isolation.
-- **Security Groups**: Security groups are typically used to control inbound and outbound traffic to EC2 instances and other resources within the VPC.
-- **NAT Gateways**: Deployed in public subnets to allow outbound internet access for resources in private subnets while preventing inbound access from the internet.
+- **Amazon VPC**: the tasks, database and cache run in private subnets in two Availability Zones, in a VPC the
+  Guidance creates or one you bring.
+- **Internal load balancer**: reachable only from the VPC and the client ranges or security groups you list;
+  public mode is opt-in and attaches AWS WAF.
+- **Security groups**: traffic is allowed only from the load balancer to the tasks and from the tasks (and clients
+  you list) to the database and cache.
+- **Egress**: one NAT gateway serves outbound calls; a mode without internet access uses VPC endpoints only.
+- **VPC flow logs**: in a created VPC, all traffic is logged to CloudWatch Logs; a bring-your-own VPC keeps its
+  own flow log configuration.
 
 ### Data Protection
 
-- **Amazon EBS Encryption**: EBS volumes used by EC2 instances for EKS compute nodes are typically encrypted to protect data at rest.
-- **AWS Key Management Service (KMS)**: used for managing encryption keys for various services, including EBS volume encryption.
-- **AWS Secrets manager**: used for stores external model providers credentials and other sensitive settings securely.
-
-### Kubernetes-specific Security
-
-- **Kubernetes RBAC**: Role-Based Access Control is implemented within the EKS cluster to manage fine-grained access to Kubernetes resources.
-- **AWS Certificate Manager**: Integrated to manage SSL/TLS certificates for secure communication within the clusters.
-- **AWS Identity and Access Manager**: used for role/policy based access to AWS services and resources, including ECS or EKS cluster resource access
+- **In transit**: the load balancer serves HTTPS with a TLS 1.2/1.3 policy and redirects HTTP; Redis requires TLS
+  and an auth token.
+- **At rest**: RDS, ElastiCache, Secrets Manager, CloudWatch Logs and the S3 buckets are encrypted, with AWS
+  managed keys or your own AWS KMS key; the alarm topic is encrypted with a KMS key the Guidance creates, or with
+  your own key.
+- **S3 buckets**: public access blocked and TLS-only bucket policies.
+- **Prompts and responses**: kept out of LiteLLM's logging callbacks; the request logs in S3 hold metadata only.
+  Email addresses are masked in the LiteLLM log group, and database logs omit query parameter values.
+- **Backups**: deletion protection is on by default, automated backups are kept for 30 days, and destroying the
+  database takes a final snapshot.
 
 ### Monitoring and Logging
 
-- **Amazon CloudWatch**: Used for monitoring and logging of AWS resources and applications running on the EKS cluster.
+- **Amazon CloudWatch**: alarms on load balancer, ECS, RDS and ElastiCache metrics and on LiteLLM errors, a
+  dashboard, and an encrypted SNS topic for notifications.
+- **Logs**: the container, RDS PostgreSQL, VPC flow, WAF and Client VPN log groups, and the load balancer access
+  logs and request logs in S3, are retained for ten years.
 
 ### Container Security
 
-- **Amazon ECR**: Stores container images in a secure, encrypted repository. It includes vulnerability scanning to identify security issues in your container images.
+- **Pinned image**: the official LiteLLM image is pinned by digest, so tasks run the reviewed image even if its
+  tag is re-pushed.
+- **Mirroring**: `deploy/mirror-image.sh` copies the pinned digest by default and verifies the upstream image
+  signature before copying it into Amazon ECR.
 
 ### Secrets Management
 
-- **AWS Secrets Manager**: Secrets Manager stores external model provider credentials and other sensitive settings securely.
+- **AWS Secrets Manager**: credentials are generated at the first deployment and written with Terraform
+  write-only arguments, which are designed to keep them out of Terraform variables, plans and state. Secrets you add are passed as
+  Secrets Manager ARNs; only the identity provider client secret reaches the Terraform state (see
+  [Identity provider](docs/deployment.md#identity-provider)).
 
 ### Additional Security Considerations
 
-- Regularly update and patch ECS or EKS clusters, compute nodes, and container images.
-- Implement network policies to control pod-to-pod communication within the cluster.
-- Use Pod Security Policies or Pod Security Standards to enforce security best practices for pods.
-- Implement proper logging and auditing mechanisms for both AWS and Kubernetes resources.
-- Regularly review and rotate IAM and Kubernetes RBAC permissions.
+- Keep the LiteLLM image up to date; follow the [LiteLLM release notes](https://docs.litellm.ai/release_notes).
+- Give applications LiteLLM virtual keys with budgets and rate limits; keep the master key for administration.
+- Configure an identity provider, especially in public mode.
+- Review IAM permissions, client ranges and LiteLLM users and teams regularly.
 
-### Supported AWS Regions
+## Repository structure
 
-As of March, 2025 `Guidance for Multi-Provider Generative AI Gateway on AWS` is supported in the following AWS Regions:
+| Path | Contents |
+| --- | --- |
+| [`terraform/foundation`](terraform/foundation) | Long-lived network and data: VPC, RDS, Redis, Secrets Manager, config bucket, optional demo Client VPN. |
+| [`terraform/app`](terraform/app) | Load balancer, WAF, ECS service and migration task, LiteLLM configuration, IAM, logs, alarms. |
+| [`terraform/modules`](terraform/modules/README.md) | Child modules: observability, rollout and vpn. |
+| [`deploy`](deploy) | Deployment scripts and the `terraform.tfvars.example` input file. |
+| [`docs`](docs) | [Deployment guide](docs/deployment.md) and [configuration reference](docs/configuration.md). |
+| [`examples/agentcore`](examples/agentcore/README.md) | An agent on Amazon Bedrock AgentCore Runtime that does all of its inference through the gateway. |
+| [`examples/eks`](examples/eks/README.md) | Guidance for running the gateway on Amazon EKS on top of the foundation stack (not a tested deployment). |
+| [`loadtest`](loadtest/README.md) | Load-test harness for a deployed gateway. |
 
-| **Region Name**               |**Region Code**  |
-| ----------------------------- |--|
-| US East (Ohio)                | us-east-1 |
-| US East (N. Virginia)         | us-east-2 |
-| US West (Northern California) | us-west-1 |
-| US West (Oregon)              | us-west-2 |
-| Europe (Paris)                | eu-west-3 |
-| Canada (Central)              | ca-central-1|
-| South America (São Paulo)     | sa-east-1 |
-| Europe (Frankfurt)            | eu-central-1 |
-| Europe (Ireland)              | eu-west-1 |
-| Europe (London)               | eu-west-2 | 
-| Europe (Paris)                | eu-west-3 |
-| Europe (Stockholm)            | eu-north-1 |
-| Europe (Milan)                | eu-south-1 |
-| Europe (Spain)                | eu-south-2 |
-| Europe (Zurich)               | eu-central-2 | 
+## Open source libraries
 
+For the open source libraries this Guidance uses, see [ATTRIBUTION](ATTRIBUTION.md).
 
-### Quotas
+## Notices
 
-Service quotas, also referred to as limits, are the maximum number of service resources or operations for your AWS account.
-
-### Quotas for AWS services in this Guidance
-
-Make sure you have sufficient quota for each of the services implemented in this guidance. For more information, see [AWS service
-quotas](https://docs.aws.amazon.com/general/latest/gr/aws_service_limits.html).
-
-To view the service quotas for all AWS services in the documentation without switching pages, view the information in the [Service endpoints and
-quotas](https://docs.aws.amazon.com/general/latest/gr/aws-general.pdf#aws-service-information) page in the PDF format instead.
-
-## How to deploy
-
-Please find detailed guidance deployment and usage instructions in the Implementation Guide [here](https://aws-solutions-library-samples.github.io/ai-ml/guidance-for-multi-provider-generative-ai-gateway-on-aws.html )
-
-## Workshop
-
-Follow the step-by-step instructions provided in this [workshop](https://catalog.us-east-1.prod.workshops.aws/workshops/db0f23ea-2442-4962-9a54-04dcdab7de59/en-US) for a deep dive hands-on experience.
-
-
-## Open Source Library
-
-For detailed information about the open source libraries used in this application, please refer to the [ATTRIBUTION](ATTRIBUTION.md) file.
-
-## Notices 
-
-Customers are responsible for making their own independent assessment of the information in this Guidance. This Guidance: (a) is for informational purposes only, (b) represents AWS current product offerings and practices, which are subject to change without notice, and (c) does not create any commitments or assurances from AWS and its affiliates, suppliers or licensors. AWS products or services are provided "as is" without warranties, representations, or conditions of any kind, whether express or implied. AWS responsibilities and liabilities to its customers are controlled by AWS agreements, and this Guidance is not part of, nor does it modify, any agreement between AWS and its customers.
+Customers are responsible for making their own independent assessment of the information in this Guidance. This
+Guidance: (a) is for informational purposes only, (b) represents AWS current product offerings and practices,
+which are subject to change without notice, and (c) does not create any commitments or assurances from AWS and its
+affiliates, suppliers or licensors. AWS products or services are provided "as is" without warranties,
+representations, or conditions of any kind, whether express or implied. AWS responsibilities and liabilities to its
+customers are controlled by AWS agreements, and this Guidance is not part of, nor does it modify, any agreement
+between AWS and its customers.

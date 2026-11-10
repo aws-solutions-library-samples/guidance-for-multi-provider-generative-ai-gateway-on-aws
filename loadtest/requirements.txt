@@ -1,0 +1,5 @@
+locust==2.47.0
+aiohttp==3.14.5
+pytest
+pytest-aiohttp
+ruff

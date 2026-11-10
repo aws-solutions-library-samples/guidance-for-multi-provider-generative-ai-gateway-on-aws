@@ -1,0 +1,6 @@
+# Lint and format settings for the agent code (ruff check . && ruff format --check .).
+line-length = 120
+target-version = "py313"
+
+[lint]
+select = ["E", "F", "I", "B", "UP"]

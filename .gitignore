@@ -1,42 +1,33 @@
-.env
-config/config.yaml
-config/local-config.yaml
-
+# Editors and OS files
 .*.sw?
 **/.DS_Store
 .idea/
-.aws-sam/
 .vscode/settings.json
 **/.vim/
 
-*.js
-!jest.config.js
-*.d.ts
-node_modules
+# Local environment files
+.env
+**.env
 
-cdk.out
-cdk.context.json
-litellm-source
-
-litellm-cdk/resources.txt
-
-**/outputs.json
-
-**/myenv/
-**/fresh_venv/
+# Python
+.venv/
+__pycache__/
 *.pyc
-.terraform.lock.hcl
+.pytest_cache/
+.ruff_cache/
+
+# Terraform. .terraform.lock.hcl is committed for every root module
+# (terraform/foundation, terraform/app, examples/agentcore/terraform,
+# loadtest/terraform).
 .terraform
 terraform.tfstate
 terraform.tfstate.backup
 .terraform.tfstate.lock.info
 terraform.tfstate.*
-
-**.env.testing
-**error.txt
-**.env
-sessionmanager-bundle.zip
-sessionmanager-bundle
-backend.hcl
-resources.txt
 errored.tfstate
+*.tfplan
+backend.hcl
+
+# Deployment inputs and generated files
+deploy/.generated/
+deploy/terraform.tfvars

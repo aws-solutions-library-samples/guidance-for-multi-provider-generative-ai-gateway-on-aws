@@ -1,0 +1,18 @@
+# Tooling for the load-test harness only (not a package).
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = ["SIM115"] # the request log stays open for the whole run
+
+[tool.ruff.lint.isort]
+known-first-party = ["server", "locustfile"]
+
+[tool.pytest.ini_options]
+pythonpath = ["fake_upstream", "locust"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["ignore::gevent.monkey.MonkeyPatchWarning"]

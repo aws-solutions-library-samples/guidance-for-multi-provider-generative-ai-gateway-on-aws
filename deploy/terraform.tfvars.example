@@ -1,0 +1,110 @@
+# Copy to deploy/terraform.tfvars and edit. deploy/deploy.sh passes this one
+# file to both root modules (terraform/foundation and terraform/app); every
+# variable is documented in the owning module's variables.tf. The values shown
+# commented out are the defaults.
+#
+# Sizing and thresholds are fixed to the supported baseline — fork the code to change them.
+#
+# A variable only one root declares makes the other root print a harmless
+# "Value for undeclared variable" warning (Terraform folds repeats into
+# "...and N other similar warnings"). That is expected with one shared file;
+# the variable still reaches the root that declares it.
+#
+# The app's network/data inputs (vpc_id, subnets, vpc_cidr, endpoints, secret
+# ARNs, kms_key_arn, rds_instance_identifier, redis_replication_group_id,
+# redis_num_cache_clusters, vpn_security_group_id) are NOT set here: deploy.sh
+# wires them from `terraform output -json` of the foundation, and those values
+# win over this file.
+#
+# Secrets NEVER go in this file: secret-valued inputs take Secrets Manager
+# ARNs, and the scripts are designed not to print secret values.
+
+# --- Both root modules ---
+deployment_name = "llmgw" # prefix for every resource; unique per deployment in the account
+tags            = {}      # your own tags, merged into the defaults
+# public_mode         = false # true: internet-facing ALB with WAF (foundation adds public subnets)
+# deletion_protection = true  # RDS + ALB protection, buckets and log groups kept; undeploy.sh stops while true: set false + deploy before undeploying (a final DB snapshot is still taken)
+# kms_key_arn         = null  # optional customer KMS key (key policy: docs/deployment.md)
+
+# --- foundation: network (leave vpc_id unset to create a VPC) ---
+# vpc_cidr                        = "10.0.0.0/16" # created VPC only; /24 or larger; scale-out needs free addresses, so use a larger range if heavy traffic is expected
+# disable_outbound_network_access = false         # no-internet mode: no IGW/NAT, VPC endpoints only (ghcr.io image pull needs egress — see docs/deployment.md); the app reads it to warn when an IdP is unreachable
+# egress_proxy_configured         = false         # only silences the no-egress warning
+# create_interface_endpoints      = false         # interface VPC endpoints despite egress (created automatically in no-internet mode; billed per hour and AZ)
+
+# --- foundation: bring your own VPC ---
+# vpc_id                               = "vpc-0123456789abcdef0"
+# private_subnet_ids                   = ["subnet-...", "subnet-..."] # 2+ private subnets in different AZs
+# public_subnet_ids                    = []    # public mode: 2+ public subnets in different AZs
+# create_vpc_endpoints_in_existing_vpc = false # S3 gateway endpoint; interface ones with create_interface_endpoints
+
+# --- foundation: extra data-store clients (any non-ECS consumer, e.g. pods on an EKS cluster) ---
+# extra_data_ingress_security_group_ids = []
+# extra_data_ingress_cidrs              = []
+
+# --- foundation: data stores ---
+# destroy_data_without_snapshot = false # throwaway deployments only: destroy the DB with no final snapshot and delete its backups
+
+# --- foundation: demo Client VPN (trials only; run deploy/setup-vpn.sh certs first) ---
+# create_vpn                      = false
+# vpn_server_certificate_arn      = null # required with create_vpn
+# vpn_client_root_certificate_arn = null # required with create_vpn
+# vpn_client_cidr                 = "10.250.0.0/22" # /12../22, must not overlap the VPC
+
+# --- app: TLS and DNS ---
+# certificate_arn     = "arn:aws:acm:..." # required unless allow_insecure_http
+# allow_insecure_http = false             # private trial only; rejected in public mode
+# hosted_zone_id      = null              # set both or neither; your own VPC only (vpc_id), zone associated with it before deploying
+# record_name         = null              # e.g. "llm.example.com"
+
+# --- app: who may reach the ALB in private mode ---
+# client_cidrs              = [] # empty = the VPC CIDR only; listed ranges replace it
+# client_security_group_ids = [] # extra source security groups (the demo VPN is added automatically)
+
+# --- app: identity provider (ALB sign-in in front of the UI, both modes; needs HTTPS) ---
+# identity_provider = {
+#   issuer                 = "https://login.microsoftonline.com/<tenant>/v2.0"
+#   authorization_endpoint = "https://login.microsoftonline.com/<tenant>/oauth2/v2.0/authorize"
+#   token_endpoint         = "https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token"
+#   user_info_endpoint     = "https://graph.microsoft.com/oidc/userinfo"
+#   client_id              = "00000000-0000-0000-0000-000000000000"
+#   client_secret_arn      = "arn:aws:secretsmanager:..." # the ARN, never the secret
+# }
+#
+# Optional LiteLLM SSO with the same application (sign in once; register <gateway-url>/sso/callback as a
+# second redirect URI). Merge these into extra_environment and provider_secret_arns below:
+# extra_environment = {
+#   PROXY_BASE_URL                 = "https://<gateway-host>"
+#   GENERIC_CLIENT_ID              = "00000000-0000-0000-0000-000000000000"   # identity_provider.client_id
+#   GENERIC_AUTHORIZATION_ENDPOINT = "https://login.microsoftonline.com/<tenant>/oauth2/v2.0/authorize"
+#   GENERIC_TOKEN_ENDPOINT         = "https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token"
+#   GENERIC_USERINFO_ENDPOINT      = "https://graph.microsoft.com/oidc/userinfo"
+#   GENERIC_SCOPE                  = "openid email profile"
+#   GENERIC_USER_ID_ATTRIBUTE      = "sub"                                  # LiteLLM user ID = the IdP subject
+#   PROXY_ADMIN_ID                 = "<sub of the first administrator>"     # else SSO users are not admins
+#   AUTO_REDIRECT_UI_LOGIN_TO_SSO  = "true"                                 # login page goes straight to SSO
+# }
+# provider_secret_arns = { GENERIC_CLIENT_SECRET = "arn:aws:secretsmanager:..." } # identity_provider.client_secret_arn
+
+# --- app: licence (null = LiteLLM's open-source feature set) ---
+# litellm_license_secret_arn = null
+
+# --- app: image ---
+# image_uri = null # private copy of the image, e.g. from deploy/mirror-image.sh
+
+# --- app: LiteLLM config and environment ---
+# log_level              = "INFO" # DEBUG logs prompts: temporary troubleshooting only
+# config_override_file   = null   # YAML merged over the rendered config; a relative path is read from deploy/
+#   A top-level environment_variables key REPLACES the base map (drops STORE_MODEL_IN_DB, so models added in
+#   the UI are not persisted) and bypasses the extra_environment checks: merge it carefully. The file lands in
+#   state, plan output and S3: no secrets in it; use os.environ/<NAME> with provider_secret_arns.
+# extra_environment      = {}     # non-secret env vars, e.g. { HTTPS_PROXY = "http://proxy:3128" }
+# provider_secret_arns   = {}     # e.g. { OPENAI_API_KEY = "arn:aws:secretsmanager:..." }
+
+# --- app: Bedrock permissions ---
+# bedrock_model_allowlist  = [] # empty = any model / inference profile
+# bedrock_region_allowlist = [] # empty = any region
+# cross_account_role_arns  = [] # explicit role ARNs; wildcards rejected
+
+# --- app: alarms ---
+# alarm_email = null # subscribed to the alarm topic; confirm from the email

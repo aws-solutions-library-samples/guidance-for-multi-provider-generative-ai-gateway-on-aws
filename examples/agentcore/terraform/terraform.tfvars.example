@@ -1,0 +1,22 @@
+# Copy to terraform.tfvars and fill in from the gateway deployment:
+#   terraform -chdir=<gateway>/terraform/foundation output
+#   terraform -chdir=<gateway>/terraform/app output
+
+name = "llmgw-agent-demo"
+
+gateway_url           = "https://llm.example.com"                                                    # app: service_url
+master_key_secret_arn = "arn:aws:secretsmanager:eu-west-1:111111111111:secret:llmgw-master-key-abc123" # foundation: master_key_secret_arn
+vpc_id                = "vpc-0123456789abcdef0"                                                      # foundation: vpc_id
+subnet_ids            = ["subnet-0123456789abcdef0", "subnet-0fedcba9876543210"]                     # foundation: private_subnet_ids
+gateway_cidr          = "10.0.0.0/16"                                                                # foundation: vpc_cidr
+
+model_id = "claude-opus-5-5" # a model name registered in the gateway
+
+# Only for a gateway certificate from a private certificate authority: the CA certificate (PEM).
+# gateway_ca_certificate_file = "/path/to/private-ca.pem"
+
+# Limits of the agent's virtual key (defaults shown).
+# key_max_budget      = 5
+# key_budget_duration = "30d"
+# key_rpm_limit       = 30
+# key_tpm_limit       = 100000

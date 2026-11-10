@@ -1,0 +1,5 @@
+# Runtime dependencies of the agent, packaged into the AgentCore code bundle
+# by scripts/build.sh. Pinned for reproducible bundles.
+bedrock-agentcore==1.25.2
+openai==3.42.1
+strands-agents==1.63.0
