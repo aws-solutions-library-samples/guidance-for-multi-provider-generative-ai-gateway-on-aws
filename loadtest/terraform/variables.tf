@@ -31,8 +31,8 @@ variable "gateway_url" {
   description = "Base URL of the gateway as seen from inside the VPC, for example http://internal-<alb>.elb.amazonaws.com."
   type        = string
   validation {
-    condition     = can(regex("^https?://[^/]+$", var.gateway_url))
-    error_message = "gateway_url: scheme and host only, no path or trailing slash."
+    condition     = can(regex("^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$", var.gateway_url))
+    error_message = "gateway_url: scheme, host name and optional port only (letters, digits, dots and hyphens), no path or trailing slash."
   }
 }
 
@@ -83,9 +83,9 @@ variable "driver_instance_type" {
 }
 
 variable "python_image" {
-  description = "Python base image for the fake upstream (ARM64 or multi-architecture)."
+  description = "Python base image for the fake upstream (ARM64 or multi-architecture), pinned by digest so every run uses the same image."
   type        = string
-  default     = "public.ecr.aws/docker/library/python:3.12-slim"
+  default     = "public.ecr.aws/docker/library/python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b"
 }
 
 variable "aiohttp_version" {

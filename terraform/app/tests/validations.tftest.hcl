@@ -23,8 +23,9 @@ mock_provider "aws" {
 }
 
 variables {
-  deployment_name = "llmgw"
-  certificate_arn = "arn:aws:acm:eu-west-1:111111111111:certificate/00000000-0000-0000-0000-000000000000"
+  deployment_name  = "llmgw"
+  certificate_arn  = "arn:aws:acm:eu-west-1:111111111111:certificate/00000000-0000-0000-0000-000000000000"
+  gateway_hostname = "llm.example.com"
 
   # Foundation outputs (wired by deploy.sh in real runs).
   vpc_id                         = "vpc-0123456789abcdef0"
@@ -147,4 +148,34 @@ run "identity_provider_with_https_plans_in_private_mode" {
       client_secret_arn      = "arn:aws:secretsmanager:eu-west-1:111111111111:secret:llmgw/idp-AbCdEf"
     }
   }
+}
+
+run "deployment_name_with_trailing_hyphen_rejected" {
+  command = plan
+
+  variables {
+    deployment_name = "demo-"
+  }
+
+  expect_failures = [var.deployment_name]
+}
+
+run "deployment_name_with_double_hyphen_rejected" {
+  command = plan
+
+  variables {
+    deployment_name = "a--b"
+  }
+
+  expect_failures = [var.deployment_name]
+}
+
+run "gateway_hostname_must_be_a_dns_name" {
+  command = plan
+
+  variables {
+    gateway_hostname = "https://llm.example.com/"
+  }
+
+  expect_failures = [var.gateway_hostname]
 }

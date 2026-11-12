@@ -63,8 +63,9 @@ mock_provider "aws" {
 }
 
 variables {
-  deployment_name = "llmgw"
-  certificate_arn = "arn:aws:acm:eu-west-1:111111111111:certificate/00000000-0000-0000-0000-000000000000"
+  deployment_name  = "llmgw"
+  certificate_arn  = "arn:aws:acm:eu-west-1:111111111111:certificate/00000000-0000-0000-0000-000000000000"
+  gateway_hostname = "llm.example.com"
 
   # Foundation outputs (wired by deploy.sh in real runs).
   vpc_id                         = "vpc-0123456789abcdef0"
@@ -454,7 +455,7 @@ run "public_mode_wiring" {
   }
 
   assert {
-    condition     = toset([for f in aws_wafv2_web_acl_logging_configuration.this[0].redacted_fields : f.single_header[0].name]) == toset(["authorization", "x-litellm-api-key", "api-key", "cookie"])
+    condition     = toset([for f in aws_wafv2_web_acl_logging_configuration.this[0].redacted_fields : f.single_header[0].name]) == toset(["authorization", "x-litellm-api-key", "api-key", "x-api-key", "x-goog-api-key", "ocp-apim-subscription-key", "cookie"])
     error_message = "WAF logs must redact the API-key headers and cookies."
   }
 
@@ -1210,5 +1211,146 @@ run "post_2022_region_uses_the_service_principal_only" {
   assert {
     condition     = length(jsondecode(aws_s3_bucket_policy.access_logs.policy).Statement) == 2
     error_message = "A post-2022 region's policy holds exactly the TLS-only deny and the service-principal grant."
+  }
+}
+
+# --- Review fixes ---
+
+run "public_mode_rejects_db_unavailable_override" {
+  command = plan
+
+  variables {
+    public_mode          = true
+    public_subnet_ids    = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
+    config_override_file = "tests/fixtures/allow-db-unavailable.yaml"
+  }
+
+  expect_failures = [terraform_data.litellm_config, check.db_unavailable_requests_not_allowed, check.public_mode_without_identity_provider]
+}
+
+run "waf_does_not_sample_requests" {
+  command = plan
+
+  variables {
+    public_mode       = true
+    public_subnet_ids = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
+  }
+
+  expect_failures = [check.public_mode_without_identity_provider]
+
+  assert {
+    condition     = !aws_wafv2_web_acl.this[0].visibility_config[0].sampled_requests_enabled && alltrue([for r in aws_wafv2_web_acl.this[0].rule : !r.visibility_config[0].sampled_requests_enabled])
+    error_message = "WAF request sampling keeps unredacted headers: it must be off for the web ACL and every rule."
+  }
+}
+
+run "proxy_base_url_is_the_gateway_url" {
+  command = plan
+
+  assert {
+    condition     = output.service_url == "https://llm.example.com" && { for e in jsondecode(aws_ecs_task_definition.litellm.container_definitions)[0].environment : e.name => e.value }["PROXY_BASE_URL"] == "https://llm.example.com"
+    error_message = "With HTTPS, PROXY_BASE_URL must be the gateway URL so LiteLLM marks the UI session cookie Secure."
+  }
+}
+
+run "proxy_base_url_from_extra_environment_wins" {
+  command = plan
+
+  variables {
+    extra_environment = { PROXY_BASE_URL = "https://other.example.com" }
+  }
+
+  assert {
+    condition     = { for e in jsondecode(aws_ecs_task_definition.litellm.container_definitions)[0].environment : e.name => e.value }["PROXY_BASE_URL"] == "https://other.example.com"
+    error_message = "A PROXY_BASE_URL in extra_environment must replace the stack's value."
+  }
+}
+
+run "record_name_wins_over_gateway_hostname" {
+  command = plan
+
+  variables {
+    hosted_zone_id = "Z0123456789ABCDEFGHIJ"
+    record_name    = "gw.example.com"
+  }
+
+  assert {
+    condition     = output.service_url == "https://gw.example.com"
+    error_message = "record_name must take precedence for service_url."
+  }
+}
+
+run "no_gateway_name_warns" {
+  command = plan
+
+  variables {
+    gateway_hostname = null
+  }
+
+  expect_failures = [check.gateway_name_matches_certificate]
+}
+
+run "plain_http_trial_has_no_proxy_base_url" {
+  command = plan
+
+  variables {
+    allow_insecure_http = true
+    certificate_arn     = null
+    gateway_hostname    = null
+  }
+
+  assert {
+    condition     = !contains([for e in jsondecode(aws_ecs_task_definition.litellm.container_definitions)[0].environment : e.name], "PROXY_BASE_URL")
+    error_message = "A plain-HTTP trial must not set an HTTPS PROXY_BASE_URL."
+  }
+}
+
+run "jwt_explicitly_off_needs_no_licence" {
+  command = plan
+
+  variables {
+    config_override_file = "tests/fixtures/jwt-off.yaml"
+  }
+}
+
+run "empty_override_is_no_override_with_warning" {
+  command = plan
+
+  variables {
+    config_override_file = "tests/fixtures/comments-only.yaml"
+  }
+
+  expect_failures = [check.override_file_not_empty]
+
+  assert {
+    condition     = yamldecode(terraform_data.litellm_config.input.content).model_list == [] && yamldecode(terraform_data.litellm_config.input.content).litellm_settings.turn_off_message_logging == true
+    error_message = "An empty override file must leave the base configuration unchanged."
+  }
+}
+
+run "request_logs_versioned_and_locked" {
+  command = plan
+
+  assert {
+    condition     = aws_s3_bucket_versioning.request_logs.versioning_configuration[0].status == "Enabled" && aws_s3_bucket_object_lock_configuration.request_logs.rule[0].default_retention[0].mode == "GOVERNANCE" && aws_s3_bucket_object_lock_configuration.request_logs.rule[0].default_retention[0].days == 3653
+    error_message = "Request logs must be versioned and under governance-mode Object Lock for the log retention period."
+  }
+}
+
+run "service_apply_waits_for_steady_state" {
+  command = plan
+
+  assert {
+    condition     = aws_ecs_service.litellm.wait_for_steady_state
+    error_message = "The app apply must wait for the ECS deployment, so a rolled-back deployment fails the apply."
+  }
+}
+
+run "inference_profiles_pinned_to_the_account" {
+  command = plan
+
+  assert {
+    condition     = !strcontains(aws_iam_role_policy.task.policy, ":*:inference-profile/") && !strcontains(aws_iam_role_policy.task.policy, ":*:application-inference-profile/")
+    error_message = "Inference-profile ARNs must name this account, not any account."
   }
 }

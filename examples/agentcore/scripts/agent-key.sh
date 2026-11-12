@@ -95,7 +95,15 @@ stored_key_works() {
 }
 
 revoke() {
-  if [ -n "$(key_record)" ]; then
+  local record
+  # Captured outside the test: a failed lookup (gateway unreachable) must fail
+  # here, not read as "no key". SKIP_KEY_REVOCATION=1 is the only way past it.
+  record="$(key_record)" || {
+    echo "Could not look up LiteLLM key ${KEY_ALIAS} at ${GATEWAY_URL}; the key was not revoked." >&2
+    echo "Run where the gateway is reachable, or set SKIP_KEY_REVOCATION=1 to destroy without revoking." >&2
+    return 1
+  }
+  if [ -n "$record" ]; then
     gateway POST /key/delete "$(master_header)" "$(jq -cn --arg a "$KEY_ALIAS" '{key_aliases: [$a]}')" >/dev/null
     echo "Revoked LiteLLM key ${KEY_ALIAS}."
   else

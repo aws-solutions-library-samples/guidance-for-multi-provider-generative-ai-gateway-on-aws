@@ -131,7 +131,7 @@ run "private_subnet_routes_to_igw" {
     values = { id = "rtb-pub", routes = [{ cidr_block = "0.0.0.0/0", gateway_id = "igw-1", nat_gateway_id = "", transit_gateway_id = "", network_interface_id = "" }] }
   }
 
-  expect_failures = [terraform_data.vpc_validation]
+  expect_failures = [terraform_data.vpc_validation, check.byo_vpc_egress]
 }
 
 run "not_enough_free_ips" {
@@ -371,3 +371,30 @@ run "free_ip_check_plans_for_twenty_replicas" {
   expect_failures = [terraform_data.vpc_validation, check.byo_vpc_ip_headroom]
 }
 
+
+# Egress on only one private subnet: tasks placed in the other cannot reach out.
+run "egress_on_one_subnet_only_warns" {
+  command = plan
+
+  override_data {
+    target = data.aws_route_table.byo["subnet-b"]
+    values = { id = "rtb-iso", routes = [] }
+  }
+  override_data {
+    target = data.aws_network_interfaces.vpc_endpoints
+    values = { ids = [] }
+  }
+
+  expect_failures = [check.byo_vpc_egress, check.byo_vpc_endpoints]
+}
+
+run "byo_vpc_smaller_than_22_rejected" {
+  command = plan
+
+  override_data {
+    target = data.aws_vpc.existing[0]
+    values = { id = "vpc-byo", cidr_block = "10.1.0.0/23", enable_dns_support = true, enable_dns_hostnames = true }
+  }
+
+  expect_failures = [terraform_data.vpc_validation]
+}

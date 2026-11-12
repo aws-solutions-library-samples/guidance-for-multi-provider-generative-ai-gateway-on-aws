@@ -29,9 +29,17 @@ deploy/terraform.tfvars:
 Options:
   --version <tag>      Image tag to copy, e.g. v1.2.3. Default: the image
                        pinned in terraform/app/container.tf (tag@digest),
-                       pulled by its digest. Another tag is pulled by tag.
+                       pulled by its digest. Another tag needs --digest or
+                       --cosign-key (see below).
+  --digest <sha256:..> The release's digest (multi-platform index) for a tag
+                       other than the pinned one; the pull is by digest and
+                       stops if the image differs.
   --cosign-key <ref>   Public key to verify the signature with (URL or file).
                        Default: cosign.pub in the copied release's tag.
+                       For a tag other than the pinned one, tag and key are
+                       both mutable upstream references, so the script needs
+                       at least one fixed reference: --digest, or a
+                       --cosign-key you obtained and trust independently.
   --platform <os/arch> Platform to copy. Default linux/arm64, the gateway
                        tasks' architecture (Graviton); linux/amd64 is offered
                        for other consumers of the mirrored image.
@@ -81,13 +89,14 @@ EOF
 die() { echo "Error: $*" >&2; exit 1; }
 usage_error() { echo "Error: $*" >&2; echo "Run '$0 --help' for usage." >&2; exit 2; }
 
-VERSION="" COSIGN_KEY_OVERRIDE="" PLATFORM="linux/arm64" REGISTRY="" REPOSITORY="litellm" REGION="" DRY_RUN=false SKIP_VERIFY=false
+VERSION="" DIGEST_OVERRIDE="" COSIGN_KEY_OVERRIDE="" PLATFORM="linux/arm64" REGISTRY="" REPOSITORY="litellm" REGION="" DRY_RUN=false SKIP_VERIFY=false
 while [ $# -gt 0 ]; do
   case "$1" in
-    --version | --cosign-key | --platform | --registry | --repository | --region)
+    --version | --digest | --cosign-key | --platform | --registry | --repository | --region)
       [ $# -ge 2 ] && [ -n "$2" ] || usage_error "$1 needs a value."
       case "$1" in
         --version) VERSION="$2" ;;
+        --digest) DIGEST_OVERRIDE="$2" ;;
         --cosign-key) COSIGN_KEY_OVERRIDE="$2" ;;
         --platform) PLATFORM="$2" ;;
         --registry) REGISTRY="${2%/}" ;;
@@ -115,6 +124,15 @@ if [ -z "$VERSION" ]; then
 fi
 EXPECTED_DIGEST=""
 [ "$VERSION" != "$PINNED_TAG" ] || EXPECTED_DIGEST="$PINNED_DIGEST"
+if [ -n "$DIGEST_OVERRIDE" ]; then
+  [[ "$DIGEST_OVERRIDE" =~ ^sha256:[0-9a-f]{64}$ ]] || usage_error "--digest must be sha256:<64 hex characters>."
+  [ -z "$EXPECTED_DIGEST" ] || [ "$EXPECTED_DIGEST" = "$DIGEST_OVERRIDE" ] ||
+    usage_error "--digest differs from the digest pinned for ${VERSION} in terraform/app/container.tf."
+  EXPECTED_DIGEST="$DIGEST_OVERRIDE"
+fi
+if [ -z "$EXPECTED_DIGEST" ] && [ -z "$COSIGN_KEY_OVERRIDE" ] && [ "$SKIP_VERIFY" != true ]; then
+  usage_error "${VERSION} is not the pinned release: pass --digest with the release's digest, or --cosign-key with a key you trust. The tag and the cosign.pub in it are both mutable upstream references."
+fi
 [[ "$VERSION" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || usage_error "--version must be an image tag, e.g. v1.2.3."
 [[ "$PLATFORM" =~ ^linux/(arm64|amd64)$ ]] || usage_error "--platform must be linux/arm64 or linux/amd64."
 [[ "$REPOSITORY" =~ ^[a-z0-9]+([._/-][a-z0-9]+)*$ ]] || usage_error "--repository must be a lowercase repository name."
@@ -128,9 +146,9 @@ fi
 docker info >/dev/null 2>&1 || die "the Docker daemon is not running."
 
 if [ -n "$EXPECTED_DIGEST" ]; then
-  # The pinned image: pulled by digest, so a re-pushed tag cannot change it.
+  # Pulled by digest (the pin in container.tf, or --digest), so a re-pushed tag cannot change it.
   SOURCE="${SOURCE_REPO}@${EXPECTED_DIGEST}"
-  echo "Pulling ${SOURCE_REPO}:${VERSION}@${EXPECTED_DIGEST} (${PLATFORM}), the image pinned in container.tf"
+  echo "Pulling ${SOURCE_REPO}:${VERSION}@${EXPECTED_DIGEST} (${PLATFORM})"
 else
   SOURCE="${SOURCE_REPO}:${VERSION}"
   echo "Pulling ${SOURCE} (${PLATFORM})"

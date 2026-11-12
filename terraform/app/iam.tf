@@ -93,8 +93,8 @@ locals {
     ]
     ]) : flatten([for r in local.bedrock_regions : [
       "arn:aws:bedrock:${r}::foundation-model/*",
-      "arn:aws:bedrock:${r}:*:inference-profile/*",
-      "arn:aws:bedrock:${r}:*:application-inference-profile/*",
+      "arn:aws:bedrock:${r}:${data.aws_caller_identity.current.account_id}:inference-profile/*",
+      "arn:aws:bedrock:${r}:${data.aws_caller_identity.current.account_id}:application-inference-profile/*",
   ]])
 
   task_policy = jsonencode({

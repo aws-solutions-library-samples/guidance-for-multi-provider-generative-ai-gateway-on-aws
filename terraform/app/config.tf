@@ -8,7 +8,10 @@
 data "aws_region" "current" {}
 
 locals {
-  override = yamldecode(var.config_override_file != null ? file(var.config_override_file) : "{}")
+  # An empty or comments-only override file decodes to null: treated as no override (with a plan warning).
+  override_raw   = var.config_override_file != null ? trimspace(replace(file(var.config_override_file), "/(?m)^\\s*#.*$/", "")) : ""
+  override_empty = var.config_override_file != null && local.override_raw == ""
+  override       = yamldecode(local.override_raw == "" ? "{}" : file(var.config_override_file))
 
   base_config = yamldecode(templatefile("${path.module}/templates/config-base.yaml.tftpl", {
     trusted_proxy_ranges = [var.vpc_cidr]
@@ -43,6 +46,13 @@ resource "terraform_data" "litellm_config" {
     key     = local.config_object_key
     content = local.litellm_config_yaml
   }
+
+  lifecycle {
+    precondition {
+      condition     = !(var.public_mode && try(local.litellm_config.general_settings.allow_requests_on_db_unavailable, false) == true)
+      error_message = "config_override_file sets general_settings.allow_requests_on_db_unavailable: true, which public mode rejects. During a database outage LiteLLM would then admit any request whose bearer token starts with sk-, without key, team or budget checks, from the internet. Remove the setting."
+    }
+  }
 }
 
 # Plan-time warnings (not errors): risky settings the plan should call out.
@@ -56,7 +66,7 @@ check "debug_logging_is_temporary" {
 
 check "enterprise_settings_need_licence" {
   assert {
-    condition     = var.litellm_license_secret_arn != null || !can(local.litellm_config.general_settings.enable_jwt_auth)
+    condition     = var.litellm_license_secret_arn != null || try(local.litellm_config.general_settings.enable_jwt_auth, false) != true
     error_message = "enable_jwt_auth is an Enterprise feature: without litellm_license_secret_arn LiteLLM answers 403 to JWTs."
   }
 }
@@ -87,7 +97,21 @@ check "identity_provider_needs_outbound_access" {
 check "db_unavailable_requests_not_allowed" {
   assert {
     condition     = try(local.litellm_config.general_settings.allow_requests_on_db_unavailable, false) != true
-    error_message = "config_override_file sets general_settings.allow_requests_on_db_unavailable: true. During a database outage LiteLLM then admits ANY presented key, including invalid ones, without budgets. LiteLLM virtual keys are this gateway's only API authentication, so every database failover becomes an unauthenticated window. Remove the setting unless another layer authenticates every caller."
+    error_message = "config_override_file sets general_settings.allow_requests_on_db_unavailable: true. During a database outage LiteLLM then admits any request whose bearer token starts with sk- as a restricted internal user, without key, team or budget checks (master-key-only routes stay refused). LiteLLM virtual keys are this gateway's only API authentication, so every database failover becomes a window without key checks. Remove the setting unless another layer authenticates every caller."
+  }
+}
+
+check "override_file_not_empty" {
+  assert {
+    condition     = !local.override_empty
+    error_message = "config_override_file ${coalesce(var.config_override_file, "-")} is empty or contains only comments; it is treated as no override."
+  }
+}
+
+check "gateway_name_matches_certificate" {
+  assert {
+    condition     = var.allow_insecure_http || var.record_name != null || var.gateway_hostname != null
+    error_message = "Neither record_name nor gateway_hostname is set, so service_url uses the load balancer's own DNS name, which your certificate does not cover: clients that verify TLS will fail. Create a DNS record for the certificate's name that points to alb_dns_name, and set gateway_hostname to that name."
   }
 }
 

@@ -35,12 +35,16 @@ cmd="${1:-}"; shift || true
 case "$cmd" in
   run)
     run="${1:?run name}"; shift; valid_run "$run"
-    envs="ARTIFACTS_BUCKET=$(out artifacts_bucket) API_KEY_SECRET_ID=$(out api_key_secret_id) GATEWAY_URL=$(out gateway_url)"
+    # Values from the Terraform outputs, checked and shell-quoted: the command runs in a root shell on the driver.
+    bucket="$(out artifacts_bucket)" secret_id="$(out api_key_secret_id)" gateway_url="$(out gateway_url)"
+    [[ "$bucket" =~ ^[a-z0-9.-]+$ ]] || { echo "unexpected artifacts_bucket output: $bucket" >&2; exit 2; }
+    [[ "$secret_id" =~ ^[A-Za-z0-9:/_+=.@-]+$ ]] || { echo "unexpected api_key_secret_id output" >&2; exit 2; }
+    [[ "$gateway_url" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$ ]] || { echo "unexpected gateway_url output: $gateway_url" >&2; exit 2; }
+    envs="ARTIFACTS_BUCKET=$(printf %q "$bucket") API_KEY_SECRET_ID=$(printf %q "$secret_id") GATEWAY_URL=$(printf %q "$gateway_url")"
     for kv in "$@"; do
       [[ "$kv" =~ ^[A-Z_]+=[A-Za-z0-9.,:/_-]*$ ]] || { echo "invalid setting: $kv" >&2; exit 2; }
       envs+=" $kv"
     done
-    bucket="$(out artifacts_bucket)"
     send "load test ${run}" "aws s3 cp --quiet s3://${bucket}/scenario/run-driver.sh /opt/loadtest/run-driver.sh && mkdir -p /opt/loadtest/logs && (nohup env ${envs} bash /opt/loadtest/run-driver.sh ${run} >/opt/loadtest/logs/${run}.log 2>&1 &) && echo started ${run}"
     ;;
   status)

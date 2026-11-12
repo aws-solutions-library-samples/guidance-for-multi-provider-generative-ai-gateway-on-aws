@@ -13,6 +13,10 @@ locals {
   # completions get an ALB 504 instead of LiteLLM's own error. Independent of
   # the 120 s drain settings (container.tf). KEEPALIVE_TIMEOUT follows it.
   alb_idle_timeout_seconds = 600
+
+  # The name clients use: the stack's alias record, else the name the operator
+  # manages elsewhere, else the ALB's own DNS name (which no certificate covers).
+  service_url = "${var.allow_insecure_http ? "http" : "https"}://${coalesce(var.record_name, var.gateway_hostname, aws_lb.this.dns_name)}"
 }
 
 resource "aws_lb" "this" {

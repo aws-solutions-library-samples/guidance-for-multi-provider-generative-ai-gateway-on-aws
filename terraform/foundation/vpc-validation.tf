@@ -67,7 +67,8 @@ locals {
   # 8 free IPs per subnet; plus one endpoint ENI per service and subnet, RDS
   # (2 for Multi-AZ) and the Redis nodes.
   byo_ips_needed = local.max_gateway_instances * 2 + 8 * local.byo_entry_subnets + length(local.required_endpoints) * length(var.private_subnet_ids) + 2 + local.redis_num_cache_clusters
-  byo_has_egress = anytrue([for id in var.private_subnet_ids : try(local.byo_nat_default_route[id], false)])
+  # Every private subnet needs its own route out: ECS may place a task in any of them.
+  byo_has_egress = alltrue([for id in var.private_subnet_ids : try(local.byo_nat_default_route[id], false)])
   byo_vpc_dns_ok = !local.byo_vpc || (try(data.aws_vpc.existing[0].enable_dns_support, false) && try(data.aws_vpc.existing[0].enable_dns_hostnames, false))
 }
 
@@ -97,7 +98,11 @@ resource "terraform_data" "vpc_validation" {
     }
     precondition {
       condition     = local.byo_free_ips >= local.byo_ips_needed
-      error_message = "The private subnets have ${local.byo_free_ips} free IP addresses; this deployment needs about ${local.byo_ips_needed} (max gateway replicas x 2 for rolling deploys, the entry point, endpoints, RDS, Redis)."
+      error_message = "The private subnets have ${local.byo_free_ips} free IP addresses; this deployment needs about ${local.byo_ips_needed}. Every gateway task takes an address, ECS auto scaling adds tasks under load and a rolling deploy runs new tasks next to the old ones; the load balancer, VPC endpoints, the database and the cache need addresses too. Use larger private subnets."
+    }
+    precondition {
+      condition     = tonumber(split("/", data.aws_vpc.existing[0].cidr_block)[1]) <= 22
+      error_message = "The VPC's CIDR (${data.aws_vpc.existing[0].cidr_block}) is smaller than /22. The private subnets must hold the gateway tasks as ECS auto scaling adds them, the extra tasks of a rolling deploy, the load balancer, VPC endpoints, the database and the cache; use a VPC of /22 or larger."
     }
     precondition {
       condition     = local.byo_vpc_dns_ok

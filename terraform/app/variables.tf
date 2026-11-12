@@ -8,8 +8,8 @@ variable "deployment_name" {
   type        = string
 
   validation {
-    condition     = can(regex("^[a-z][a-z0-9-]{0,19}$", var.deployment_name))
-    error_message = "deployment_name must start with a lowercase letter and contain only lowercase letters, digits and hyphens (max 20 characters), so it can prefix S3 bucket, secret and database identifier names."
+    condition     = can(regex("^[a-z](-?[a-z0-9])*$", var.deployment_name)) && length(var.deployment_name) <= 20
+    error_message = "deployment_name must start with a lowercase letter, contain only lowercase letters, digits and single hyphens, end with a letter or digit, and be at most 20 characters, so it can prefix S3 bucket, secret, database and cache identifiers."
   }
 }
 
@@ -164,6 +164,17 @@ variable "allow_insecure_http" {
   }
 }
 
+variable "gateway_hostname" {
+  description = "The DNS name clients use (the name on certificate_arn, for example llm.example.com) when its DNS record is managed outside this stack. Used for service_url and LiteLLM's public URL. Ignored when record_name is set."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.gateway_hostname == null || can(regex("^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$", var.gateway_hostname))
+    error_message = "gateway_hostname must be a DNS name such as llm.example.com, without scheme, port or path."
+  }
+}
+
 variable "hosted_zone_id" {
   description = "Optional Route 53 hosted zone; with record_name, creates an alias to the ALB. Set both or neither."
   type        = string
@@ -302,7 +313,7 @@ variable "provider_secret_arns" {
 }
 
 variable "extra_environment" {
-  description = "Additional non-secret environment variables for LiteLLM (for example SSO client IDs, PROXY_BASE_URL, HTTPS_PROXY). Names the stack sets itself are rejected; set the log level with log_level."
+  description = "Additional non-secret environment variables for LiteLLM (for example SSO client IDs, HTTPS_PROXY). Names the stack sets itself are rejected; set the log level with log_level. The stack sets PROXY_BASE_URL to the gateway URL for HTTPS deployments; a value here replaces it."
   type        = map(string)
   default     = {}
 

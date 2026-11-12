@@ -27,7 +27,7 @@ tags            = {}      # your own tags, merged into the defaults
 # kms_key_arn         = null  # optional customer KMS key (key policy: docs/deployment.md)
 
 # --- foundation: network (leave vpc_id unset to create a VPC) ---
-# vpc_cidr                        = "10.0.0.0/16" # created VPC only; /24 or larger; scale-out needs free addresses, so use a larger range if heavy traffic is expected
+# vpc_cidr                        = "10.0.0.0/16" # created VPC only; /22 or larger (ECS scale-out and rolling deploys need free addresses)
 # disable_outbound_network_access = false         # no-internet mode: no IGW/NAT, VPC endpoints only (ghcr.io image pull needs egress — see docs/deployment.md); the app reads it to warn when an IdP is unreachable
 # egress_proxy_configured         = false         # only silences the no-egress warning
 # create_interface_endpoints      = false         # interface VPC endpoints despite egress (created automatically in no-internet mode; billed per hour and AZ)
@@ -40,7 +40,7 @@ tags            = {}      # your own tags, merged into the defaults
 
 # --- foundation: extra data-store clients (any non-ECS consumer, e.g. pods on an EKS cluster) ---
 # extra_data_ingress_security_group_ids = []
-# extra_data_ingress_cidrs              = []
+# extra_data_ingress_cidrs              = [] # opens PostgreSQL 5432 and Redis 6379 to these ranges; keep them narrow
 
 # --- foundation: data stores ---
 # destroy_data_without_snapshot = false # throwaway deployments only: destroy the DB with no final snapshot and delete its backups
@@ -56,6 +56,7 @@ tags            = {}      # your own tags, merged into the defaults
 # allow_insecure_http = false             # private trial only; rejected in public mode
 # hosted_zone_id      = null              # set both or neither; your own VPC only (vpc_id), zone associated with it before deploying
 # record_name         = null              # e.g. "llm.example.com"
+# gateway_hostname    = null              # the certificate's name when you manage its DNS record yourself (points to alb_dns_name)
 
 # --- app: who may reach the ALB in private mode ---
 # client_cidrs              = [] # empty = the VPC CIDR only; listed ranges replace it
@@ -74,7 +75,6 @@ tags            = {}      # your own tags, merged into the defaults
 # Optional LiteLLM SSO with the same application (sign in once; register <gateway-url>/sso/callback as a
 # second redirect URI). Merge these into extra_environment and provider_secret_arns below:
 # extra_environment = {
-#   PROXY_BASE_URL                 = "https://<gateway-host>"
 #   GENERIC_CLIENT_ID              = "00000000-0000-0000-0000-000000000000"   # identity_provider.client_id
 #   GENERIC_AUTHORIZATION_ENDPOINT = "https://login.microsoftonline.com/<tenant>/oauth2/v2.0/authorize"
 #   GENERIC_TOKEN_ENDPOINT         = "https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token"

@@ -36,7 +36,7 @@ resource "aws_wafv2_web_acl" "this" {
   visibility_config {
     cloudwatch_metrics_enabled = true
     metric_name                = "${var.deployment_name}WebAcl"
-    sampled_requests_enabled   = true
+    sampled_requests_enabled   = false
   }
 
   rule {
@@ -75,7 +75,7 @@ resource "aws_wafv2_web_acl" "this" {
     visibility_config {
       cloudwatch_metrics_enabled = true
       metric_name                = "${var.deployment_name}CommonRuleSet"
-      sampled_requests_enabled   = true
+      sampled_requests_enabled   = false
     }
   }
 
@@ -97,7 +97,7 @@ resource "aws_wafv2_web_acl" "this" {
     visibility_config {
       cloudwatch_metrics_enabled = true
       metric_name                = "${var.deployment_name}KnownBadInputs"
-      sampled_requests_enabled   = true
+      sampled_requests_enabled   = false
     }
   }
 
@@ -119,7 +119,7 @@ resource "aws_wafv2_web_acl" "this" {
     visibility_config {
       cloudwatch_metrics_enabled = true
       metric_name                = "${var.deployment_name}IpReputation"
-      sampled_requests_enabled   = true
+      sampled_requests_enabled   = false
     }
   }
 
@@ -148,7 +148,7 @@ resource "aws_wafv2_web_acl" "this" {
     visibility_config {
       cloudwatch_metrics_enabled = true
       metric_name                = "${var.deployment_name}RateLimitPerIp"
-      sampled_requests_enabled   = true
+      sampled_requests_enabled   = false
     }
   }
 }
@@ -176,7 +176,8 @@ resource "aws_wafv2_web_acl_logging_configuration" "this" {
   log_destination_configs = [aws_cloudwatch_log_group.waf[0].arn]
 
   dynamic "redacted_fields" {
-    for_each = ["authorization", "x-litellm-api-key", "api-key", "cookie"]
+    # Every header LiteLLM accepts a key in (re-check on a LiteLLM upgrade), and cookies.
+    for_each = ["authorization", "x-litellm-api-key", "api-key", "x-api-key", "x-goog-api-key", "ocp-apim-subscription-key", "cookie"]
     content {
       single_header {
         name = redacted_fields.value

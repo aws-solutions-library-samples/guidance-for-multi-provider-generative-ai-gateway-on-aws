@@ -185,3 +185,23 @@ run "tiny_vpc_cidr_rejected" {
 
   expect_failures = [var.vpc_cidr]
 }
+
+run "vpc_cidr_smaller_than_22_rejected" {
+  command = plan
+
+  variables {
+    vpc_cidr = "10.0.0.0/24"
+  }
+
+  expect_failures = [var.vpc_cidr]
+}
+
+run "deployment_name_with_trailing_hyphen_rejected" {
+  command = plan
+
+  variables {
+    deployment_name = "demo-"
+  }
+
+  expect_failures = [var.deployment_name]
+}

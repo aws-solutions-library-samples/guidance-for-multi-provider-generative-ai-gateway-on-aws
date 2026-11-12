@@ -64,24 +64,26 @@ resource "aws_subnet" "private" {
   tags = { Name = "${var.deployment_name}-private-${count.index}" }
 }
 
-# One NAT gateway, in the first public subnet, for outbound traffic from the
-# private subnets: the image pull from ghcr.io, the online check of older-format
-# licence keys, the IdP, non-Bedrock providers, and AWS service calls unless the
-# optional interface endpoints are created. S3 traffic uses the gateway endpoint.
+# One NAT gateway per Availability Zone, each in that zone's public subnet, for
+# outbound traffic from the private subnet in the same zone: the image pull from
+# ghcr.io, the online check of older-format licence keys, the IdP, non-Bedrock
+# providers, and AWS service calls unless the optional interface endpoints are
+# created. A zone outage leaves the other zone's egress intact. S3 traffic uses
+# the gateway endpoint.
 resource "aws_eip" "nat" {
-  count  = local.creating_new_vpc && local.internet_enabled ? 1 : 0
+  count  = length(aws_subnet.public)
   domain = "vpc"
 
-  tags = { Name = "${var.deployment_name}-nat" }
+  tags = { Name = "${var.deployment_name}-nat-${count.index}" }
 }
 
 resource "aws_nat_gateway" "this" {
-  count         = local.creating_new_vpc && local.internet_enabled ? 1 : 0
-  allocation_id = aws_eip.nat[0].id
-  subnet_id     = aws_subnet.public[0].id
+  count         = length(aws_subnet.public)
+  allocation_id = aws_eip.nat[count.index].id
+  subnet_id     = aws_subnet.public[count.index].id
   depends_on    = [aws_internet_gateway.this]
 
-  tags = { Name = "${var.deployment_name}-nat" }
+  tags = { Name = "${var.deployment_name}-nat-${count.index}" }
 }
 
 resource "aws_route_table" "public" {
@@ -96,19 +98,20 @@ resource "aws_route_table" "public" {
   tags = { Name = "${var.deployment_name}-public" }
 }
 
+# One private route table per zone, routing through that zone's NAT gateway.
 resource "aws_route_table" "private" {
-  count  = local.creating_new_vpc ? 1 : 0
+  count  = length(aws_subnet.private)
   vpc_id = aws_vpc.new[0].id
 
   dynamic "route" {
     for_each = local.internet_enabled ? [1] : []
     content {
       cidr_block     = "0.0.0.0/0"
-      nat_gateway_id = aws_nat_gateway.this[0].id
+      nat_gateway_id = aws_nat_gateway.this[count.index].id
     }
   }
 
-  tags = { Name = "${var.deployment_name}-private" }
+  tags = { Name = "${var.deployment_name}-private-${count.index}" }
 }
 
 resource "aws_route_table_association" "public" {
@@ -120,7 +123,7 @@ resource "aws_route_table_association" "public" {
 resource "aws_route_table_association" "private" {
   count          = length(aws_subnet.private)
   subnet_id      = aws_subnet.private[count.index].id
-  route_table_id = aws_route_table.private[0].id
+  route_table_id = aws_route_table.private[count.index].id
 }
 
 # Flow logs for the created VPC. A bring-your-own VPC keeps its owner's flow

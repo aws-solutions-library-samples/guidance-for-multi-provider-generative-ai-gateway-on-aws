@@ -155,6 +155,15 @@ resource "aws_ecs_service" "litellm" {
     ignore_changes = [desired_count]
   }
 
+  # The apply returns only when the new deployment is steady, so a rollout the
+  # circuit breaker rolls back fails the apply instead of reporting success.
+  wait_for_steady_state = true
+
+  timeouts {
+    create = "30m"
+    update = "30m"
+  }
+
   # The target group must be attached to a listener, the role policies must
   # exist, and the config must be uploaded and the schema migrated (module
   # rollout), before tasks roll.

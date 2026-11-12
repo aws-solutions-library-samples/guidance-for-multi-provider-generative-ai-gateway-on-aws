@@ -1,0 +1,2 @@
+general_settings:
+  enable_jwt_auth: false

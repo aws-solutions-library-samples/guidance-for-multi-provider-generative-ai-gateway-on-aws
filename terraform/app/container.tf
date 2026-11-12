@@ -65,6 +65,9 @@ locals {
         # reuses a connection the task has just closed (sporadic 502s).
         KEEPALIVE_TIMEOUT = tostring(local.alb_idle_timeout_seconds + 5)
       },
+      # LiteLLM sees plain HTTP from the ALB; its public HTTPS URL makes it mark
+      # the UI session cookie Secure (and builds the SSO callback URL).
+      var.allow_insecure_http ? {} : { PROXY_BASE_URL = local.service_url },
       var.extra_environment,
     )
 

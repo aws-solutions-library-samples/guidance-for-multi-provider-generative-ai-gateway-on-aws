@@ -190,6 +190,32 @@ resource "aws_s3_bucket_public_access_block" "request_logs" {
   restrict_public_buckets = true
 }
 
+# Versioning and Object Lock (governance mode) keep every written request log
+# for the retention period: the task role can add objects but not replace or
+# remove a retained version. Governance mode lets a principal with
+# s3:BypassGovernanceRetention (and the teardown, when deletion protection is
+# off) still delete them.
+resource "aws_s3_bucket_versioning" "request_logs" {
+  bucket = aws_s3_bucket.request_logs.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_object_lock_configuration" "request_logs" {
+  bucket = aws_s3_bucket.request_logs.id
+
+  rule {
+    default_retention {
+      mode = "GOVERNANCE"
+      days = local.log_retention_days
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.request_logs]
+}
+
 resource "aws_s3_bucket_lifecycle_configuration" "request_logs" {
   bucket = aws_s3_bucket.request_logs.id
 
@@ -202,7 +228,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "request_logs" {
     expiration {
       days = local.log_retention_days
     }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 1
+    }
   }
+
+  depends_on = [aws_s3_bucket_versioning.request_logs]
 }
 
 resource "aws_s3_bucket_policy" "request_logs" {

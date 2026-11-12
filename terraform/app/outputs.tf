@@ -1,6 +1,6 @@
 output "service_url" {
-  description = "The gateway URL clients call (the alias record, or the ALB's own DNS name)."
-  value       = "${var.allow_insecure_http ? "http" : "https"}://${var.record_name != null ? var.record_name : aws_lb.this.dns_name}"
+  description = "The gateway URL clients call: record_name, else gateway_hostname, else the ALB's own DNS name."
+  value       = local.service_url
 }
 
 output "alb_dns_name" {

@@ -26,7 +26,8 @@ python3 -m pip install --quiet --disable-pip-version-check \
   --target "$PKG_DIR" \
   --platform manylinux2014_aarch64 --implementation cp --python-version 3.13 \
   --only-binary=:all: \
-  --requirement "${AGENT_DIR}/requirements.txt"
+  --no-deps --require-hashes \
+  --requirement "${AGENT_DIR}/requirements.lock"
 
 cp "${AGENT_DIR}/main.py" "$PKG_DIR/"
 

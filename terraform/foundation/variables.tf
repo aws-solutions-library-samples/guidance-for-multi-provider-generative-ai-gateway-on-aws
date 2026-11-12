@@ -6,8 +6,8 @@ variable "deployment_name" {
   type        = string
 
   validation {
-    condition     = can(regex("^[a-z][a-z0-9-]{0,19}$", var.deployment_name))
-    error_message = "deployment_name must start with a lowercase letter and contain only lowercase letters, digits and hyphens (max 20 characters), so it can prefix S3 bucket, secret and database identifier names."
+    condition     = can(regex("^[a-z](-?[a-z0-9])*$", var.deployment_name)) && length(var.deployment_name) <= 20
+    error_message = "deployment_name must start with a lowercase letter, contain only lowercase letters, digits and single hyphens, end with a letter or digit, and be at most 20 characters, so it can prefix S3 bucket, secret, database and cache identifiers."
   }
 }
 
@@ -71,13 +71,13 @@ variable "public_mode" {
 }
 
 variable "vpc_cidr" {
-  description = "IPv4 CIDR for the created VPC. Ignored for a bring-your-own VPC. Scale-out needs free addresses in the private subnets; use a larger range if heavy traffic is expected."
+  description = "IPv4 CIDR for the created VPC, /22 or larger: the private subnets must hold the tasks ECS auto scaling adds and the extra tasks of a rolling deploy. Ignored for a bring-your-own VPC (which the plan also requires to be /22 or larger)."
   type        = string
   default     = "10.0.0.0/16"
 
   validation {
-    condition     = can(cidrsubnet(var.vpc_cidr, 3, 3)) && tonumber(split("/", var.vpc_cidr)[1]) <= 24
-    error_message = "vpc_cidr must be an IPv4 CIDR no smaller than /24, so four subnets can be carved out of it."
+    condition     = can(cidrsubnet(var.vpc_cidr, 3, 3)) && tonumber(split("/", var.vpc_cidr)[1]) <= 22
+    error_message = "vpc_cidr must be an IPv4 CIDR of /22 or larger. Each private subnet gets an eighth of it and must hold the gateway tasks at their auto scaling maximum, the extra tasks of a rolling deploy, the load balancer, VPC endpoints, the database and the cache; a smaller VPC runs out of addresses when ECS scales out or redeploys."
   }
 }
 
@@ -117,7 +117,7 @@ variable "extra_data_ingress_security_group_ids" {
 }
 
 variable "extra_data_ingress_cidrs" {
-  description = "Extra CIDR ranges admitted to RDS and Redis, for any non-ECS client of the data stores."
+  description = "Extra CIDR ranges admitted to RDS (PostgreSQL, 5432) and Redis (6379), for any non-ECS client of the data stores, from anywhere they are routed into the VPC from. Use the narrowest ranges; the stores stay private and still require their password and auth token."
   type        = list(string)
   default     = []
 

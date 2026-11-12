@@ -76,7 +76,7 @@ This list is not exhaustive.
 
 ### Service quotas
 
-Check these default quotas before the first deployment: Elastic IP addresses (one for the NAT gateway), VPCs per
+Check these default quotas before the first deployment: Elastic IP addresses (one per NAT gateway, two for a created VPC), VPCs per
 Region, Application Load Balancers per Region, and Fargate On-Demand vCPUs (enough for the maximum task count in
 the [architecture](../README.md#architecture)).
 
@@ -123,7 +123,10 @@ With `kms_key_arn = null` AWS managed keys are used and no key policy work is ne
 - **DNS name.** `hosted_zone_id` and `record_name` create an Amazon Route 53 alias record for the load balancer.
   A hosted zone is supported only together with [your own VPC](#your-own-vpc) (`vpc_id`), and the private hosted
   zone must be associated with that VPC before you deploy; the plan rejects a hosted zone with a created VPC.
-  Without them, clients use the load balancer's own DNS name.
+  If you manage the DNS record elsewhere, create a record for the certificate's name that points to the
+  `alb_dns_name` output, and set `gateway_hostname` to that name: the stack then uses it as the gateway URL.
+  Without any of them, the gateway URL is the load balancer's own DNS name, which no certificate covers, and the
+  plan warns.
 - **Certificate.** `certificate_arn` is an AWS Certificate Manager (ACM) certificate for the name clients use; the
   load balancer serves HTTPS with it and redirects HTTP to HTTPS. Required unless `allow_insecure_http = true`
   (trial only).
@@ -230,9 +233,10 @@ security groups.
 
 #### VPC size
 
-The gateway needs free IP addresses in its private subnets for every task, including the extra tasks of a rolling
-deploy and of a scale-out under traffic. A small VPC may not hold them: if heavy traffic is expected, use a larger
-`vpc_cidr` for a created VPC, or larger subnets in your own VPC.
+The gateway needs free IP addresses in its private subnets for every task, including the tasks ECS auto scaling
+adds under load and the extra tasks of a rolling deploy, plus the load balancer, VPC endpoints, the database and the
+cache. The plan therefore requires a VPC of `/22` or larger, for a created VPC (`vpc_cidr`) and for your own VPC,
+and checks the free addresses in your own private subnets.
 
 #### Your own VPC
 
@@ -244,7 +248,11 @@ interface endpoints) if the VPC lacks them.
 
 #### Other clients of the data stores
 
-`extra_data_ingress_security_group_ids` and `extra_data_ingress_cidrs` admit non-ECS clients to RDS and Redis.
+`extra_data_ingress_security_group_ids` and `extra_data_ingress_cidrs` admit non-ECS clients to RDS and Redis:
+each listed security group or CIDR range may connect to PostgreSQL (5432) and Redis (6379) from anywhere it is
+routed into the VPC from (the VPC itself, peered VPCs, Transit Gateway or VPN networks). Use the narrowest ranges,
+and prefer security groups where the client runs in the same VPC. The data stores stay in private subnets and still
+require the database password and the Redis auth token.
 Redis requires TLS and its auth token (Secrets Manager, `redis_auth_secret_arn` output): connect with `rediss://`;
 plain `redis://` connections are refused, which looks like a timeout from naive clients.
 
@@ -252,7 +260,7 @@ plain `redis://` connections are refused, which looks like a timeout from naive 
 
 The tasks pull the pinned image from `ghcr.io`, and the identity provider and non-Bedrock providers are
 internet endpoints, as is the LiteLLM licence server for older-format licence keys (signed keys are verified
-offline). The created VPC has a NAT gateway for this; Bedrock and the other
+offline). The created VPC has a NAT gateway in each Availability Zone for this; Bedrock and the other
 AWS services can additionally go through interface VPC endpoints (`create_interface_endpoints`).
 
 `disable_outbound_network_access = true` creates the VPC without an internet gateway or NAT, with interface
@@ -268,7 +276,8 @@ bring-your-own VPC without egress behaves the same way.
 >
 > The script verifies the image signature with the `cosign.pub` published in the copied release's tag, because
 > LiteLLM has changed its signing key between releases; `--cosign-key` uses another key, for example one you
-> distribute internally. Releases are multi-platform images and only one platform is copied (`linux/arm64`, or
+> distribute internally. For a release other than the pinned one, the tag and its `cosign.pub` are both mutable,
+> so the script also needs `--digest` with the release's digest, or a `--cosign-key` you trust. Releases are multi-platform images and only one platform is copied (`linux/arm64`, or
 > `--platform`), so the printed digest is that platform's image inside the pinned release, not the release digest
 > pinned in `terraform/app/container.tf`. The script reads the digest back from the registry and stops if it does
 > not match the verified release.
@@ -326,7 +335,7 @@ the provider:
 https://<gateway-host>/oauth2/idpresponse
 ```
 
-`<gateway-host>` is `record_name`, or the load balancer DNS name without DNS. The load balancer requests the
+`<gateway-host>` is `record_name`, else `gateway_hostname` (the host of the `service_url` output). The load balancer requests the
 `openid profile email` scopes. The provider's discovery document (`<issuer>/.well-known/openid-configuration`)
 lists the issuer and endpoints.
 
@@ -367,11 +376,11 @@ https://<gateway-host>/sso/callback
 ```
 
 Then pass the SSO settings in `deploy/terraform.tfvars`: plain values in `extra_environment`, the client secret
-through `provider_secret_arns` (the same secret as `client_secret_arn`):
+through `provider_secret_arns` (the same secret as `client_secret_arn`). The stack already sets `PROXY_BASE_URL`,
+from which LiteLLM builds the `/sso/callback` URI, to the gateway URL:
 
 ```hcl
 extra_environment = {
-  PROXY_BASE_URL                 = "https://<gateway-host>"
   GENERIC_CLIENT_ID              = "<client-id>"
   GENERIC_AUTHORIZATION_ENDPOINT = "<authorization_endpoint>"
   GENERIC_TOKEN_ENDPOINT         = "<token_endpoint>"
@@ -388,7 +397,6 @@ provider_secret_arns = {
 
 | Variable | Purpose |
 | --- | --- |
-| `PROXY_BASE_URL` | The gateway URL; LiteLLM builds the `/sso/callback` redirect URI from it. |
 | `GENERIC_*` | The same client and endpoints as `identity_provider`. |
 | `GENERIC_USER_ID_ATTRIBUTE` | The claim LiteLLM uses as the user ID. `sub` is the provider's stable subject identifier. LiteLLM's default, `preferred_username`, is missing from many providers' user-info responses, and LiteLLM then falls back to another value such as the email address, so `PROXY_ADMIN_ID` does not match. |
 | `PROXY_ADMIN_ID` | The LiteLLM user ID that gets the admin role: with `GENERIC_USER_ID_ATTRIBUTE = "sub"`, the user's subject (`sub` claim) at the provider. Other users who sign in with SSO get LiteLLM's default role, a read-only viewer of their own resources, until an administrator assigns a role in the UI. Without a matching `PROXY_ADMIN_ID`, only the `admin` account with the UI password can manage the gateway. |
@@ -444,12 +452,18 @@ deploy/deploy.sh
 ```
 
 It plans and applies the foundation, then the app, asking for confirmation before each apply (`--auto-approve`
-skips the prompts; `--help` lists the options), and prints the gateway URL at the end. The first run generates the master key, the salt key,
+skips the prompts; `--help` lists the options), and prints the gateway URL at the end. The app apply waits until
+the new tasks are running and healthy; if ECS rolls the deployment back, the apply fails. The first run generates the master key, the salt key,
 the UI password, the Redis auth token and the database URL (with a generated database password) in Secrets
 Manager.
 
 > **The salt key must never change.** LiteLLM uses it to encrypt the provider credentials stored in its database;
 > a new salt key would make them unreadable.
+
+**A replaced database needs a task rollout.** The database is replaced only by a deliberate change with deletion
+protection off. Its connection URL then changes under the same secret ARN, which the app stack does not detect:
+after such a change, make a change that rolls the app (for example to `image_uri` or the configuration) and run
+`deploy/deploy.sh`, so the migration runs against the new database and the tasks read the new URL.
 
 ### Terraform state
 
@@ -514,12 +528,19 @@ The rendered configuration contains no models. Add them in the UI (**Models**) o
 database. Bedrock models need no credentials: LiteLLM uses the task role. For example, a Bedrock cross-Region
 inference profile:
 
+The examples keep keys out of command lines, where other users of the machine and process-auditing tools can
+read them: each key goes into a private header file that curl reads with `-H @file`.
+
 ```bash
-LITELLM_MASTER_KEY="$(aws secretsmanager get-secret-value --secret-id "$(jq -r .master_key_secret_arn "$OUT")" \
-  --query SecretString --output text)"
+umask 077
+MASTER_HDR="$(mktemp)" APP_HDR="$(mktemp)"
+trap 'rm -f "$MASTER_HDR" "$APP_HDR"' EXIT
+
+aws secretsmanager get-secret-value --secret-id "$(jq -r .master_key_secret_arn "$OUT")" \
+  --query SecretString --output text | sed 's/^/Authorization: Bearer /' >"$MASTER_HDR"
 
 curl -sS -X POST "<gateway-url>/model/new" \
-  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+  -H @"$MASTER_HDR" \
   -H "Content-Type: application/json" \
   -d '{
     "model_name": "claude-opus-5-5",
@@ -545,13 +566,13 @@ Then create a virtual key for the model, as you would for an application, and ca
 OpenAI-compatible endpoint:
 
 ```bash
-APP_KEY="$(curl -sS -X POST "<gateway-url>/key/generate" \
-  -H "Authorization: Bearer ${LITELLM_MASTER_KEY}" \
+curl -sS -X POST "<gateway-url>/key/generate" \
+  -H @"$MASTER_HDR" \
   -H "Content-Type: application/json" \
-  -d '{"models": ["claude-opus-5-5"]}' | jq -r .key)"
+  -d '{"models": ["claude-opus-5-5"]}' | jq -r '"Authorization: Bearer " + .key' >"$APP_HDR"
 
 curl -sS "<gateway-url>/v1/chat/completions" \
-  -H "Authorization: Bearer ${APP_KEY}" \
+  -H @"$APP_HDR" \
   -H "Content-Type: application/json" \
   -d '{"model": "claude-opus-5-5", "messages": [{"role": "user", "content": "What is the capital of Australia?"}]}'
 ```
@@ -570,7 +591,9 @@ until a newer image is deployed or you set its price in `model_info`
 2. Pin the new release by tag and digest in `terraform/app/container.tf`
    (`docker buildx imagetools inspect ghcr.io/berriai/litellm:<tag>` prints the digest). With a mirrored image,
    run `deploy/mirror-image.sh` again and set the printed `image_uri`.
-3. Check the UI and login paths the load balancer protects (`terraform/app/alb.tf`) against the release's routes.
+3. Check the UI and login paths the load balancer protects (`terraform/app/alb.tf`) against the release's routes,
+   and the request headers LiteLLM accepts keys in against the headers the WAF logs redact
+   (`terraform/app/waf.tf`).
 4. Run `deploy/deploy.sh`. The new release's schema migration runs first, and the service rolls only if it
    succeeds, replacing tasks while keeping full capacity.
 
@@ -584,3 +607,6 @@ Set `deletion_protection = false` in `deploy/terraform.tfvars` and run `deploy/d
 log groups are kept. It destroys the app, then the foundation, asking for confirmation before each destroy. The
 database still leaves a final snapshot (unless `destroy_data_without_snapshot = true`), and the Terraform state
 bucket is kept.
+
+Request logs are written under S3 Object Lock in governance mode for the log retention period: with deletion
+protection on, nobody without `s3:BypassGovernanceRetention` can delete or overwrite them.

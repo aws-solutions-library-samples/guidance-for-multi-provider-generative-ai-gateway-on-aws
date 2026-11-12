@@ -66,7 +66,7 @@ read_deployment_name() {
   name="$(echo 'var.deployment_name' | terraform -chdir="$tmp" console -var-file="$TFVARS" 2>/dev/null |
     sed -n 's/^"\([a-z][a-z0-9-]*\)"$/\1/p' | tail -n 1)" || true
   rm -rf "$tmp"
-  [[ "$name" =~ ^[a-z][a-z0-9-]{0,19}$ ]] ||
+  [[ "$name" =~ ^[a-z](-?[a-z0-9])*$ && ${#name} -le 20 ]] ||
     { echo "deployment_name is missing or invalid in ${TFVARS}" >&2; exit 1; }
   printf '%s\n' "$name"
 }
@@ -124,11 +124,38 @@ state_bucket_status() { # -> owned | missing | foreign
   fi
 }
 
+# An existing bucket is used only if it already has the controls this script
+# would set; it is never changed. Fixing it is the bucket owner's job.
+check_state_bucket() {
+  local problems=() out
+  out="$(aws s3api get-bucket-versioning --bucket "$TF_STATE_BUCKET" --query Status --output text 2>/dev/null || true)"
+  [ "$out" = "Enabled" ] || problems+=("versioning is not enabled")
+  aws s3api get-bucket-encryption --bucket "$TF_STATE_BUCKET" >/dev/null 2>&1 ||
+    problems+=("no default encryption")
+  out="$(aws s3api get-public-access-block --bucket "$TF_STATE_BUCKET" --output json 2>/dev/null |
+    jq -r '[.PublicAccessBlockConfiguration | .BlockPublicAcls, .IgnorePublicAcls, .BlockPublicPolicy, .RestrictPublicBuckets] | all' 2>/dev/null || true)"
+  [ "$out" = "true" ] || problems+=("Block Public Access is not fully on")
+  out="$(aws s3api get-bucket-ownership-controls --bucket "$TF_STATE_BUCKET" \
+    --query 'OwnershipControls.Rules[0].ObjectOwnership' --output text 2>/dev/null || true)"
+  [ "$out" = "BucketOwnerEnforced" ] || problems+=("object ownership is not BucketOwnerEnforced")
+  out="$(aws s3api get-bucket-policy --bucket "$TF_STATE_BUCKET" --query Policy --output text 2>/dev/null |
+    jq -r '[.Statement[] | select(.Effect == "Deny" and (.Condition.Bool["aws:SecureTransport"] // "" | tostring) == "false")] | length > 0' 2>/dev/null || true)"
+  [ "$out" = "true" ] || problems+=("the bucket policy does not deny non-TLS access (aws:SecureTransport = false)")
+  if [ "${#problems[@]}" -gt 0 ]; then
+    echo "State bucket ${TF_STATE_BUCKET} is missing controls Terraform state needs:" >&2
+    printf '  - %s\n' "${problems[@]}" >&2
+    echo "Configure them on the bucket, or set TF_STATE_BUCKET to a bucket that has them. This script does not change an existing bucket." >&2
+    exit 1
+  fi
+}
+
 # State bucket: versioned, encrypted, private, owner-enforced, TLS-only, with
 # native S3 state locking (use_lockfile). Creating it is the fresh-account
 # bootstrap step.
 case "$(state_bucket_status)" in
-  owned) echo "Using Terraform state bucket ${TF_STATE_BUCKET}" ;;
+  owned)
+    check_state_bucket
+    echo "Using Terraform state bucket ${TF_STATE_BUCKET}" ;;
   foreign)
     echo "State bucket ${TF_STATE_BUCKET} exists but is not owned by account ${ACCOUNT_ID} (or is not accessible): refusing to use it." >&2
     exit 1 ;;

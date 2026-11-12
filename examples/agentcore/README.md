@@ -55,7 +55,9 @@ ARN) and does not modify the gateway's stacks.
   (it reaches the runtime base64-encoded in the `GATEWAY_CA_PEM_BASE64`
   environment variable; a CA certificate is not secret), and `scripts/agent-key.sh` passes it to curl.
 - **Deployment.** Direct code deployment: `scripts/build.sh` builds a zip of
-  the agent and its dependencies for the runtime's platform (Linux arm64,
+  the agent and its dependencies (installed from `agent/requirements.lock`,
+  every package pinned with its hash; regenerate it after changing
+  `agent/requirements.txt`, as its header shows) for the runtime's platform (Linux arm64,
   Python 3.13); Terraform uploads it to S3 and creates the runtime from it. No
   container build is needed. Agent code, configuration and other content that
   you create and upload are "Your Content" as defined in the

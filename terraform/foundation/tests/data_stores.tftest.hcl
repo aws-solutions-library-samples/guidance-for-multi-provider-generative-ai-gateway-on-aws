@@ -315,8 +315,8 @@ run "created_vpc_has_flow_logs_endpoints_and_two_az_subnets" {
   }
 
   assert {
-    condition     = length(aws_nat_gateway.this) == 1 && length(aws_internet_gateway.this) == 1
-    error_message = "The default created VPC must have egress through a NAT gateway."
+    condition     = length(aws_nat_gateway.this) == 2 && length(aws_internet_gateway.this) == 1 && length(aws_route_table.private) == 2
+    error_message = "The default created VPC must have a NAT gateway and a private route table in each Availability Zone."
   }
 }
 
@@ -415,7 +415,7 @@ run "interface_endpoints_on_request_with_egress" {
   }
 
   assert {
-    condition     = length(aws_vpc_endpoint.interface) == 6 && length(aws_security_group.vpc_endpoints) == 1 && length(aws_nat_gateway.this) == 1
+    condition     = length(aws_vpc_endpoint.interface) == 6 && length(aws_security_group.vpc_endpoints) == 1 && length(aws_nat_gateway.this) == 2
     error_message = "create_interface_endpoints must add the 6 interface endpoints next to the NAT egress."
   }
 }

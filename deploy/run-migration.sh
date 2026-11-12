@@ -94,8 +94,13 @@ fi
 echo "Waiting up to ${TIMEOUT}s for ${TASK_ARN}"
 deadline=$((SECONDS + TIMEOUT))
 while :; do
-  STATUS=$(aws ecs describe-tasks --region "$AWS_REGION" --cluster "$CLUSTER" --tasks "$TASK_ARN" \
-    --query 'tasks[0].lastStatus' --output text)
+  # A failed status read is retried until the deadline: one error says nothing
+  # about the migration, and the exit trap would stop a healthy task.
+  if ! STATUS=$(aws ecs describe-tasks --region "$AWS_REGION" --cluster "$CLUSTER" --tasks "$TASK_ARN" \
+    --query 'tasks[0].lastStatus' --output text); then
+    echo "Could not read the migration task's status; retrying." >&2
+    STATUS="UNKNOWN"
+  fi
   if [ "$STATUS" = "STOPPED" ]; then
     TASK_STOPPED=true
     break

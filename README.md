@@ -147,7 +147,7 @@ A default deployment runs these resources around the clock:
 
 | AWS service | Resources |
 | --- | --- |
-| Amazon VPC | 1 NAT gateway with 1 public IPv4 address; the S3 gateway endpoint (no charge) |
+| Amazon VPC | 2 NAT gateways (one per Availability Zone) with 1 public IPv4 address each; the S3 gateway endpoint (no charge) |
 | Elastic Load Balancing | 1 Application Load Balancer |
 | Amazon ECS on AWS Fargate | 2 or more tasks (Linux/ARM, 2 vCPU, 4 GiB memory each) |
 | Amazon RDS for PostgreSQL | 1 `db.t4g.large` instance, Multi-AZ, gp3 storage from 20 GB, 30 days of backups |
@@ -227,7 +227,7 @@ identity provider and DEBUG logging also print a warning on every plan.
   public mode is opt-in and attaches AWS WAF.
 - **Security groups**: traffic is allowed only from the load balancer to the tasks and from the tasks (and clients
   you list) to the database and cache.
-- **Egress**: one NAT gateway serves outbound calls; a mode without internet access uses VPC endpoints only.
+- **Egress**: a NAT gateway in each Availability Zone serves that zone's outbound calls; a mode without internet access uses VPC endpoints only.
 - **VPC flow logs**: in a created VPC, all traffic is logged to CloudWatch Logs; a bring-your-own VPC keeps its
   own flow log configuration.
 
