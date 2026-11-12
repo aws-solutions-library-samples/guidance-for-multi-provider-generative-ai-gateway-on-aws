@@ -2,9 +2,9 @@
 # (7) Security Groups & Ingress for Redis and RDS
 ###############################################################################
 
-# CloudFront security is implemented using origin custom headers instead of IP ranges
-# This avoids hitting AWS security group rule limits (60 rules per security group)
-# CloudFront has hundreds of IP ranges globally, which would exceed the limit
+# CloudFront security layers origin custom-header checks with IP-based filtering
+# The AWS-managed origin-facing prefix list avoids enumerating CloudFront IP ranges
+# individually and exhausting security group rule quotas
 # Security group for ECS Service tasks
 resource "aws_security_group" "ecs_service_sg" {
   name        = "${var.name}-service-sg"
@@ -124,5 +124,5 @@ resource "aws_security_group_rule" "alb_ingress_http_direct" {
   protocol          = "tcp"
   security_group_id = aws_security_group.alb_sg.id
   cidr_blocks       = var.public_load_balancer ? ["0.0.0.0/0"] : var.private_subnets_cidr_blocks
-  description       = "HTTP traffic for CloudFront origin"
+  description       = "HTTP traffic for direct ALB access"
 }
