@@ -29,22 +29,22 @@ resource "aws_cloudfront_distribution" "this" {
     domain_name = aws_lb.this.dns_name
     origin_id   = "ALB"
     
-    # Add a custom origin header for security
-    # This replaces the IP-based security group approach
-    # ALB should be configured to only accept requests with this header
+    # Add a custom origin header for defense in depth
+    # This complements IP-based filtering using the CloudFront prefix list
+    # ALB listener rules require this header except on configured health-check paths
     custom_header {
       name  = "X-CloudFront-Secret"
       value = "litellm-cf-${random_password.cloudfront_secret[0].result}"
     }
     
     # Security note on CloudFront-ALB communication:
-    # 
-    # By setting origin_protocol_policy = "http-only", communication between CloudFront and ALB 
+    #
+    # By setting origin_protocol_policy = "http-only", communication between CloudFront and ALB
     # is unencrypted. However, security is maintained through:
     #
-    # 1. Custom header authentication (X-CloudFront-Secret) that prevents direct access to the ALB
-    # 2. Communication between end users and CloudFront remains encrypted with HTTPS
-    # 3. The ALB is configured to reject requests without the secret header
+    # 1. ALB security group ingress restricted to CloudFront origin-facing IPs
+    # 2. Custom header authentication (X-CloudFront-Secret) on ALB listener rules
+    # 3. Communication between end users and CloudFront remains encrypted with HTTPS
     #
     # This approach eliminates certificate validation issues while maintaining a strong security posture.
     custom_origin_config {
