@@ -49,9 +49,16 @@ resource "aws_db_subnet_group" "main" {
 }
 
 resource "aws_db_parameter_group" "example_pg" {
-  name   = "rds-postgres-parameter-group"
   # Update the family to match your PostgreSQL version
-  family = "postgres15"
+  family = "postgres17"
+
+  # To support in-place major version upgrades:
+  # - Use a name prefix rather than a fully-specified "name"
+  # - Create the new family-specific group before detaching/deleting the old one
+  lifecycle {
+    create_before_destroy = true
+  }
+  name_prefix = "rds-postgres-parameter-group-"
 
   # Enable logging of all statements
   parameter {
@@ -69,8 +76,9 @@ resource "aws_db_parameter_group" "example_pg" {
 # Database #1: litellm
 resource "aws_db_instance" "database" {
   identifier                = "${var.name}-litellm-db"
+  allow_major_version_upgrade = true
   engine                    = "postgres"
-  engine_version           = "15" # or "15.x"
+  engine_version           = "17" # (Should be compatible back to at least "15.x" if needed)
   instance_class            = var.rds_instance_class
   storage_type              = "gp3"
   allocated_storage         = var.rds_allocated_storage
