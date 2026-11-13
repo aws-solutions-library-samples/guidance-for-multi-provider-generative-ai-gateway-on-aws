@@ -104,9 +104,9 @@ With `kms_key_arn = null` AWS managed keys are used and no key policy work is ne
 1. **[Trial](#trial-deployment): for testing only.** A private gateway on plain HTTP, reached through a demo AWS
    Client VPN, without a LiteLLM licence or identity provider. Use it to explore LiteLLM; do not use it for real
    workloads or send real credentials through it.
-2. **[Recommended private](#recommended-private-deployment).** The recommended configuration: an internal load
-   balancer with HTTPS, a DNS name, an identity provider in front of the UI and a LiteLLM Enterprise licence,
-   reached from your own network.
+2. **[Recommended private](#recommended-private-deployment).** The recommended configuration: open-source LiteLLM
+   (MIT License) behind an internal load balancer with HTTPS, a DNS name and an identity provider in front of the
+   UI, reached from your own network, with an optional LiteLLM Enterprise licence.
 3. **[Public](#public-deployment).** An internet-facing load balancer with HTTPS and AWS WAF, for clients that
    cannot reach your network. Use it with an identity provider.
 
@@ -116,7 +116,7 @@ With `kms_key_arn = null` AWS managed keys are used and no key policy work is ne
 | Protocol | Plain HTTP | HTTPS (your ACM certificate) | HTTPS (your ACM certificate) |
 | Client access | Demo Client VPN | Your VPN, Direct Connect or Transit Gateway | Internet |
 | Identity provider | Not available (needs HTTPS) | Recommended | Strongly recommended |
-| LiteLLM licence | No | Recommended | Recommended |
+| LiteLLM Enterprise licence | No | Optional | Optional |
 
 ### Optional features
 
@@ -132,9 +132,10 @@ With `kms_key_arn = null` AWS managed keys are used and no key policy work is ne
   (trial only).
 - **Private or public mode.** `public_mode = false` (the default) keeps the load balancer internal; `true` makes
   it internet-facing and attaches AWS WAF.
-- **LiteLLM licence.** `litellm_license_secret_arn` enables the
+- **LiteLLM Enterprise licence (optional).** `litellm_license_secret_arn` enables the
   [LiteLLM Enterprise features](https://docs.litellm.ai/docs/enterprise). Without it LiteLLM runs its
-  open-source feature set (MIT License). LiteLLM verifies signed licence keys offline with the public key in its
+  open-source feature set (MIT License). Several features need the licence, for example LiteLLM SSO for more than
+  five users, JWT authentication for applications, and guardrails per team or key. LiteLLM verifies signed licence keys offline with the public key in its
   image; only older-format keys are checked online at `license.litellm.ai`.
 - **Identity provider.** `identity_provider` makes the load balancer require OpenID Connect (OIDC) sign-in before
   it serves the LiteLLM UI. See [Identity provider](#identity-provider).
@@ -204,7 +205,8 @@ reach it over your own network.
   [trial](#trial-deployment) (`create_vpn` and the two VPN certificates) and
   [connect it](#connect-the-trial-vpn); it is for testing only, and clients must trust your certificate's CA;
 - an OIDC identity provider application (see [Identity provider](#identity-provider));
-- a LiteLLM Enterprise licence key, stored as a plain-text Secrets Manager secret, for example
+- optionally, a LiteLLM Enterprise licence key (see [LiteLLM Enterprise licence](#optional-features)), stored as
+  a plain-text Secrets Manager secret, for example
   `aws secretsmanager create-secret --name llmgw-litellm-license --secret-string file://license.txt`. Signed
   licence keys are verified offline and need no outbound internet access.
 
@@ -311,8 +313,14 @@ public_mode = true
 
 > **Public mode without an identity provider exposes the admin UI.** The LiteLLM UI, which can create keys,
 > change models and read spend for every team, is then reachable from the internet behind only the UI password
-> and WAF. The plan warns about it on every run but does not block it. Configure an
-> [identity provider](#identity-provider) for public deployments.
+> and WAF. The plan therefore stops unless `allow_public_ui_without_identity_provider = true`, and warns on every
+> run even then. Configure an [identity provider](#identity-provider) for public deployments.
+
+LiteLLM's management API (keys, teams, models, spend) is served on the same address as the model API, and the
+LiteLLM UI uses it from the user's browser, so public mode cannot simply block it: any key with administrative
+rights, the master key above all, works from the internet. Keep the master key out of daily use, give
+applications virtual keys limited to their models, and restrict network access further (for example AWS WAF
+rules for your source addresses) if your clients allow it.
 
 ### Identity provider
 
@@ -460,10 +468,9 @@ Manager.
 > **The salt key must never change.** LiteLLM uses it to encrypt the provider credentials stored in its database;
 > a new salt key would make them unreadable.
 
-**A replaced database needs a task rollout.** The database is replaced only by a deliberate change with deletion
-protection off. Its connection URL then changes under the same secret ARN, which the app stack does not detect:
-after such a change, make a change that rolls the app (for example to `image_uri` or the configuration) and run
-`deploy/deploy.sh`, so the migration runs against the new database and the tasks read the new URL.
+A replaced database or cache (only by a deliberate change with deletion protection off) changes the
+`data_store_generation` foundation output; the next app apply then rolls the tasks and runs the migration
+against the new database.
 
 ### Terraform state
 
@@ -609,4 +616,6 @@ database still leaves a final snapshot (unless `destroy_data_without_snapshot = 
 bucket is kept.
 
 Request logs are written under S3 Object Lock in governance mode for the log retention period: with deletion
-protection on, nobody without `s3:BypassGovernanceRetention` can delete or overwrite them.
+protection on, nobody without `s3:BypassGovernanceRetention` can delete or overwrite them. Removing the request
+log bucket at teardown therefore needs `s3:BypassGovernanceRetention` on it; it is not in the permission list
+above, so grant it to the principal that runs `deploy/undeploy.sh` only for the teardown.

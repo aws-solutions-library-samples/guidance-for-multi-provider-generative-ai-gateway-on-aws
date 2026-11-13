@@ -1,5 +1,9 @@
 # Agents on Amazon Bedrock AgentCore Runtime through the gateway
 
+> [!IMPORTANT]
+> This is an example, not part of the gateway deployment. It was tested with the gateway in a test account; adapt
+> and test it in your own environment before use.
+
 This example deploys a [Strands](https://strandsagents.com/) agent on
 [Amazon Bedrock AgentCore Runtime](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agents-tools-runtime.html)
 that does **all** of its LLM inference through the LiteLLM gateway. The agent is

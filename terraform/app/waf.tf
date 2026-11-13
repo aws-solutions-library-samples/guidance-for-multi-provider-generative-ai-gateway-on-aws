@@ -175,6 +175,11 @@ resource "aws_wafv2_web_acl_logging_configuration" "this" {
   resource_arn            = aws_wafv2_web_acl.this[0].arn
   log_destination_configs = [aws_cloudwatch_log_group.waf[0].arn]
 
+  # Query strings can carry keys too (some clients send ?api_key=...).
+  redacted_fields {
+    query_string {}
+  }
+
   dynamic "redacted_fields" {
     # Every header LiteLLM accepts a key in (re-check on a LiteLLM upgrade), and cookies.
     for_each = ["authorization", "x-litellm-api-key", "api-key", "x-api-key", "x-goog-api-key", "ocp-apim-subscription-key", "cookie"]

@@ -32,7 +32,9 @@ Checks (in order):
                            pass on an unmigrated database; this does not).
                            Needs an admin key such as the master key; with an
                            application key (403) the check is skipped
-  6. completion            (only with --model) one chat completion returns 200
+  6. sign-in gate          with load balancer sign-in (GET /ui/ redirects), the
+                           percent-encoded /%75i/ and POST /v2/%6cogin redirect too
+  7. completion            (only with --model) one chat completion returns 200
 
 Options:
   --key-secret-arn <arn>  Fetch the key from this Secrets Manager secret at
@@ -252,6 +254,16 @@ if [[ "$KEY_LIST" == "403" ]]; then
   echo "SKIP  schema migrated (key list): needs an admin key such as the master key (got 403)"
 else
   check "schema migrated (key list)" 200 "$KEY_LIST"
+fi
+
+# With load balancer sign-in, encoded spellings of UI and login paths must be
+# sent to the identity provider as well (the load balancer decodes before matching).
+UI_CODE="$(code_noauth "$URL/ui/")"
+if [[ "$UI_CODE" == "302" ]]; then
+  check "sign-in gate on /%75i/" 302 "$(code_noauth --path-as-is "$URL/%75i/")"
+  check "sign-in gate on POST /v2/%6cogin" 302 "$(code_noauth --path-as-is -X POST "$URL/v2/%6cogin")"
+else
+  echo "SKIP  sign-in gate: /ui/ is not behind load balancer sign-in (got ${UI_CODE})"
 fi
 
 if [[ -n "$MODEL" ]]; then

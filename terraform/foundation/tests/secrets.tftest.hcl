@@ -26,14 +26,14 @@ run "secrets_created_at_version_1" {
 
   plan_options {
     target = [
-      aws_secretsmanager_secret_version.master_key,
-      aws_secretsmanager_secret_version.salt_key,
+      aws_secretsmanager_secret_version.master_key[0],
+      aws_secretsmanager_secret_version.salt_key[0],
       aws_secretsmanager_secret_version.ui_password,
     ]
   }
 
   assert {
-    condition     = aws_secretsmanager_secret_version.master_key.secret_string_wo_version == 1 && aws_secretsmanager_secret_version.salt_key.secret_string_wo_version == 1
+    condition     = aws_secretsmanager_secret_version.master_key[0].secret_string_wo_version == 1 && aws_secretsmanager_secret_version.salt_key[0].secret_string_wo_version == 1
     error_message = "Generated secrets are created at version 1."
   }
 }
@@ -45,14 +45,38 @@ run "reapply_never_rewrites_the_salt_key" {
 
   plan_options {
     target = [
-      aws_secretsmanager_secret_version.master_key,
-      aws_secretsmanager_secret_version.salt_key,
+      aws_secretsmanager_secret_version.master_key[0],
+      aws_secretsmanager_secret_version.salt_key[0],
       aws_secretsmanager_secret_version.ui_password,
     ]
   }
 
   assert {
-    condition     = aws_secretsmanager_secret_version.salt_key.secret_string_wo_version == 1 && aws_secretsmanager_secret_version.salt_key.secret_string == null
+    condition     = aws_secretsmanager_secret_version.salt_key[0].secret_string_wo_version == 1 && aws_secretsmanager_secret_version.salt_key[0].secret_string == null
     error_message = "The salt key must never be re-sent: a new value makes every stored provider credential unreadable."
   }
+}
+
+run "existing_keys_are_used_as_given" {
+  command = plan
+
+  variables {
+    existing_master_key_secret_arn = "arn:aws:secretsmanager:eu-west-1:111111111111:secret:v1-master-AbCdEf"
+    existing_salt_key_secret_arn   = "arn:aws:secretsmanager:eu-west-1:111111111111:secret:v1-salt-AbCdEf"
+  }
+
+  assert {
+    condition     = length(aws_secretsmanager_secret.master_key) == 0 && length(aws_secretsmanager_secret.salt_key) == 0 && output.master_key_secret_arn == var.existing_master_key_secret_arn && output.salt_key_secret_arn == var.existing_salt_key_secret_arn
+    error_message = "Existing master and salt keys must be used as given, with no new secrets."
+  }
+}
+
+run "existing_key_must_be_a_plain_secret_arn" {
+  command = plan
+
+  variables {
+    existing_salt_key_secret_arn = "arn:aws:secretsmanager:eu-west-1:111111111111:secret:v1-AbCdEf:LITELLM_SALT_KEY::"
+  }
+
+  expect_failures = [var.existing_salt_key_secret_arn]
 }

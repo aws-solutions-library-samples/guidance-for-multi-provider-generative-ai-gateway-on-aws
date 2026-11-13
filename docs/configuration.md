@@ -20,6 +20,8 @@ Descriptions combine both roots.
 | `public_mode` | `bool` | `false` | `false`: internal ALB, reachable from the VPC or the listed client ranges only. `true`: internet-facing ALB with WAF; the foundation creates (or validates) public subnets in two Availability Zones. Cannot be combined with `disable_outbound_network_access` or `allow_insecure_http`. |
 | `disable_outbound_network_access` | `bool` | `false` | No-internet mode for the created VPC: no internet gateway, no NAT, AWS services through VPC endpoints only. An IdP, non-Bedrock providers and the online check of older-format licence keys are unreachable without an egress proxy; signed licence keys are verified offline. The app reads it only to warn when an identity provider is unreachable. |
 | `kms_key_arn` | `string` | `null` | Optional customer KMS key for the database, Redis, secrets, logs and S3. Null uses AWS-managed keys. |
+| `existing_master_key_secret_arn` | `string` | `null` | Secrets Manager ARN of an existing LiteLLM master key (a plain `sk-...` string), for example when restoring a database from a previous deployment. Null generates a new one. Terraform never reads the value. |
+| `existing_salt_key_secret_arn` | `string` | `null` | Secrets Manager ARN of an existing LiteLLM salt key (a plain `sk-...` string). A database restored from a previous deployment needs that deployment's salt key, because LiteLLM encrypts stored provider credentials with it. Null generates a new one. Terraform never reads the value. |
 | `deletion_protection` | `bool` | `true` | Protects the database and the ALB from deletion and keeps the S3 buckets and the LiteLLM, WAF and RDS PostgreSQL log groups on destroy; deploy/undeploy.sh stops before any destroy while it is true. Set to false and deploy before undeploying. |
 | `hosted_zone_id` | `string` | `null` | Optional Route 53 hosted zone; with record_name, the app creates an alias to the ALB. Set both or neither. The foundation only validates it: a hosted zone requires your own VPC (`vpc_id`), and the private zone must be associated with that VPC before deployment. |
 
@@ -55,6 +57,8 @@ Descriptions combine both roots.
 | `record_name` | `string` | `null` | Optional DNS name (for example llm.example.com) created in hosted_zone_id. Set both or neither. |
 | `gateway_hostname` | `string` | `null` | The DNS name clients use (the name on `certificate_arn`) when its DNS record is managed outside this stack; point that record to `alb_dns_name`. Used for `service_url` and LiteLLM's public URL; ignored when `record_name` is set. |
 | `identity_provider` | `object` | `null` | Optional OIDC identity provider. When set, the ALB requires sign-in in front of the LiteLLM UI paths — unconditionally, in private and public mode alike. The client secret is given as a Secrets Manager ARN; its value does not pass through variables. |
+| `identity_provider_session_timeout_seconds` | `number` | `43200` | How long the load balancer's sign-in session lasts (5 minutes to 7 days). |
+| `allow_public_ui_without_identity_provider` | `bool` | `false` | Public mode without `identity_provider` is rejected unless this is `true`; the plan warns on every run even then. |
 | `litellm_license_secret_arn` | `string` | `null` | Optional Secrets Manager ARN of the LiteLLM Enterprise licence. Null runs LiteLLM's open-source feature set. |
 | `client_cidrs` | `list(string)` | `[]` | Private mode: CIDR ranges allowed to reach the ALB (VPN, Direct Connect, Transit Gateway). Empty means the VPC CIDR only, not all of RFC 1918. |
 | `client_security_group_ids` | `list(string)` | `[]` | Extra security groups allowed to reach the ALB. The foundation's demo Client VPN is admitted automatically via vpn_security_group_id. |
@@ -78,7 +82,7 @@ else to set:
 `vpc_id`, `private_subnet_ids`, `vpc_cidr`, `database_url_secret_arn`, `redis_endpoint`,
 `redis_port`, `redis_auth_secret_arn`, `config_bucket_name`, `master_key_secret_arn`, `salt_key_secret_arn`,
 `data_ingress_security_group_id`, `public_subnet_ids`, `ui_password_secret_arn`, `rds_instance_identifier`,
-`redis_replication_group_id`, `redis_num_cache_clusters`, `vpn_security_group_id`.
+`redis_replication_group_id`, `redis_num_cache_clusters`, `vpn_security_group_id`, `data_store_generation` (changes when the database or the cache is replaced, so the tasks roll and the migration runs again).
 
 ## Outputs
 
@@ -88,7 +92,7 @@ and prints the app's `service_url`. The secret outputs are Secrets Manager ARNs,
 
 | App output | Description |
 | --- | --- |
-| `service_url` | The gateway URL clients call (the alias record, or the ALB's own DNS name). |
+| `service_url` | The gateway URL clients call: `record_name`, else `gateway_hostname`, else the ALB's own DNS name. |
 | `alb_dns_name` | The ALB's own DNS name. |
 | `ecs_cluster_name` / `ecs_service_name` | ECS cluster and service. |
 | `log_group_name` | The LiteLLM CloudWatch log group. |

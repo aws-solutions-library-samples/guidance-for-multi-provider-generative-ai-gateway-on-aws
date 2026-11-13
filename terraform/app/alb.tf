@@ -134,6 +134,7 @@ resource "aws_lb_listener_rule" "ui_oidc" {
       client_secret              = data.aws_secretsmanager_secret_version.alb_oidc[0].secret_string
       on_unauthenticated_request = "authenticate"
       scope                      = "openid profile email"
+      session_timeout            = var.identity_provider_session_timeout_seconds
     }
   }
 

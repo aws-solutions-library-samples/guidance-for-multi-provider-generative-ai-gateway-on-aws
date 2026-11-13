@@ -3,7 +3,7 @@
 # variable is documented in the owning module's variables.tf. The values shown
 # commented out are the defaults.
 #
-# Sizing and thresholds are fixed to the supported baseline — fork the code to change them.
+# Sizing and alarm thresholds have defaults (see README.md, Deployment Options); adapt them in the code if needed.
 #
 # A variable only one root declares makes the other root print a harmless
 # "Value for undeclared variable" warning (Terraform folds repeats into
@@ -25,6 +25,8 @@ tags            = {}      # your own tags, merged into the defaults
 # public_mode         = false # true: internet-facing ALB with WAF (foundation adds public subnets)
 # deletion_protection = true  # RDS + ALB protection, buckets and log groups kept; undeploy.sh stops while true: set false + deploy before undeploying (a final DB snapshot is still taken)
 # kms_key_arn         = null  # optional customer KMS key (key policy: docs/deployment.md)
+# existing_salt_key_secret_arn   = null # keys of a previous deployment whose database you restore (docs/migration-v1-to-v2.md)
+# existing_master_key_secret_arn = null
 
 # --- foundation: network (leave vpc_id unset to create a VPC) ---
 # vpc_cidr                        = "10.0.0.0/16" # created VPC only; /22 or larger (ECS scale-out and rolling deploys need free addresses)
@@ -63,6 +65,8 @@ tags            = {}      # your own tags, merged into the defaults
 # client_security_group_ids = [] # extra source security groups (the demo VPN is added automatically)
 
 # --- app: identity provider (ALB sign-in in front of the UI, both modes; needs HTTPS) ---
+# identity_provider_session_timeout_seconds = 43200 # load balancer sign-in session (default 12 hours)
+# allow_public_ui_without_identity_provider = false # public mode without identity_provider is rejected unless true
 # identity_provider = {
 #   issuer                 = "https://login.microsoftonline.com/<tenant>/v2.0"
 #   authorization_endpoint = "https://login.microsoftonline.com/<tenant>/oauth2/v2.0/authorize"

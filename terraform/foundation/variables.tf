@@ -181,3 +181,25 @@ variable "vpn_client_cidr" {
   default     = "10.250.0.0/22"
 }
 
+
+variable "existing_master_key_secret_arn" {
+  description = "Optional Secrets Manager ARN of an existing LiteLLM master key (a plain sk-... string), for example when restoring a database from a previous deployment. Null generates a new one. Terraform never reads the value."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.existing_master_key_secret_arn == null || can(regex("^arn:aws[a-z-]*:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:[A-Za-z0-9/_+=.@-]+$", var.existing_master_key_secret_arn))
+    error_message = "existing_master_key_secret_arn must be a Secrets Manager secret ARN (a plain-string secret, no JSON key suffix)."
+  }
+}
+
+variable "existing_salt_key_secret_arn" {
+  description = "Optional Secrets Manager ARN of an existing LiteLLM salt key (a plain sk-... string). LiteLLM encrypts provider credentials stored in its database with it, so a database restored from a previous deployment needs that deployment's salt key. Null generates a new one. Terraform never reads the value."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.existing_salt_key_secret_arn == null || can(regex("^arn:aws[a-z-]*:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:[A-Za-z0-9/_+=.@-]+$", var.existing_salt_key_secret_arn))
+    error_message = "existing_salt_key_secret_arn must be a Secrets Manager secret ARN (a plain-string secret, no JSON key suffix)."
+  }
+}

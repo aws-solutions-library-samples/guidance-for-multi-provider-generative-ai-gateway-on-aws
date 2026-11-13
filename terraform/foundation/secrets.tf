@@ -25,6 +25,7 @@ ephemeral "random_password" "master_key" {
 }
 
 resource "aws_secretsmanager_secret" "master_key" {
+  count                   = var.existing_master_key_secret_arn == null ? 1 : 0
   name_prefix             = "${var.deployment_name}-master-key-"
   description             = "LiteLLM master key (sk-...)"
   recovery_window_in_days = local.secret_recovery_window_days
@@ -34,7 +35,8 @@ resource "aws_secretsmanager_secret" "master_key" {
 # A plain sk-... string, not JSON: deploy/smoke-test.sh --key-secret-arn and
 # LiteLLM read the SecretString verbatim.
 resource "aws_secretsmanager_secret_version" "master_key" {
-  secret_id                = aws_secretsmanager_secret.master_key.id
+  count                    = var.existing_master_key_secret_arn == null ? 1 : 0
+  secret_id                = aws_secretsmanager_secret.master_key[0].id
   secret_string_wo         = "sk-${ephemeral.random_password.master_key.result}"
   secret_string_wo_version = local.generated_secrets_wo_version
 }
@@ -49,6 +51,7 @@ ephemeral "random_password" "salt_key" {
 }
 
 resource "aws_secretsmanager_secret" "salt_key" {
+  count                   = var.existing_salt_key_secret_arn == null ? 1 : 0
   name_prefix             = "${var.deployment_name}-salt-key-"
   description             = "LiteLLM salt key - never rotate it"
   recovery_window_in_days = local.secret_recovery_window_days
@@ -56,13 +59,41 @@ resource "aws_secretsmanager_secret" "salt_key" {
 }
 
 resource "aws_secretsmanager_secret_version" "salt_key" {
-  secret_id                = aws_secretsmanager_secret.salt_key.id
+  count                    = var.existing_salt_key_secret_arn == null ? 1 : 0
+  secret_id                = aws_secretsmanager_secret.salt_key[0].id
   secret_string_wo         = "sk-${ephemeral.random_password.salt_key.result}"
   secret_string_wo_version = local.generated_secrets_wo_version
 
   lifecycle {
     ignore_changes = [secret_string_wo, secret_string_wo_version]
   }
+}
+
+# Existing keys (for example from a previous deployment whose database is
+# restored here) are used as given and never read by Terraform.
+locals {
+  master_key_secret_arn = coalesce(var.existing_master_key_secret_arn, try(aws_secretsmanager_secret.master_key[0].arn, null))
+  salt_key_secret_arn   = coalesce(var.existing_salt_key_secret_arn, try(aws_secretsmanager_secret.salt_key[0].arn, null))
+}
+
+moved {
+  from = aws_secretsmanager_secret.master_key
+  to   = aws_secretsmanager_secret.master_key[0]
+}
+
+moved {
+  from = aws_secretsmanager_secret_version.master_key
+  to   = aws_secretsmanager_secret_version.master_key[0]
+}
+
+moved {
+  from = aws_secretsmanager_secret.salt_key
+  to   = aws_secretsmanager_secret.salt_key[0]
+}
+
+moved {
+  from = aws_secretsmanager_secret_version.salt_key
+  to   = aws_secretsmanager_secret_version.salt_key[0]
 }
 
 # Redis auth token: the same ephemeral value goes to ElastiCache (redis.tf) and

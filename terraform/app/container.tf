@@ -61,6 +61,9 @@ locals {
         REDIS_SSL                        = "True"
         DISABLE_SCHEMA_UPDATE            = "true"
         LITELLM_LOCAL_MODEL_COST_MAP     = "True" # no start-up fetch from raw.githubusercontent.com
+        NO_DOCS                          = "True" # no Swagger UI (/docs) describing the admin API
+        NO_REDOC                         = "True" # no ReDoc (/redoc) either
+        NO_OPENAPI                       = "True" # nor the OpenAPI document (/openapi.json) behind them
         # uvicorn keep-alive outlasts the ALB idle timeout, so the ALB never
         # reuses a connection the task has just closed (sporadic 502s).
         KEEPALIVE_TIMEOUT = tostring(local.alb_idle_timeout_seconds + 5)
@@ -68,6 +71,9 @@ locals {
       # LiteLLM sees plain HTTP from the ALB; its public HTTPS URL makes it mark
       # the UI session cookie Secure (and builds the SSO callback URL).
       var.allow_insecure_http ? {} : { PROXY_BASE_URL = local.service_url },
+      # A replaced database or cache changes this value: new task definitions,
+      # so the migration runs against it and the tasks read the new secrets.
+      var.data_store_generation == null ? {} : { DATA_STORE_GENERATION = var.data_store_generation },
       var.extra_environment,
     )
 

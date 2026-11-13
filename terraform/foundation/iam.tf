@@ -1,3 +1,5 @@
+data "aws_caller_identity" "current" {}
+
 # Service roles for the foundation's own infrastructure. Scoped to the named
 # resources — no managed full-access policies except AWS's own
 # service-role policy for RDS Enhanced Monitoring.
@@ -12,6 +14,8 @@ resource "aws_iam_role" "vpc_flow_logs" {
       Effect    = "Allow"
       Action    = "sts:AssumeRole"
       Principal = { Service = "vpc-flow-logs.amazonaws.com" }
+      # Only on behalf of this account (confused-deputy protection).
+      Condition = { StringEquals = { "aws:SourceAccount" = data.aws_caller_identity.current.account_id } }
     }]
   })
 }
@@ -41,6 +45,8 @@ resource "aws_iam_role" "rds_enhanced_monitoring" {
       Effect    = "Allow"
       Action    = "sts:AssumeRole"
       Principal = { Service = "monitoring.rds.amazonaws.com" }
+      # Only on behalf of this account (confused-deputy protection).
+      Condition = { StringEquals = { "aws:SourceAccount" = data.aws_caller_identity.current.account_id } }
     }]
   })
 }

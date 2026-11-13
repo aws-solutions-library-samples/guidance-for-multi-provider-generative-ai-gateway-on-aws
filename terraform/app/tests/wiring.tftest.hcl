@@ -393,8 +393,9 @@ run "public_mode_wiring" {
   command = apply
 
   variables {
-    public_mode       = true
-    public_subnet_ids = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
+    public_mode                               = true
+    allow_public_ui_without_identity_provider = true
+    public_subnet_ids                         = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
   }
 
   # Public mode without an identity provider: the plan warns (see the
@@ -455,7 +456,7 @@ run "public_mode_wiring" {
   }
 
   assert {
-    condition     = toset([for f in aws_wafv2_web_acl_logging_configuration.this[0].redacted_fields : f.single_header[0].name]) == toset(["authorization", "x-litellm-api-key", "api-key", "x-api-key", "x-goog-api-key", "ocp-apim-subscription-key", "cookie"])
+    condition     = toset([for f in aws_wafv2_web_acl_logging_configuration.this[0].redacted_fields : f.single_header[0].name if length(f.single_header) > 0]) == toset(["authorization", "x-litellm-api-key", "api-key", "x-api-key", "x-goog-api-key", "ocp-apim-subscription-key", "cookie"])
     error_message = "WAF logs must redact the API-key headers and cookies."
   }
 
@@ -476,7 +477,8 @@ run "public_mode_needs_public_subnets" {
   command = plan
 
   variables {
-    public_mode = true
+    public_mode                               = true
+    allow_public_ui_without_identity_provider = true
   }
 
   # Also public without an identity provider, so the plan warning fires too.
@@ -537,8 +539,9 @@ run "oidc_applied_in_public_mode" {
   command = apply
 
   variables {
-    public_mode       = true
-    public_subnet_ids = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
+    public_mode                               = true
+    allow_public_ui_without_identity_provider = true
+    public_subnet_ids                         = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
     identity_provider = {
       issuer                 = "https://login.example.com/tenant/v2.0"
       authorization_endpoint = "https://login.example.com/tenant/oauth2/v2.0/authorize"
@@ -832,8 +835,9 @@ run "public_with_identity_provider_is_silent" {
   command = plan
 
   variables {
-    public_mode       = true
-    public_subnet_ids = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
+    public_mode                               = true
+    allow_public_ui_without_identity_provider = true
+    public_subnet_ids                         = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
     identity_provider = {
       issuer                 = "https://login.example.com/tenant/v2.0"
       authorization_endpoint = "https://login.example.com/tenant/oauth2/v2.0/authorize"
@@ -849,8 +853,9 @@ run "public_without_identity_provider_warns" {
   command = plan
 
   variables {
-    public_mode       = true
-    public_subnet_ids = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
+    public_mode                               = true
+    allow_public_ui_without_identity_provider = true
+    public_subnet_ids                         = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
   }
 
   expect_failures = [check.public_mode_without_identity_provider]
@@ -894,8 +899,9 @@ run "every_app_log_keeps_ten_years" {
   command = apply
 
   variables {
-    public_mode       = true
-    public_subnet_ids = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
+    public_mode                               = true
+    allow_public_ui_without_identity_provider = true
+    public_subnet_ids                         = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
   }
 
   expect_failures = [check.public_mode_without_identity_provider]
@@ -915,8 +921,9 @@ run "log_groups_survive_destroy_while_protected" {
   command = apply
 
   variables {
-    public_mode       = true
-    public_subnet_ids = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
+    public_mode                               = true
+    allow_public_ui_without_identity_provider = true
+    public_subnet_ids                         = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
   }
 
   expect_failures = [check.public_mode_without_identity_provider]
@@ -931,9 +938,10 @@ run "log_groups_are_destroyable_when_protection_is_off" {
   command = apply
 
   variables {
-    public_mode         = true
-    public_subnet_ids   = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
-    deletion_protection = false
+    public_mode                               = true
+    allow_public_ui_without_identity_provider = true
+    public_subnet_ids                         = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
+    deletion_protection                       = false
   }
 
   expect_failures = [check.public_mode_without_identity_provider]
@@ -1220,9 +1228,10 @@ run "public_mode_rejects_db_unavailable_override" {
   command = plan
 
   variables {
-    public_mode          = true
-    public_subnet_ids    = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
-    config_override_file = "tests/fixtures/allow-db-unavailable.yaml"
+    public_mode                               = true
+    allow_public_ui_without_identity_provider = true
+    public_subnet_ids                         = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
+    config_override_file                      = "tests/fixtures/allow-db-unavailable.yaml"
   }
 
   expect_failures = [terraform_data.litellm_config, check.db_unavailable_requests_not_allowed, check.public_mode_without_identity_provider]
@@ -1232,8 +1241,9 @@ run "waf_does_not_sample_requests" {
   command = plan
 
   variables {
-    public_mode       = true
-    public_subnet_ids = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
+    public_mode                               = true
+    allow_public_ui_without_identity_provider = true
+    public_subnet_ids                         = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
   }
 
   expect_failures = [check.public_mode_without_identity_provider]
@@ -1352,5 +1362,97 @@ run "inference_profiles_pinned_to_the_account" {
   assert {
     condition     = !strcontains(aws_iam_role_policy.task.policy, ":*:inference-profile/") && !strcontains(aws_iam_role_policy.task.policy, ":*:application-inference-profile/")
     error_message = "Inference-profile ARNs must name this account, not any account."
+  }
+}
+
+# --- Second review round ---
+
+run "public_mode_without_identity_provider_needs_opt_in" {
+  command = plan
+
+  variables {
+    public_mode       = true
+    public_subnet_ids = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
+  }
+
+  expect_failures = [terraform_data.litellm_config, check.public_mode_without_identity_provider]
+}
+
+run "api_docs_are_off" {
+  command = plan
+
+  assert {
+    condition = (
+      { for e in jsondecode(aws_ecs_task_definition.litellm.container_definitions)[0].environment : e.name => e.value }["NO_DOCS"] == "True" &&
+      { for e in jsondecode(aws_ecs_task_definition.litellm.container_definitions)[0].environment : e.name => e.value }["NO_REDOC"] == "True" &&
+      { for e in jsondecode(aws_ecs_task_definition.litellm.container_definitions)[0].environment : e.name => e.value }["NO_OPENAPI"] == "True"
+    )
+    error_message = "LiteLLM's Swagger and ReDoc pages must be off."
+  }
+}
+
+run "data_store_generation_reaches_both_task_definitions" {
+  command = plan
+
+  variables {
+    data_store_generation = "0123456789abcdef"
+  }
+
+  assert {
+    condition = (
+      { for e in jsondecode(aws_ecs_task_definition.litellm.container_definitions)[0].environment : e.name => e.value }["DATA_STORE_GENERATION"] == "0123456789abcdef" &&
+      { for e in jsondecode(aws_ecs_task_definition.migrate.container_definitions)[0].environment : e.name => e.value }["DATA_STORE_GENERATION"] == "0123456789abcdef"
+    )
+    error_message = "A data-store replacement must change both task definitions, so the tasks roll and the migration runs."
+  }
+}
+
+run "oidc_session_timeout_defaults_to_twelve_hours" {
+  command = plan
+
+  variables {
+    identity_provider = {
+      issuer                 = "https://login.example.com"
+      authorization_endpoint = "https://login.example.com/authorize"
+      token_endpoint         = "https://login.example.com/token"
+      user_info_endpoint     = "https://login.example.com/userinfo"
+      client_id              = "client"
+      client_secret_arn      = "arn:aws:secretsmanager:eu-west-1:111111111111:secret:idp-AbCdEf"
+    }
+  }
+
+  assert {
+    condition     = alltrue([for r in aws_lb_listener_rule.ui_oidc : r.action[0].authenticate_oidc[0].session_timeout == 43200])
+    error_message = "The load balancer sign-in session must default to 12 hours."
+  }
+}
+
+run "customer_key_use_limited_to_its_services" {
+  command = plan
+
+  variables {
+    kms_key_arn = "arn:aws:kms:eu-west-1:111111111111:key/00000000-0000-0000-0000-000000000000"
+  }
+
+  assert {
+    condition     = strcontains(aws_iam_role_policy.execution.policy, "kms:ViaService") && strcontains(aws_iam_role_policy.execution.policy, "secretsmanager.") && strcontains(aws_iam_role_policy.task.policy, "kms:ViaService") && strcontains(aws_iam_role_policy.task.policy, "\"s3.")
+    error_message = "The roles may use the customer key only through Secrets Manager (execution role) and S3 (task role)."
+  }
+}
+
+run "waf_logs_redact_the_query_string" {
+  command = plan
+
+  variables {
+    public_mode                               = true
+    allow_public_ui_without_identity_provider = true
+    public_subnet_ids                         = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
+  }
+
+  expect_failures = [check.public_mode_without_identity_provider]
+
+  assert {
+    condition     = length([for f in aws_wafv2_web_acl_logging_configuration.this[0].redacted_fields : f if length(f.query_string) > 0]) == 1
+    error_message = "WAF logs must redact the query string."
   }
 }

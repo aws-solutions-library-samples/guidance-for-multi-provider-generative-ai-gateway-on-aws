@@ -55,13 +55,13 @@ output "config_bucket_name" {
 }
 
 output "master_key_secret_arn" {
-  description = "Secrets Manager ARN of the generated LiteLLM master key."
-  value       = aws_secretsmanager_secret.master_key.arn
+  description = "Secrets Manager ARN of the LiteLLM master key (generated, or existing_master_key_secret_arn)."
+  value       = local.master_key_secret_arn
 }
 
 output "salt_key_secret_arn" {
-  description = "Secrets Manager ARN of the generated LiteLLM salt key (never rotate it)."
-  value       = aws_secretsmanager_secret.salt_key.arn
+  description = "Secrets Manager ARN of the LiteLLM salt key (generated, or existing_salt_key_secret_arn; never rotate it)."
+  value       = local.salt_key_secret_arn
 }
 
 output "ui_password_secret_arn" {
@@ -99,4 +99,13 @@ output "redis_num_cache_clusters" {
 output "vpn_security_group_id" {
   description = "Security group of the demo Client VPN, to admit on the gateway entry point; null when create_vpn is false."
   value       = var.create_vpn ? module.vpn[0].security_group_id : null
+}
+
+output "data_store_generation" {
+  description = "Changes whenever the database or the cache is replaced (their connection secrets are re-written). The app puts it in the task environment, so a replacement rolls the tasks and re-runs the schema migration. Not secret."
+  value = substr(sha256(join("/", [
+    aws_db_instance.database.resource_id,
+    aws_secretsmanager_secret_version.database_url.version_id,
+    aws_secretsmanager_secret_version.redis_auth.version_id,
+  ])), 0, 16)
 }

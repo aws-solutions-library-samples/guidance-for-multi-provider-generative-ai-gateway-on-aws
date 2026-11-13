@@ -78,10 +78,11 @@ run "insecure_http_in_public_mode_rejected" {
   command = plan
 
   variables {
-    certificate_arn     = null
-    allow_insecure_http = true
-    public_mode         = true
-    public_subnet_ids   = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
+    certificate_arn                           = null
+    allow_insecure_http                       = true
+    public_mode                               = true
+    allow_public_ui_without_identity_provider = true
+    public_subnet_ids                         = ["subnet-0fedcba9876543210", "subnet-0fedcba9876543211"]
   }
 
   expect_failures = [var.allow_insecure_http]

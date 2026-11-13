@@ -49,7 +49,7 @@ flowchart LR
             migrate["One-off migration task"]
             rds[("RDS PostgreSQL<br/>Multi-AZ")]
             redis[("ElastiCache Redis<br/>primary + replica")]
-            nat["NAT gateway"]
+            nat["NAT gateway per AZ"]
         end
         bedrock["Amazon Bedrock"]
         secrets["Secrets Manager"]
@@ -120,8 +120,15 @@ flowchart LR
 ## Deployment Options
 
 The gateway deploys as a trial (private, plain HTTP, demo VPN; for testing only), as the recommended
-private deployment with HTTPS, DNS, an identity provider and a LiteLLM licence, or in public mode behind AWS
-WAF. Follow [docs/deployment.md](docs/deployment.md); every input and output is listed in
+private deployment with HTTPS, DNS and an identity provider (open-source LiteLLM, with an optional LiteLLM
+Enterprise licence), or in public mode behind AWS WAF. Moving from version 1 of this Guidance:
+[docs/migration-v1-to-v2.md](docs/migration-v1-to-v2.md). The published Implementation Guide and workshop
+describe version 1 ([source](https://github.com/aws-solutions-library-samples/guidance-for-multi-provider-generative-ai-gateway-on-aws/tree/6e7cc78)).
+
+Sizing has defaults: database `db.t4g.large`, cache `cache.t3.micro`, tasks with 2 vCPU and 4 GiB scaling
+between 2 and 20, and alarm thresholds that fit them. If your workload needs different values, adapt them in the
+code (`terraform/foundation/rds.tf`, `terraform/foundation/redis.tf`, `terraform/app/container.tf`,
+`terraform/app/ecs.tf`). Follow [docs/deployment.md](docs/deployment.md); every input and output is listed in
 [docs/configuration.md](docs/configuration.md).
 
 ## Cost
@@ -269,7 +276,9 @@ identity provider and DEBUG logging also print a warning on every plan.
 
 - Keep the LiteLLM image up to date; follow the [LiteLLM release notes](https://docs.litellm.ai/release_notes).
 - Give applications LiteLLM virtual keys with budgets and rate limits; keep the master key for administration.
-- Configure an identity provider, especially in public mode.
+- Configure an identity provider, especially in public mode (public mode without one needs an explicit opt-in).
+- LiteLLM's API documentation (Swagger UI, ReDoc and `/openapi.json`) is turned off, so the admin API is not
+  described to anyone who reaches the gateway.
 - Review IAM permissions, client ranges and LiteLLM users and teams regularly.
 
 ## Repository structure

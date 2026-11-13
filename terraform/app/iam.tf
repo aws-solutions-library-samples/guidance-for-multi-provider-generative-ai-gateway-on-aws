@@ -57,10 +57,11 @@ locals {
         },
       ],
       var.kms_key_arn != null ? [{
-        Sid      = "DecryptWithCustomerKey"
-        Effect   = "Allow"
-        Action   = "kms:Decrypt"
-        Resource = var.kms_key_arn
+        Sid       = "DecryptWithCustomerKey"
+        Effect    = "Allow"
+        Action    = "kms:Decrypt"
+        Resource  = var.kms_key_arn
+        Condition = { StringEquals = { "kms:ViaService" = "secretsmanager.${data.aws_region.current.region}.amazonaws.com" } }
       }] : [],
       local.ecr_image != null ? [
         {
@@ -140,10 +141,11 @@ locals {
         Resource = var.cross_account_role_arns
       }] : [],
       var.kms_key_arn != null ? [{
-        Sid      = "DecryptConfigAndEncryptLogs"
-        Effect   = "Allow"
-        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
-        Resource = var.kms_key_arn
+        Sid       = "DecryptConfigAndEncryptLogs"
+        Effect    = "Allow"
+        Action    = ["kms:Decrypt", "kms:GenerateDataKey"]
+        Resource  = var.kms_key_arn
+        Condition = { StringEquals = { "kms:ViaService" = "s3.${data.aws_region.current.region}.amazonaws.com" } }
       }] : [],
     )
   })

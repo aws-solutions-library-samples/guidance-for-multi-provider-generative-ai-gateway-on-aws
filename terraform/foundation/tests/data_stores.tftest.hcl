@@ -30,13 +30,13 @@ override_resource {
 }
 
 override_resource {
-  target          = aws_secretsmanager_secret.master_key
+  target          = aws_secretsmanager_secret.master_key[0]
   override_during = plan
   values          = { arn = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:llmgw-master-key-abc" }
 }
 
 override_resource {
-  target          = aws_secretsmanager_secret.salt_key
+  target          = aws_secretsmanager_secret.salt_key[0]
   override_during = plan
   values          = { arn = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:llmgw-salt-key-abc" }
 }
@@ -172,8 +172,8 @@ run "secrets_have_recovery_windows_and_stay_out_of_outputs" {
 
   assert {
     condition = alltrue([
-      aws_secretsmanager_secret.master_key.recovery_window_in_days == 7,
-      aws_secretsmanager_secret.salt_key.recovery_window_in_days == 7,
+      aws_secretsmanager_secret.master_key[0].recovery_window_in_days == 7,
+      aws_secretsmanager_secret.salt_key[0].recovery_window_in_days == 7,
       aws_secretsmanager_secret.redis_auth.recovery_window_in_days == 7,
       aws_secretsmanager_secret.ui_password.recovery_window_in_days == 7,
       aws_secretsmanager_secret.database_url.recovery_window_in_days == 7,
@@ -182,7 +182,7 @@ run "secrets_have_recovery_windows_and_stay_out_of_outputs" {
   }
 
   assert {
-    condition     = output.master_key_secret_arn == aws_secretsmanager_secret.master_key.arn && output.salt_key_secret_arn == aws_secretsmanager_secret.salt_key.arn
+    condition     = output.master_key_secret_arn == aws_secretsmanager_secret.master_key[0].arn && output.salt_key_secret_arn == aws_secretsmanager_secret.salt_key[0].arn
     error_message = "Outputs must expose the master/salt key secret ARNs (never values)."
   }
 
@@ -211,8 +211,8 @@ run "customer_kms_key_covers_db_redis_secrets_logs_s3" {
 
   assert {
     condition = alltrue([
-      aws_secretsmanager_secret.master_key.kms_key_id == var.kms_key_arn,
-      aws_secretsmanager_secret.salt_key.kms_key_id == var.kms_key_arn,
+      aws_secretsmanager_secret.master_key[0].kms_key_id == var.kms_key_arn,
+      aws_secretsmanager_secret.salt_key[0].kms_key_id == var.kms_key_arn,
       aws_secretsmanager_secret.redis_auth.kms_key_id == var.kms_key_arn,
       aws_secretsmanager_secret.ui_password.kms_key_id == var.kms_key_arn,
       aws_secretsmanager_secret.database_url.kms_key_id == var.kms_key_arn,
@@ -377,8 +377,8 @@ run "generated_secrets_never_reach_state" {
   assert {
     condition = alltrue([
       for v in [
-        aws_secretsmanager_secret_version.master_key,
-        aws_secretsmanager_secret_version.salt_key,
+        aws_secretsmanager_secret_version.master_key[0],
+        aws_secretsmanager_secret_version.salt_key[0],
         aws_secretsmanager_secret_version.redis_auth,
         aws_secretsmanager_secret_version.ui_password,
         aws_secretsmanager_secret_version.database_url,

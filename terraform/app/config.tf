@@ -49,6 +49,10 @@ resource "terraform_data" "litellm_config" {
 
   lifecycle {
     precondition {
+      condition     = !(var.public_mode && var.identity_provider == null) || var.allow_public_ui_without_identity_provider
+      error_message = "Public mode without identity_provider would make the LiteLLM admin UI reachable from the internet behind only the UI password and WAF. Configure identity_provider, or set allow_public_ui_without_identity_provider = true to proceed deliberately."
+    }
+    precondition {
       condition     = !(var.public_mode && try(local.litellm_config.general_settings.allow_requests_on_db_unavailable, false) == true)
       error_message = "config_override_file sets general_settings.allow_requests_on_db_unavailable: true, which public mode rejects. During a database outage LiteLLM would then admit any request whose bearer token starts with sk-, without key, team or budget checks, from the internet. Remove the setting."
     }
@@ -81,8 +85,8 @@ check "public_mode_without_identity_provider" {
       spend for every team.
       Fix: configure identity_provider, so the ALB requires sign-in in front of
       the UI paths (API paths keep LiteLLM key authentication).
-      To proceed deliberately without it, apply this plan as is; this warning
-      does not block the deployment and repeats on every plan.
+      allow_public_ui_without_identity_provider = true allows this deliberately;
+      the warning then repeats on every plan.
     EOT
   }
 }

@@ -291,7 +291,7 @@ variable "cross_account_role_arns" {
 # request-count restarts). Overriding any of them through the free-form maps
 # would silently replace the stack's wiring.
 locals {
-  reserved_env_names    = ["LITELLM_LOG", "JSON_LOGS", "UI_USERNAME", "DISABLE_SCHEMA_UPDATE", "LITELLM_LOCAL_MODEL_COST_MAP", "MAX_REQUESTS_BEFORE_RESTART", "NUM_WORKERS", "KEEPALIVE_TIMEOUT", "DATABASE_URL", "LITELLM_MASTER_KEY", "LITELLM_SALT_KEY", "UI_PASSWORD", "LITELLM_LICENSE"]
+  reserved_env_names    = ["LITELLM_LOG", "JSON_LOGS", "UI_USERNAME", "DISABLE_SCHEMA_UPDATE", "LITELLM_LOCAL_MODEL_COST_MAP", "MAX_REQUESTS_BEFORE_RESTART", "NUM_WORKERS", "KEEPALIVE_TIMEOUT", "DATABASE_URL", "LITELLM_MASTER_KEY", "LITELLM_SALT_KEY", "UI_PASSWORD", "LITELLM_LICENSE", "DATA_STORE_GENERATION", "NO_DOCS", "NO_REDOC", "NO_OPENAPI"]
   reserved_env_prefixes = ["REDIS_", "LITELLM_CONFIG_"]
 }
 
@@ -340,4 +340,27 @@ variable "image_uri" {
   description = "Override of the LiteLLM image URI, for air-gapped deployments pulling from a private registry (e.g. a copy made with deploy/mirror-image.sh). For a private ECR URI (<account>.dkr.ecr.<region>.amazonaws.com/<repository>...) the execution role gets pull rights on that repository only; other registries get no extra permissions. null uses the pinned upstream image."
   type        = string
   default     = null
+}
+
+variable "data_store_generation" {
+  description = "Foundation output: changes when the database or the cache is replaced; a change rolls the tasks and re-runs the migration."
+  type        = string
+  default     = null
+}
+
+variable "identity_provider_session_timeout_seconds" {
+  description = "How long the load balancer's sign-in session lasts before users sign in at the identity provider again. Default 12 hours (the load balancer's own default is 7 days)."
+  type        = number
+  default     = 43200
+
+  validation {
+    condition     = var.identity_provider_session_timeout_seconds >= 300 && var.identity_provider_session_timeout_seconds <= 604800
+    error_message = "identity_provider_session_timeout_seconds must be between 300 (5 minutes) and 604800 (7 days)."
+  }
+}
+
+variable "allow_public_ui_without_identity_provider" {
+  description = "Public mode without identity_provider is rejected unless this is true: the LiteLLM admin UI would then be reachable from the internet behind only the UI password and WAF. Even when true, every plan warns."
+  type        = bool
+  default     = false
 }
