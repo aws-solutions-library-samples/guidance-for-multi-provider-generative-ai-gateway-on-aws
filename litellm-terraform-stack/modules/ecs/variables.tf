@@ -202,6 +202,12 @@ variable "certificate_arn" {
   default     = ""
 }
 
+variable "cloudfront_certificate_arn" {
+  description = "ARN of the us-east-1 ACM certificate for the CloudFront distribution. Falls back to certificate_arn when empty."
+  type        = string
+  default     = ""
+}
+
 variable "wafv2_acl_arn" {
   description = "ARN of the WAFv2 ACL"
   type        = string

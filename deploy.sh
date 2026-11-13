@@ -346,6 +346,9 @@ export TF_VAR_record_name=$RECORD_NAME
 export TF_VAR_hosted_zone_name=$HOSTED_ZONE_NAME
 export TF_VAR_create_private_hosted_zone_in_existing_vpc=$CREATE_PRIVATE_HOSTED_ZONE_IN_EXISTING_VPC
 export TF_VAR_certificate_arn=$CERTIFICATE_ARN
+# Optional: only set when CloudFront needs a us-east-1 certificate distinct from
+# the ALB one. Tolerate a pre-existing .env that predates this variable.
+export TF_VAR_cloudfront_certificate_arn=${CLOUDFRONT_CERTIFICATE_ARN:-}
 export TF_VAR_architecture=$ARCH
 export TF_VAR_disable_outbound_network_access=$DISABLE_OUTBOUND_NETWORK_ACCESS
 export TF_VAR_desired_capacity=$DESIRED_CAPACITY

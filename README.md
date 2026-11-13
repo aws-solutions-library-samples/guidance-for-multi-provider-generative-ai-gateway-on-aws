@@ -146,7 +146,8 @@ CERTIFICATE_ARN="arn:aws:acm:region:account:certificate/certificate-id"
 | `CLOUDFRONT_PRICE_CLASS` | `PriceClass_100` | CloudFront price class (100/200/All) |
 | `HOSTED_ZONE_NAME` | `""` | Route53 hosted zone name for custom domain |
 | `RECORD_NAME` | `""` | Record to create in Route53 (subdomain) |
-| `CERTIFICATE_ARN` | `""` | ARN of ACM certificate for custom domain |
+| `CERTIFICATE_ARN` | `""` | ARN of ACM certificate for custom domain (must be in the deployment region, for the ALB listener) |
+| `CLOUDFRONT_CERTIFICATE_ARN` | `""` | ARN of the ACM certificate CloudFront serves. CloudFront only accepts certificates issued in `us-east-1`. Required when `USE_CLOUDFRONT=true`, `USE_ROUTE53=true` and the deployment region is not `us-east-1`; leave empty to reuse `CERTIFICATE_ARN` |
 
 ### Security Considerations
 

@@ -210,6 +210,22 @@ variable "certificate_arn" {
   default     = ""
 }
 
+variable "cloudfront_certificate_arn" {
+  description = <<-EOT
+    ARN of the ACM certificate used by the CloudFront distribution.
+    CloudFront only accepts certificates issued in us-east-1, whereas the ALB
+    listener requires a certificate in the deployment region. Leave empty to
+    fall back to certificate_arn, which is correct when deploying in us-east-1.
+  EOT
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.cloudfront_certificate_arn == "" || can(regex("^arn:aws[a-z-]*:acm:us-east-1:", var.cloudfront_certificate_arn))
+    error_message = "cloudfront_certificate_arn must be an ACM certificate in us-east-1, because CloudFront accepts viewer certificates only from that region."
+  }
+}
+
 variable "record_name" {
   description = "Record name for the ingress. Required if use_route53 is true."
   type        = string

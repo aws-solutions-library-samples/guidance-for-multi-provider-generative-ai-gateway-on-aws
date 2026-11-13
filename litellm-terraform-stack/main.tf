@@ -77,6 +77,7 @@ module "ecs_cluster" {
   okta_audience = var.okta_audience
   okta_issuer = var.okta_issuer
   certificate_arn = var.certificate_arn
+  cloudfront_certificate_arn = var.cloudfront_certificate_arn
   wafv2_acl_arn = module.base.WafAclArn
   record_name = var.record_name
   hosted_zone_name = var.hosted_zone_name

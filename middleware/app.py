@@ -823,13 +823,18 @@ async def get_chat_stream(
                 # Yield as a Server-Sent Event
                 yield f"data: {json.dumps(chunk_dict)}\n\n".encode("utf-8")
 
-                # Optionally accumulate partial content
-                choice = chunk_dict["choices"][0]
-                delta = choice.get("delta", {})
-                finish_reason = choice.get("finish_reason", None)
+                # Optionally accumulate partial content.
+                # Some chunks (e.g. upstream error chunks like {"error": {...}} or
+                # usage-only chunks) do not contain "choices"; guard against them so
+                # the stream is forwarded gracefully instead of crashing with KeyError.
+                choices = chunk_dict.get("choices") or []
+                if choices:
+                    choice = choices[0]
+                    delta = choice.get("delta", {})
+                    finish_reason = choice.get("finish_reason", None)
 
-                if history_enabled and "content" in delta and delta["content"]:
-                    assistant_content_parts.append(delta["content"])
+                    if history_enabled and "content" in delta and delta["content"]:
+                        assistant_content_parts.append(delta["content"])
 
                 # You could break if finish_reason == "stop", if desired
                 # if finish_reason == "stop":
@@ -843,6 +848,11 @@ async def get_chat_stream(
                 }
                 chat_history.append(assistant_message)
                 update_chat_history(session_id, chat_history)
+
+            # Always emit the OpenAI SSE terminator so OpenAI-compatible clients
+            # (e.g. Raycast) can detect the end of the stream. LiteLLM sends
+            # "data: [DONE]" upstream, but it is consumed above; re-emit it here.
+            yield "data: [DONE]\n\n".encode("utf-8")
 
         finally:
             # Very important: Close the session once we're done streaming.

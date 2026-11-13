@@ -29,3 +29,42 @@ model_list:
     litellm_params:
       model: bedrock/apac.anthropic.claude-3-5-sonnet-20241022-v2:0
 
+
+  # --- Added: Claude Opus 4.8 (GLOBAL inference profile, resolves in ap-northeast-2) ---
+  - model_name: bedrock-claude-opus-4-8
+    litellm_params:
+      model: bedrock/global.anthropic.claude-opus-4-8
+
+  # --- Added: Claude Opus 5 (GLOBAL inference profile, ACTIVE in ap-northeast-2) ---
+  # Thinking is on by default on Opus 5 (a behavior change from Opus 4.8).
+  - model_name: bedrock-claude-opus-5
+    litellm_params:
+      model: bedrock/global.anthropic.claude-opus-5
+      drop_params: true
+
+  # --- Added: Claude Opus 5 with thinking disabled, for OpenAI-compatible clients ---
+  # With thinking active, LiteLLM puts thinking_blocks (list) and
+  # provider_specific_fields (dict) inside the streaming delta. Strict
+  # OpenAI-compatible clients such as Raycast fail to decode those and report
+  # "Failed to decode the response". Disabling thinking leaves the delta with
+  # only content and role, matching the shape those clients expect.
+  - model_name: bedrock-claude-opus-5-chat
+    litellm_params:
+      model: bedrock/global.anthropic.claude-opus-5
+      drop_params: true
+      thinking: { type: disabled }
+
+  # --- Added: OpenAI GPT-OSS on Bedrock (only available in us-west-2 -> cross-region call) ---
+  - model_name: bedrock-gpt-oss-120b
+    litellm_params:
+      model: bedrock/openai.gpt-oss-120b-1:0
+      aws_region_name: us-west-2
+
+  - model_name: bedrock-gpt-oss-20b
+    litellm_params:
+      model: bedrock/openai.gpt-oss-20b-1:0
+      aws_region_name: us-west-2
+
+  - model_name: bedrock-claude-sonnet-4-5
+    litellm_params:
+      model: bedrock/global.anthropic.claude-sonnet-4-5-20250929-v1:0
