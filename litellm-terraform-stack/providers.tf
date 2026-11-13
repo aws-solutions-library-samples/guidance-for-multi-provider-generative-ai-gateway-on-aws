@@ -30,19 +30,13 @@ provider "aws" {
   }
 }
 
-resource "aws_servicecatalogappregistry_application" "solution_application" {
-  name        = "${local.SolutionNameKeySatisfyingRestrictions}-${data.aws_region.current.name}-${data.aws_caller_identity.current.account_id}"
-  description = "Service Catalog application to track and manage all your resources for the solution ${local.common_labels.SolutionNameKey}"
-
-  tags = {
-    "Solutions:SolutionID"      = local.common_labels.SolutionID
-    "Solutions:SolutionName"    = local.common_labels.SolutionNameKey
-    "Solutions:SolutionVersion" = local.common_labels.SolutionVersionKey
-    "Solutions:ApplicationType" = "AWS-Solutions"
-  }
-}
-
-
+# NOTE: AWS Service Catalog AppRegistry entered maintenance mode on July 30, 2026
+# and rejects CreateApplication for accounts that have not previously used it
+# (AccessDeniedException / 403). This resource was tracking-only (it grouped and
+# tagged solution resources for inventory) and had no functional role, so it has
+# been removed to allow deployment to proceed. The solution's resources are still
+# tagged via the provider default_tags above.
+# See: https://docs.aws.amazon.com/servicecatalog/latest/arguide/app-registry-availability-change.html
 
 data "aws_eks_cluster_auth" "cluster" {
   count = local.platform == "EKS" ? 1 : 0
