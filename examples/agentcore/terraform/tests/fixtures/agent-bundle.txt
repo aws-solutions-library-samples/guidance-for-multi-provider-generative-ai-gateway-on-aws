@@ -1,0 +1,1 @@
+Stand-in for the agent code bundle: the mocked plan only hashes this file.

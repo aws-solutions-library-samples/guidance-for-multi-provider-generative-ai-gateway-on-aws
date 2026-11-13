@@ -1,7 +1,0 @@
-model_list:
-#Bedrock Models
-  - model_name: amazon.titan-embed-text-v2:0
-    litellm_params:
-      model: bedrock/amazon.titan-embed-text-v2:0
-      drop_params: true #Needed to avoid errors when encoding_format is passed in by openai python client
-

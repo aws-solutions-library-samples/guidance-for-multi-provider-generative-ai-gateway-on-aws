@@ -1,0 +1,4 @@
+# Local test and lint tooling (not packaged).
+-r requirements.txt
+pytest==8.4.2
+ruff==0.14.3

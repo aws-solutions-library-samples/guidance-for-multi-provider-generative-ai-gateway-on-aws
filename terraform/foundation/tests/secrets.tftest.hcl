@@ -1,0 +1,82 @@
+# Generated secrets written once and salt-key protection, applied against a mocked
+# AWS provider (no credentials, no AWS) with the real, local random provider
+# (mock providers do not support ephemeral resources). Only the secrets are
+# applied, so unrelated resources need no realistic mock values.
+
+mock_provider "aws" {
+  mock_data "aws_region" {
+    defaults = { region = "eu-west-1" }
+  }
+  mock_data "aws_availability_zones" {
+    defaults = { names = ["eu-west-1a", "eu-west-1b"] }
+  }
+  mock_data "aws_network_interfaces" {
+    defaults = { ids = ["eni-vpce-1"] }
+  }
+}
+
+provider "random" {}
+
+variables {
+  deployment_name = "llmgw"
+}
+
+run "secrets_created_at_version_1" {
+  command = apply
+
+  plan_options {
+    target = [
+      aws_secretsmanager_secret_version.master_key[0],
+      aws_secretsmanager_secret_version.salt_key[0],
+      aws_secretsmanager_secret_version.ui_password,
+    ]
+  }
+
+  assert {
+    condition     = aws_secretsmanager_secret_version.master_key[0].secret_string_wo_version == 1 && aws_secretsmanager_secret_version.salt_key[0].secret_string_wo_version == 1
+    error_message = "Generated secrets are created at version 1."
+  }
+}
+
+# A second apply generates new ephemeral values; none is re-sent, so the salt
+# key keeps its first value.
+run "reapply_never_rewrites_the_salt_key" {
+  command = apply
+
+  plan_options {
+    target = [
+      aws_secretsmanager_secret_version.master_key[0],
+      aws_secretsmanager_secret_version.salt_key[0],
+      aws_secretsmanager_secret_version.ui_password,
+    ]
+  }
+
+  assert {
+    condition     = aws_secretsmanager_secret_version.salt_key[0].secret_string_wo_version == 1 && aws_secretsmanager_secret_version.salt_key[0].secret_string == null
+    error_message = "The salt key must never be re-sent: a new value makes every stored provider credential unreadable."
+  }
+}
+
+run "existing_keys_are_used_as_given" {
+  command = plan
+
+  variables {
+    existing_master_key_secret_arn = "arn:aws:secretsmanager:eu-west-1:111111111111:secret:v1-master-AbCdEf"
+    existing_salt_key_secret_arn   = "arn:aws:secretsmanager:eu-west-1:111111111111:secret:v1-salt-AbCdEf"
+  }
+
+  assert {
+    condition     = length(aws_secretsmanager_secret.master_key) == 0 && length(aws_secretsmanager_secret.salt_key) == 0 && output.master_key_secret_arn == var.existing_master_key_secret_arn && output.salt_key_secret_arn == var.existing_salt_key_secret_arn
+    error_message = "Existing master and salt keys must be used as given, with no new secrets."
+  }
+}
+
+run "existing_key_must_be_a_plain_secret_arn" {
+  command = plan
+
+  variables {
+    existing_salt_key_secret_arn = "arn:aws:secretsmanager:eu-west-1:111111111111:secret:v1-AbCdEf:LITELLM_SALT_KEY::"
+  }
+
+  expect_failures = [var.existing_salt_key_secret_arn]
+}

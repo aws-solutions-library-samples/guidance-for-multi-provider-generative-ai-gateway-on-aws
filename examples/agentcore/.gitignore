@@ -1,0 +1,4 @@
+build/
+terraform/terraform.tfvars
+terraform/.terraform/
+.agentcore.json

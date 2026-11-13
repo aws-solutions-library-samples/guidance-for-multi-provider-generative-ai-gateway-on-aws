@@ -1,0 +1,71 @@
+# LiteLLM base configuration, rendered by terraform/app/config.tf (templatefile).
+# Nothing here is ECS-specific: every runtime value comes from an environment
+# variable, so the same rendered file loads from S3 (or as a ConfigMap) on EKS.
+
+environment_variables:
+  STORE_MODEL_IN_DB: "True"
+  # Do not set LITELLM_LOG here: it would override the log_level Terraform input.
+  # At DEBUG, LiteLLM writes every prompt and response to the logs.
+
+general_settings:
+  # The ALB is the reverse proxy LiteLLM needs to be told about:
+  # attribute UI sign-in attempts to the client, not to the ALB.
+  trusted_proxy_ranges: ${jsonencode(trusted_proxy_ranges)}
+  # Spend is written to the database in batches every 60 s (LiteLLM default
+  # 10 s): fewer, larger writes on the shared database. Trade-off: a task that
+  # stops without a graceful shutdown loses up to 60 s of spend records, and
+  # persisted spend (budgets across tasks) lags by up to a minute.
+  proxy_batch_write_at: 60
+
+litellm_settings:
+  json_logs: true
+  # Keeps prompts and responses out of every logging callback (S3, Langfuse, ...);
+  # spend and metadata are still logged.
+  turn_off_message_logging: true
+
+  cache: true
+  cache_params:
+    type: redis
+    host: os.environ/REDIS_HOST
+    port: os.environ/REDIS_PORT
+    password: os.environ/REDIS_PASSWORD
+    ssl: true # ElastiCache requires TLS; explicit, so the file works without REDIS_SSL
+
+  # Request logs (metadata only, see above) to S3: the audit trail kept from the
+  # original guidance.
+  success_callback: ["s3"]
+  failure_callback: ["s3"]
+  service_callback: ["s3"]
+  s3_callback_params:
+    s3_bucket_name: ${jsonencode(request_log_bucket)}
+    s3_region_name: ${jsonencode(region)}
+
+router_settings:
+  # simple-shuffle is LiteLLM's recommended routing strategy; usage-based
+  # routing adds a Redis round trip to every request. Redis stays attached so
+  # RPM/TPM limits are shared across tasks.
+  routing_strategy: simple-shuffle
+  redis_host: os.environ/REDIS_HOST
+  redis_port: os.environ/REDIS_PORT
+  redis_password: os.environ/REDIS_PASSWORD
+  redis_ssl: true # ElastiCache requires TLS; explicit, so the file works without REDIS_SSL
+
+  # Per-attempt timeouts make retries and fallbacks possible at all (LiteLLM's
+  # own request timeout is 6000 s). Worst case for one non-streaming request:
+  # (1 + Timeout retries) x timeout = 3 x 120 s = 360 s, inside the ALB idle
+  # timeout (600 s, alb.tf). Streams send bytes, so the
+  # idle timer does not run during a stream.
+  timeout: 120
+  stream_timeout: 180
+  num_retries: 3
+  retry_after: 0
+  allowed_fails: 3
+  cooldown_time: 5
+  # No retries for errors a retry cannot fix; bounded retries otherwise.
+  retry_policy:
+    AuthenticationErrorRetries: 0
+    BadRequestErrorRetries: 0
+    ContentPolicyViolationErrorRetries: 0
+    RateLimitErrorRetries: 3
+    TimeoutErrorRetries: 2
+    InternalServerErrorRetries: 1
